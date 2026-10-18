@@ -21,7 +21,14 @@ from pydantic import ValidationError
 
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import RepoState
-from wavedevsecops.engine.operations import OpContext, Projection, StepOutcome, WorkspaceEngine
+from wavedevsecops.engine.designation import accepted_types, mark_views
+from wavedevsecops.engine.operations import (
+    OpContext,
+    Projection,
+    Projector,
+    StepOutcome,
+    WorkspaceEngine,
+)
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import StepObserved, StepVerdict
 from wavedevsecops.scenarios import STEP_TYPES, Scenario, ScenarioError, load_scenario
@@ -90,6 +97,33 @@ class StepRunner:
     def _run(self, layout: Layout) -> dict[str, Any] | None:
         return load_run(layout) if layout.run_json.exists() else None
 
+    def designating(self, projector: Projector) -> Projector:
+        """Projecteur qui marque `designable` selon l'étape courante (désignation, story 5.2) :
+        les éléments des types acceptés, et eux seuls, quand l'étape courante est une
+        désignation ; sinon les vues restent telles quelles."""
+
+        def project(ctx: OpContext) -> Projection:
+            projection = projector(ctx)
+            try:
+                run = self._run(ctx.layout)
+                scenario = self.scenario(run) if run is not None else None
+                step = (
+                    next(
+                        (s for s in scenario.steps if s.step_id == (run or {}).get("step_id")), None
+                    )
+                    if scenario
+                    else None
+                )
+                accept = accepted_types(step)
+            except Exception:  # noqa: BLE001 - un `run.json` illisible ne bloque pas la projection
+                log.exception("Marques designable de %s", ctx.workspace_id)
+                return projection
+            if accept is None:
+                return projection
+            return replace(projection, views=mark_views(projection.views, accept))
+
+        return project
+
     # ------------------------------------------------------------ validation
     def validate(self, ctx: OpContext, projection: Projection) -> StepOutcome | None:
         """Verdict de l'étape courante sur l'état projeté ; `None` : rien à publier."""
@@ -129,9 +163,16 @@ class StepRunner:
             )
             facts = self._quiz_facts(run, [step.step_id])
             facts += self._facts_of(run, [step.step_id], finished=following is None)
+            after = accepted_types(steps[index + 1]) if index + 1 < len(steps) else None
+            remarked = (
+                mark_views(projection.views, after)
+                if accepted_types(step) != after  # entrée dans une désignation, ou sortie
+                else None
+            )
             return replace(
                 StepOutcome.explained(published, step.explanation_text, step.explain_ref),
                 facts=tuple(facts),
+                views=remarked,
             )
         published = StepVerdict(
             step_id=step.step_id,
@@ -152,7 +193,21 @@ class StepRunner:
             "scenario_id": run.get("scenario_id"),
             "mode": run.get("mode"),
         }
-        facts = [{"kind": "step_validated", "step_id": sid, **where} for sid in step_ids]
+        answers = run.get("answers") if isinstance(run.get("answers"), dict) else {}
+        facts: list[dict] = []
+        for sid in step_ids:
+            answer = answers.get(sid)
+            if isinstance(answer, dict) and isinstance(answer.get("correct"), bool):
+                # Désignation : le premier essai (juste ou faux) compte pour le score (AD-14).
+                facts.append(
+                    {
+                        "kind": "quiz_first_attempt",
+                        "step_id": sid,
+                        "correct": answer["correct"],
+                        **where,
+                    }
+                )
+            facts.append({"kind": "step_validated", "step_id": sid, **where})
         if finished:
             facts.append({"kind": "scenario_completed", **where})
         return facts

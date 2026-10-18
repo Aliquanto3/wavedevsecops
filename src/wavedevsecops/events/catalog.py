@@ -192,8 +192,31 @@ class AppErrorPayload(_Payload):
     action_text: str
 
 
-class AnswerCorrected(_OpenPayload):
-    pass
+class SlotMark(_Payload):
+    """Marque d'une case corrigée (story 5.2) : choix juste ou faux, attendu, équivalents."""
+
+    slot_id: str
+    element_id: str
+    """Élément désigné par l'apprenant."""
+    correct: bool
+    equivalent: bool = False
+    """Juste, mais autre que l'élément principal (un équivalent accepté)."""
+    expected_element_id: str
+    """Élément principal attendu."""
+    accepted_element_ids: list[str] = []
+    """Tous les éléments acceptés pour cette case, principal compris."""
+    text: str
+    """Phrase de correction écrite par le serveur."""
+
+
+class AnswerCorrected(_Payload):
+    """Correction d'une désignation, une seule fois par étape (AD-17)."""
+
+    step_id: str
+    correct: bool
+    """Toutes les cases sont justes."""
+    slots: list[SlotMark] = []
+    summary_text: str = ""
 
 
 class HintOpened(_OpenPayload):

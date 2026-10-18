@@ -218,9 +218,9 @@ class WorkspaceManager:
         self.settings = settings
         self.boot_id = boot_id or secrets.token_hex(8)
         self._git_path = git_path
-        self._projector = projector or repo_projector(settings, git_path)
-        self._refresh_github = github_refresher(settings, git_path)
         self._steps = StepRunner(settings)
+        self._projector = self._steps.designating(projector or repo_projector(settings, git_path))
+        self._refresh_github = github_refresher(settings, git_path)
         self._progress = ProgressStore.for_dir(settings.resolved_data_dir())
         self._validator = validator or self._steps.validate
         if watch and watcher_factory is None:

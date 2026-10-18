@@ -20,7 +20,7 @@ import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import Future
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -118,6 +118,9 @@ class StepOutcome:
     facts: tuple[dict[str, Any], ...] = ()
     """Faits du premier passage que le verdict produit (`kind`, `step_id`, …) : la file les
     complète (clé d'idempotence) et les soumet à `progress` après `run.json` (AD-14)."""
+    views: dict[str, Any] | None = None
+    """Vues re-marquées pour l'étape suivante (`designable`, story 5.2) : la file les republie
+    dans un dernier `state_projected` ; `None` : les vues publiées restent valables."""
 
     @classmethod
     def explained(
@@ -668,6 +671,16 @@ class WorkspaceEngine:
                         "Progression",
                         lambda: self._submit_facts(list(outcome.facts), op.op_id),
                     )
+                    if outcome.views is not None:
+                        projection = replace(projection, views=outcome.views)
+                        self.last_projection = projection
+                        self.publish(
+                            Kind.STATE_PROJECTED,
+                            StateProjected(
+                                views=projection.views, fingerprint=projection.fingerprint
+                            ),
+                            op_id=op.op_id,
+                        )
             return OpResult(op.op_id, code if ok else None, projection)
         finally:
             with self._lock:

@@ -28,6 +28,7 @@ from wavedevsecops.engine import (
     WorkspaceNotFound,
     build_operation,
 )
+from wavedevsecops.engine.designation import resolve_sha
 from wavedevsecops.events import Envelope
 
 log = logging.getLogger("wavedevsecops")
@@ -68,6 +69,17 @@ def install_workspace_routes(app: FastAPI, manager: WorkspaceManager) -> None:
         except _Refused as refused:
             return refused.response
         return JSONResponse(engine.snapshot())
+
+    @app.get("/api/ws/{workspace_id}/resolve_sha")
+    async def ws_resolve_sha(workspace_id: str, prefix: str = "") -> Response:
+        """Aperçu d'un commit à partir d'un préfixe de SHA (7 caractères au moins), en lecture
+        seule : l'unique essai de la désignation n'est pas consommé (Story 5.2)."""
+        try:
+            engine = await _engine(manager, workspace_id)
+        except _Refused as refused:
+            return refused.response
+        status, body = resolve_sha(engine.last_projection.views, prefix)
+        return JSONResponse(body, status_code=status)
 
     @app.get("/api/ws/{workspace_id}/events")
     async def ws_events(workspace_id: str, request: Request) -> Response:
