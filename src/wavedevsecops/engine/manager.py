@@ -35,13 +35,13 @@ from wavedevsecops.engine.operations import (
     Validator,
     WorkspaceEngine,
 )
-from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.snapshots import (
     RESTORED_KEY,
     pending_restore,
     restore_operation,
     resume_operation,
 )
+from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.watcher import TreeWatcher
 from wavedevsecops.engine.workspace import prepare_workspace, resolve_git
 from wavedevsecops.events import EngineStateName, EventLog, ExternalChange, Kind

@@ -40,7 +40,6 @@ from wavedevsecops.engine.operations import (
     WorkspaceEngine,
 )
 from wavedevsecops.engine.runfile import RUN_SCHEMA_VERSION, RunFileError, load_run, save_run
-from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.snapshots import (
     RestoreFailed,
     Snapshot,
@@ -54,6 +53,7 @@ from wavedevsecops.engine.snapshots import (
     resume_restore,
     take_snapshot,
 )
+from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.workspace import (
     PreparedWorkspace,
     WorkspaceError,
