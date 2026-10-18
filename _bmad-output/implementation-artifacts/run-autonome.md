@@ -322,6 +322,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 01:24 · 4.6 · fusion · CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 4.4 et 6.2 (si 3.4, 4.5, 4.6, 6.1 done : oui) éligibles · a0f8127
 - 2026-10-19 01:24 · 4.4 · dev · lancé (dev-story Sonnet ; intention restart attendue par 4.5, 4.6, 4.7, 5.2) · —
 - 2026-10-19 01:24 · 5.1 · fusion · rebase sur main sans conflit, branche poussée, suite complète et CI en cours · —
+- 2026-10-19 01:30 · 3.5 · second-avis · aucun high, aucun contournement trouvé ; 3 medium (message de protection affiché aussi pour un non fast-forward, interpréteur figé : venv déplacé → tous les pushes refusés sans explication, exception non GithubSimError → tout refusé), 6 low ; reviewer Opus lancé · —
+- 2026-10-19 01:45 · 7.2 · review · rebase sans conflit, M1 (`--` et valeurs commençant par `-` refusés : pytest -k -p chargeait aussi un greffon), M2 (relance machine interruptible, code 130), M3 (uv sync retenté), medium trouvé en revue (section: stations, sinon rangés dans le socle), test Ctrl+C stabilisé ; L4-L6 écartés, L7 reporté (poste réel) ; CI branche verte sur 6 jobs · f5d1c1d
+- 2026-10-19 01:45 · — · décision pour Anaël · 7.2 : scénarios de station 1 absents du catalogue jusqu'à 9.3 (ou les ajouter au socle en attendant) ; evidence_seen limité aux codes 0 et 1 ? · —
+- 2026-10-19 01:52 · 5.1 · fusion · suite complète 1082 passed / 42 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 5.6 attend 5.5 · 0fde9cc
+- 2026-10-19 01:53 · 7.2 · fusion · rebase sur main (conflits d'ajout operations.py submit_facts/output, workspace.py hints/_prepare_tool_environment, résolus par l'orchestrateur), ruff vert, branche poussée, suite complète et CI en cours · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
