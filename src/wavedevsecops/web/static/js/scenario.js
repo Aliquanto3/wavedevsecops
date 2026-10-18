@@ -4,6 +4,7 @@
 // que des choix d'affichage : l'étape rouverte par un segment, l'encart écarté par « Continuer ».
 import { el, richText } from "./dom.js";
 import { alteredExplanation, quizChoices, restoreFailedNotice } from "./quiz.js";
+import { openNext, scoreSummary, summaryStatus } from "./summary.js";
 
 export const UNEXPECTED_TITLE = "État inattendu";
 export const CONTINUE_LABEL = "Continuer";
@@ -40,11 +41,12 @@ export function statusFor(state) {
     parts.push(verdict.reason_text.replaceAll("`", ""));
   } else if (verdict && verdict.status === "unexpected") parts.push(`${UNEXPECTED_TITLE}.`);
   if (current) parts.push(`${progressLabel(panel)} : ${current.title_text}.`);
+  if (panel.summary) parts.push(summaryStatus(panel.summary));
   return parts.join(" ");
 }
 
 /** Monte le contenu du panneau ; `update(state)` le redessine depuis le magasin. */
-export function createScenarioView({ onSelect, onIntent } = {}) {
+export function createScenarioView({ onSelect, onIntent, onError, navigate, fetchImpl } = {}) {
   const root = el("div", "scenario-body", { "data-zone": "scenario-body" });
   root.hidden = true;
   let shownId = null; // étape rouverte par un segment terminé
@@ -193,7 +195,24 @@ export function createScenarioView({ onSelect, onIntent } = {}) {
     richText(chat, shown.instruction_text);
     instruction.append(heading, chat);
 
-    const children = [...modeRow(panel), progress(panel, view), instruction];
+    const children = [...modeRow(panel), progress(panel, view)];
+    // Bilan : le score du premier coup et les indices, lus dans `progress.json` par le serveur.
+    if (panel.summary) {
+      children.push(
+        scoreSummary(panel.summary, {
+          onNext(next) {
+            openNext(next, { fetchImpl, assign: navigate }).catch((err) => onError && onError(err.message));
+          },
+          onCatalogue() {
+            (navigate || ((path) => window.location.assign(path)))("/");
+          },
+          onRestart() {
+            if (onIntent) onIntent("restart", {});
+          },
+        }),
+      );
+    }
+    children.push(instruction);
     // Quiz : les commandes proposées, puis l'explication de la mauvaise réponse et, si le
     // rétablissement échoue, l'encart d'erreur (UX-DR9, UX-DR11).
     if (shown === current && current.quiz && !panel.restore_failed) {
@@ -243,6 +262,9 @@ export function createScenarioView({ onSelect, onIntent } = {}) {
       return `.step-segment[data-step="${active.dataset.step}"]`;
     }
     if (active.classList.contains("mode-info")) return ".mode-info";
+    if (active.dataset && active.dataset.action && active.closest(".score-summary")) {
+      return `.score-summary [data-action="${active.dataset.action}"]`;
+    }
     if (active.classList.contains("quiz-radio")) return `.quiz-radio[value="${active.getAttribute("value")}"]`;
     if (active.classList.contains("quiz-run")) return ".quiz-run";
     if (active.dataset && active.dataset.elementId) {

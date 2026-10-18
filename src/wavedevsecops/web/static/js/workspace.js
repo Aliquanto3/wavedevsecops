@@ -47,6 +47,7 @@ export function mountWorkspace(
   const scenarioView = createScenarioView({
     onSelect,
     onIntent: (intent, body) => postIntent(store, intent, body),
+    onError: (text) => store.fail(text),
   });
   panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
   // Seul le parcours LLM a du code d'exercice à lancer ; le serveur revérifie le parcours.
