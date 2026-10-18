@@ -160,3 +160,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.6 · second-avis · 1 medium prouvé (placement par date : un commit antidaté déplace les existants), 6 low · —
 - 2026-10-18 · 2.3 · fusion · ff sur main, suite complète 409 passed / 36 skipped, CI branche verte, story done ; rendu navigateur à vérifier par Anaël · de83bb3
 - 2026-10-18 · 2.4, 9.1 · dev · lancés (Sonnet) · —
+- 2026-10-18 19:58 · 9.1 · dev · fini, 412 tests, CI verte · 5bf1f3d
+- 2026-10-18 19:58 · — · convention · à partir d'ici chaque ligne du journal porte l'heure (HH:MM) pour l'estimation de fin · —
+- 2026-10-18 19:56 · 7.1 · review · 2 rebases sans conflit, 2 medium corrigés (garde réseau : IP loopback littérale seulement, sendto/DNS refusés), 3 low corrigés · 159685f
+- 2026-10-18 19:56 · 7.1 · fusion · ff sur main, suite complète verte, CI branche verte sur 6 jobs, story done · 159685f
+- 2026-10-18 19:56 · 7.2 · dev · lancé (dev-story Sonnet) · —
