@@ -31,6 +31,19 @@ def origin_branch(ctx: SetupContext, value: str) -> str:
     raise SetupError(f"L'alias « {value} » ne désigne pas une branche.")
 
 
+def resolve_on_origin(ctx: SetupContext, value: str) -> str:
+    """SHA d'un commit présent dans `origin.git` : `@alias`, nom de branche d'origin ou SHA."""
+    name = value
+    if value.startswith("@"):
+        name = ctx.revision(value)
+        for prefix in _PREFIXES:
+            name = name.removeprefix(prefix)
+    found = ctx.git.run("rev-parse", "--verify", "-q", f"{name}^{{commit}}", cwd=ctx.layout.origin)
+    if not found.ok:
+        raise SetupError(f"« {value} » n'existe pas dans origin.")
+    return found.stdout.strip()
+
+
 def commit_on_origin(
     ctx: SetupContext,
     persona: str,
@@ -39,6 +52,8 @@ def commit_on_origin(
     message: str,
     date: datetime | None = None,
     start: str | None = None,
+    parent: str | None = None,
+    force: bool = False,
 ) -> str:
     """Commit de `persona` écrit directement dans `origin.git`, sans toucher au dépôt local.
 
@@ -46,16 +61,24 @@ def commit_on_origin(
     (ou de `start` si `branch` n'existe pas encore sur `origin`) plus `files` (chemin posix ->
     contenu UTF-8, LF). `branch` est avancée avec `update-ref` ; si elle n'existe pas et que
     `start` est vide, le commit est une racine ; si elle existe, `start` est ignoré (toujours
-    fast-forward : un push forcé demanderait un parent explicite). Identité et date sont celles
-    du setup (AD-3) :
-    le SHA est le même sur les trois systèmes. Rend le SHA du commit."""
+    fast-forward). `parent` (SHA, nom de branche d'`origin` ou `@alias`) impose le parent et
+    l'arbre de départ : sans `force`, il doit être le sommet actuel de `branch` ; avec `force`,
+    la branche est réécrite (push forcé : l'ancien sommet n'en est plus accessible). Identité et
+    date sont celles du setup (AD-3) : le SHA est le même sur les trois systèmes. Rend le SHA."""
     git, bare = ctx.git, ctx.layout.origin
     name = origin_branch(ctx, branch)
     ref = f"refs/heads/{name}"
     current = git.run("rev-parse", "--verify", "-q", ref, cwd=bare)
     old = current.stdout.strip() if current.ok else None
-    parent = old
-    if old is None and start is not None:
+    if parent is not None:
+        parent = resolve_on_origin(ctx, parent)
+        if old is not None and parent != old and not force:
+            raise SetupError(
+                f"La branche « {name} » d'origin ne s'écrase que par un push forcé (force: true)."
+            )
+    else:
+        parent = old
+    if parent is None and start is not None:
         base = git.run("rev-parse", "--verify", "-q", origin_branch(ctx, start), cwd=bare)
         if not base.ok:
             raise SetupError(f"La branche de départ « {start} » n'existe pas sur origin.")
