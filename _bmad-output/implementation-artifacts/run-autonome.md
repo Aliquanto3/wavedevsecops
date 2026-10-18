@@ -246,6 +246,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 22:45 · 3.2, 4.2, 6.6, 2.7 · fusion · suite complète sur le sommet de pile 922 passed / 41 skipped · fbcb3ef
 - 2026-10-18 22:45 · 3.2 · fusion · CI branche verte, ff sur main, story done ; 3.3, 3.5, 7.4 ★ éligibles · 8c4040d
 - 2026-10-18 22:45 · 4.2 · fusion · CI branche verte, ff sur main, story done ; 4.4 éligible (4.2 et 4.3 done) · d73cbef
+- 2026-10-18 22:46 · 6.6 · fusion · CI branche verte sur 6 jobs, fusion sur main (commit de fusion avec 2.7), story done ; 4 vérifications Ollama réel en attente d'Anaël · 430c980
+- 2026-10-18 22:46 · 2.7 · fusion · CI branche verte sur 6 jobs, fusion sur main, story done ; 2.10 attend encore 2.8 et 3.3 · fbcb3ef
 - 2026-10-18 22:01 · 9.2 · fusion · rebase sur 6860667 sans conflit, suite complète en cours · —
 
 

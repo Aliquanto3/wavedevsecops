@@ -52,7 +52,7 @@ development_status:
   2-4-taper-de-vraies-commandes-git-dans-le-terminal: done
   2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: done
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
-  2-7-voir-le-graphe-la-liste-des-commits-et-l-index: review
+  2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: backlog
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: backlog
   2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: backlog
@@ -94,7 +94,7 @@ development_status:
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
   6-5-exporter-mon-rapport-de-progression: backlog
-  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: review
+  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: done
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
   epic-6-retrospective: optional
 
