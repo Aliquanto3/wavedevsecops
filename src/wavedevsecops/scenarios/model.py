@@ -51,7 +51,7 @@ class Scenario(BaseModel):
     catalogue: bool = True
     """Faux : scénario interne (gabarit d'exercice, empreinte de référence), jamais proposé à
     l'apprenant dans le catalogue."""
-    station: int | None = Field(default=None, ge=0)
+    station: int | None = Field(default=None, ge=0, le=4)
     tracks: list[Track] = Field(min_length=1)
     """Parcours servis ; un espace par parcours (AD-5)."""
     tools: list[str] = Field(default_factory=list)

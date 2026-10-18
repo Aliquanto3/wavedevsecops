@@ -31,18 +31,24 @@ def test_bandeau_station_courante_frontiere_et_aucune_vue_masquee(tmp_path: Path
         tmp_path,
         f"""
 const chain = {json.dumps(CHAIN)};
-mount();
+const first = mount();
 const bare = {{ band: $$(".chain-band").length, shown: shown(), cls: $(".workspace").className,
   menu: $$(".pane-menu-item").map((i) => i.dataset.pane), zones: $$("[data-zone]").map((z) => z.dataset.zone) }};
+first.destroy();
+// `destroy` ne retire pas le menu Volets de l'en-tête (montage unique par page) : on le retire ici.
+$("#pane-menu").remove();
 main.replaceChildren();
 mountWorkspace(main, {{ title: "Bac à sable libre", store, storage, chain }});
 const items = [...$(".chain-stations").children];
 console.log(JSON.stringify({{
   bare,
-  order: [...main.children].map((c) => c.className),
+  mainChildren: [...main.children].map((c) => c.className),
+  order: [...$(".workspace").children].map((c) => c.className),
   label: $(".chain-band").getAttribute("aria-label"),
   items: items.map((i) => i.textContent),
-  boundaryAt: items.findIndex((i) => i.className === "chain-boundary"),
+  hidden: items.map((i) => i.getAttribute("aria-hidden")),
+  describedby: items.map((i) => i.getAttribute("aria-describedby")),
+  boundaryId: $(".chain-boundary").id,
   current: $$("[aria-current]").map((c) => [c.dataset.station, c.getAttribute("aria-current"), c.className]),
   pill: $$(".chain-here").map((p) => p.textContent),
   bandInsideViews: $(".views").querySelectorAll(".chain-band").length,
@@ -54,7 +60,9 @@ console.log(JSON.stringify({{
 """,
     )
     assert out["bare"]["band"] == 0 and "has-chain-band" not in out["bare"]["cls"]
-    assert out["order"][0] == "chain-band" and out["order"][1].startswith("workspace")
+    # Le bandeau est la première rangée de la grille de l'espace, avant le panneau et les vues.
+    assert out["mainChildren"] == [out["workspaceClass"]]
+    assert out["order"][0] == "chain-band" and len(out["order"]) == 3
     assert out["label"] == "Chaîne de livraison"
     assert out["items"] == [
         "Station 1 · Poste local",
@@ -63,15 +71,17 @@ console.log(JSON.stringify({{
         "CI | CD",
         "Station 4 · Livraison",
     ]
-    assert out["boundaryAt"] == 3
+    # La frontière n'est pas comptée comme une station ; elle décrit la Station 4.
+    assert out["hidden"] == [None, None, None, "true", None]
+    assert out["describedby"] == [None, None, None, None, out["boundaryId"]]
+    assert out["boundaryId"] == "chain-boundary"
     assert out["current"] == [["2", "step", "chain-station is-current"]]
     assert out["pill"] == ["Vous êtes ici"]
-    # Aucune vue masquée ni déplacée ; le menu Volets et les zones F6 sont inchangés.
+    # Aucune vue masquée ni déplacée ; menu Volets et zones F6 identiques au montage sans bandeau.
     assert out["bandInsideViews"] == 0
-    assert out["shown"] == out["bare"]["shown"]
-    # Le second montage ajoute son propre menu à l'en-tête (le premier n'est pas détruit ici).
-    assert out["menu"][-len(out["bare"]["menu"]) :] == out["bare"]["menu"]
-    assert set(out["zones"]) == set(out["bare"]["zones"])
+    assert out["shown"] == out["bare"]["shown"] and out["shown"]
+    assert out["menu"] == out["bare"]["menu"] and out["menu"]
+    assert out["zones"] == out["bare"]["zones"] and out["zones"]
     assert "has-chain-band" in out["workspaceClass"]
 
 
@@ -81,7 +91,7 @@ def test_sans_station_pas_de_bandeau(tmp_path: Path) -> None:
         """
 main.replaceChildren();
 mountWorkspace(main, { title: "Bac", store, storage, chain: null });
-console.log(JSON.stringify({ bands: $$(".chain-band").length, first: main.children[0].className }));
+console.log(JSON.stringify({ bands: $$(".chain-band").length, first: main.children[0].className, inner: main.children[0].children[0].className }));
 """,
     )
-    assert out == {"bands": 0, "first": "workspace"}
+    assert out == {"bands": 0, "first": "workspace", "inner": "scenario-panel"}

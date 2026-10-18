@@ -20,9 +20,11 @@ export function buildChainBand(chain) {
   const list = el("ol", "chain-stations");
   for (const station of chain.stations) {
     const current = station.number === chain.current;
+    const afterBoundary = station.number === chain.boundary_after + 1;
     const item = el("li", current ? "chain-station is-current" : "chain-station", {
       "data-station": station.number,
       "aria-current": current ? "step" : false,
+      "aria-describedby": afterBoundary ? "chain-boundary" : false,
     });
     item.append(station.text);
     if (current) {
@@ -32,7 +34,9 @@ export function buildChainBand(chain) {
     }
     list.append(item);
     if (station.number === chain.boundary_after) {
-      const boundary = el("li", "chain-boundary");
+      // Séparateur visuel, pas une station : masqué du décompte de la liste, lu comme
+      // description de la station qui le suit.
+      const boundary = el("li", "chain-boundary", { id: "chain-boundary", "aria-hidden": "true" });
       boundary.textContent = chain.boundary_text;
       list.append(boundary);
     }
@@ -73,10 +77,13 @@ export function mountWorkspace(container, { title, store, storage, chain = null 
   const grid = el("div", "views-grid");
   const announce = el("p", "visually-hidden", { role: "status", id: "layout-status" });
   zone.append(chipBar, grid, announce);
+  // Bandeau de la chaîne : première rangée de la grille ; seule la rangée des vues rétrécit.
+  if (chain) {
+    workspace.classList.add("has-chain-band");
+    workspace.append(buildChainBand(chain));
+  }
   workspace.append(panel, zone);
-  const band = chain ? buildChainBand(chain) : null;
-  if (band) workspace.classList.add("has-chain-band");
-  container.replaceChildren(...(band ? [band, workspace] : [workspace]));
+  container.replaceChildren(workspace);
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
   const unsubscribe = store.subscribe((state) => {

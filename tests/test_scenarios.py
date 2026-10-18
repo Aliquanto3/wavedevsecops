@@ -168,3 +168,10 @@ def test_cle_en_double_refusee() -> None:
 def test_revision_de_depart_qui_ressemble_a_une_option() -> None:
     errors = _errors(VALID.replace('start: "@premier"', 'start: "--orphan"'))
     assert errors[0].field == "setup[2].start" and "révision invalide" in errors[0].message
+
+
+def test_station_hors_de_la_chaine_refusee() -> None:
+    errors = _errors(VALID.replace("tracks: [llm]", "station: 7\ntracks: [llm]"))
+    assert [e.field for e in errors] == ["station"]
+    four = VALID.replace("tracks: [llm]", "station: 4\ntracks: [llm]")
+    assert parse_scenario(four, "essai.A.yaml").station == 4

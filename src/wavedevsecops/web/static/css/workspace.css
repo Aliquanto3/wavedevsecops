@@ -58,16 +58,18 @@ main.is-workspace {
   min-height: 520px;
 }
 
-/* Bandeau de la chaîne (Story 9.1) : seule la hauteur des vues diminue. */
+/* Bandeau de la chaîne (Story 9.1) : première rangée de la grille, sur toute la largeur.
+   L'espace garde sa hauteur ; la rangée des vues prend le reste, quelle que soit la hauteur
+   effective du bandeau (44 px, davantage s'il passe sur deux lignes). */
 .workspace.has-chain-band {
-  height: calc(100vh - 230px - var(--chain-band-height) - var(--gutter));
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .chain-band {
+  grid-column: 1 / -1;
   display: flex;
   align-items: stretch;
   min-height: var(--chain-band-height);
-  margin-bottom: var(--gutter);
   background: var(--color-surface-raised);
   border-radius: var(--radius-sm);
 }
@@ -375,11 +377,14 @@ main.is-workspace {
 }
 
 @media (max-width: 640px) {
-  .workspace,
-  .workspace.has-chain-band {
+  .workspace {
     grid-template-columns: minmax(0, 1fr);
     height: auto;
     min-height: 0;
+  }
+
+  .workspace.has-chain-band {
+    grid-template-rows: none;
   }
 
   .scenario-panel {
