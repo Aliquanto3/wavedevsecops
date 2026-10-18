@@ -537,6 +537,14 @@ function Invoke-UvCachePreload([string]$UvExe, [string]$DataDir, [string]$AppDir
     }
 }
 
+function Get-Sha256([string]$Path) {
+    # .NET plutôt que Get-FileHash : ce module peut manquer quand PSModulePath vient de PowerShell 7.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try { return (($sha.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') }) -join '') }
+    finally { $stream.Dispose(); $sha.Dispose() }
+}
+
 function Get-ExpectedChecksum([string]$SumsPath, [string]$Name) {
     # Ligne « <somme>  <nom> » (ou « <somme> *<nom> ») du fichier de sommes de la release.
     foreach ($line in [IO.File]::ReadAllLines($SumsPath)) {
@@ -568,7 +576,7 @@ function Install-Gitleaks([string]$DataDir, [hashtable]$Tool) {
     if (Test-Path -LiteralPath $sums) { Remove-Item -LiteralPath $sums -Force }
     Save-File "$base/$sumsName" $sums
     if ($script:Simulate) {
-        $fake = if (Test-SimulatedFailure 'checksum') { '0' * 64 } else { (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $fake = if (Test-SimulatedFailure 'checksum') { '0' * 64 } else { Get-Sha256 $archive }
         [IO.File]::WriteAllText($sums, "$fake  $name`n")
     }
     $expected = Get-ExpectedChecksum $sums $name
@@ -576,7 +584,7 @@ function Install-Gitleaks([string]$DataDir, [hashtable]$Tool) {
         Remove-Item -LiteralPath $archive, $sums -Force -ErrorAction SilentlyContinue
         throw (New-InstallError "Vérification de gitleaks : aucune somme de contrôle pour « $name » dans le fichier de sommes de la release." @() $script:RouteText)
     }
-    $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actual = Get-Sha256 $archive
     if ($actual -ne $expected) {
         Remove-Item -LiteralPath $archive, $sums -Force -ErrorAction SilentlyContinue
         throw (New-InstallError "Vérification de gitleaks : la somme SHA-256 de « $name » ne correspond pas à celle de la release (téléchargement corrompu ou intercepté). L'archive est supprimée, rien n'est installé." $script:NetworkSettings 'relancez la commande ; si cela persiste, un proxy modifie les téléchargements : demandez à votre administrateur réseau.')
@@ -589,7 +597,11 @@ function Install-Gitleaks([string]$DataDir, [hashtable]$Tool) {
         [IO.File]::WriteAllText((Join-Path $staging 'gitleaks.exe'), 'simulation')
     }
     else {
-        try { Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force } catch { }
+        try {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [IO.Compression.ZipFile]::ExtractToDirectory($archive, $staging)
+        }
+        catch { }
     }
     if (-not (Test-Path -LiteralPath (Join-Path $staging 'gitleaks.exe'))) {
         Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue

@@ -70,6 +70,7 @@ jobs:
         run: >
           sudo unshare --net --
           sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
+          "WDS_EXERCISE_UV=$WDS_EXERCISE_UV" "WDS_EXERCISE_DATA=$WDS_EXERCISE_DATA"
           .venv/bin/python -m pytest -q --tb=short
           tests/test_scenarios.py tests/test_setup.py tests/test_fingerprints.py
           tests/test_exercise.py
@@ -135,7 +136,9 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           set --
           if [ "$RUNNER_OS" = Linux ]; then
-            set -- sudo unshare --net -- sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
+            # Le premier sudo vide l'environnement : les variables utiles sont repassées par env.
+            set -- sudo unshare --net -- sudo -E -u "$(id -un)" \
+              env "PATH=$PATH" "HOME=$HOME" "WDS_DATA_DIR=$WDS_DATA_DIR"
           fi
           "$@" "$WDS_DATA_DIR/app/.venv/bin/python" .github/scripts/verifier_hors_ligne.py
 

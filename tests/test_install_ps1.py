@@ -8,6 +8,7 @@ vérifient que sur un poste Windows réel.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -328,6 +329,13 @@ def test_echec_du_prechargement_message_francais(tmp_path: Path) -> None:
     assert out.returncode == 1
     assert "préchargement du cache uv" in out.stdout and "HTTPS_PROXY" in out.stdout
     assert not (tmp_path / "install.json").exists()
+
+
+def test_sha256_sans_get_filehash(tmp_path: Path) -> None:
+    sample = tmp_path / "a.bin"
+    sample.write_bytes(b"wavedevsecops")
+    expected = hashlib.sha256(b"wavedevsecops").hexdigest()
+    assert _lib(f"Get-Sha256 '{sample}'", tmp_path) == expected
 
 
 def test_somme_lue_dans_le_fichier_de_la_release(tmp_path: Path) -> None:
