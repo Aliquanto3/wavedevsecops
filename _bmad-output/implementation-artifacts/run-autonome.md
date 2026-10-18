@@ -106,3 +106,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.4 · review · rebase sur main (config.py unifié sur resolved_data_dir), high corrigé (arrêt d'arbre borné, test enfant+petit-enfant), Job Object Windows reporté à procs.spawn · 78c397a
 - 2026-10-18 · 1.4 · fusion · ff sur main, suite complète 150 passed, CI branche verte sur les trois OS · 78c397a
 - 2026-10-18 · 1.3 · dev · fini, 120 tests (exclusion des licences OFL du contrôle AD-13 (2)) · 3dcd853
+- 2026-10-18 · 2.1, 1.6 · dev · lancés (2.1 dev-story Opus ★, 1.6 Sonnet), 1.3 en revue · —
+- 2026-10-18 · 1.3 · second-avis · 2 medium (fetch sans délai, désactivation des actions sans effet réel), 3 low · —
+- 2026-10-18 · 1.3 · review · rebase propre, 3 medium corrigés (délai du point de vie, test JS sous Node, contraste du lien d'évitement en sombre + test WCAG) · b9dcac0
+- 2026-10-18 · 1.3 · fusion · ff sur main, suite complète 175 passed, CI branche verte sur les trois OS, story done · b9dcac0
+- 2026-10-18 · 1.5 · dev · lancé (dev-story Sonnet, worktree) · —
