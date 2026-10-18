@@ -230,13 +230,26 @@ def is_loopback_url(url: str) -> bool:
         return False
 
 
+def is_license_text(path: Path, static: Path = STATIC) -> bool:
+    """Licence d'une police (`fonts/OFL-*.txt`) : texte juridique cité, jamais chargé ni exécuté.
+
+    Les licences OFL citent des adresses web. L'exclusion est étroite : un `.txt` de licence
+    dans `fonts/` seulement, pas un `.js`, un `.css` ou un `.html`, où une URL reste interdite.
+    """
+    return (
+        path.suffix.lower() == ".txt"
+        and path.name.startswith("OFL-")
+        and path.parent == static / "fonts"
+    )
+
+
 def static_url_violations(static: Path = STATIC) -> list[str]:
     """AD-13, contrôle 2 : aucune URL `http(s)://` ou `ws(s)://` non loopback dans `static/`."""
     if not static.is_dir():
         return []
     violations = []
     for path in sorted(p for p in static.rglob("*") if p.is_file()):
-        if path.suffix.lower() in BINARY_SUFFIXES:
+        if path.suffix.lower() in BINARY_SUFFIXES or is_license_text(path, static):
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         for match in URL_PATTERN.finditer(text):

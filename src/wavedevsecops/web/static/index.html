@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>WaveDevSecOps</title>
+  <link rel="stylesheet" href="/static/css/fonts.css">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <script src="/static/js/theme-init.js"></script>
+  <script type="module" src="/static/js/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <div id="app-alert" class="app-alert" role="alert"></div>
+  <div class="site-nav-wrap">
+    <header class="site-nav">
+      <a class="brand" href="/">WaveDevSecOps</a>
+      <nav aria-label="Surfaces">
+        <ul id="surfaces"></ul>
+      </nav>
+      <div class="site-nav-tools">
+        <div class="menu" id="display-menu">
+          <button type="button" class="menu-trigger" id="display-trigger"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="display-popup">
+            Affichage <span aria-hidden="true">&#9662;</span>
+          </button>
+          <div class="menu-popup" id="display-popup" role="group" aria-label="Affichage" hidden>
+            <label class="field" for="theme-picker">Thème
+              <select id="theme-picker">
+                <option value="system">Système</option>
+                <option value="light">Clair</option>
+                <option value="dark">Sombre</option>
+              </select>
+            </label>
+            <label class="check" for="reduce-motion">
+              <input type="checkbox" id="reduce-motion">
+              Réduire les animations
+            </label>
+          </div>
+        </div>
+      </div>
+    </header>
+  </div>
+  <main id="main" tabindex="-1">
+    <h1 id="page-title"></h1>
+    <p class="subtitle" id="page-subtitle"></p>
+    <div id="panes" class="panes"></div>
+  </main>
+</body>
+</html>

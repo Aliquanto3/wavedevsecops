@@ -6,9 +6,19 @@ Aucune réponse ne porte d'en-tête CORS : aucun `CORSMiddleware`, et les refus 
 from __future__ import annotations
 
 import secrets
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
+from fastapi.staticfiles import StaticFiles
+
+from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
 
 SESSION_COOKIE = "wds_session"
 PUBLIC_PREFIX = "/osv/"
@@ -22,10 +32,12 @@ _NO_SESSION = (
     "Accès refusé : ouvrez WaveDevSecOps avec l'adresse complète affichée dans la console "
     "de lancement, ou relancez la commande `uv run wavedevsecops`."
 )
-_INDEX = (
-    "<!doctype html><html lang=\"fr\"><meta charset=\"utf-8\">"
-    "<title>WaveDevSecOps</title><h1>WaveDevSecOps</h1>"
-    "<p>Le serveur local fonctionne. L'interface arrive avec les prochaines étapes.</p></html>"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+# Tout vient de l'application elle-même (AD-13) : le navigateur refuse le reste.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; "
+    "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
+    "frame-ancestors 'none'"
 )
 
 
@@ -33,7 +45,7 @@ def _same(a: str, b: str) -> bool:
     return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
-def create_app(*, port: int, token: str) -> FastAPI:
+def create_app(*, port: int, token: str, milestone: str = CURRENT_MILESTONE) -> FastAPI:
     """Construit l'application pour une instance : `port` et `token` fixés au lancement."""
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     session = secrets.token_urlsafe(32)
@@ -69,8 +81,42 @@ def create_app(*, port: int, token: str) -> FastAPI:
             return refuse(401, _NO_SESSION)
         return await call_next(request)
 
-    @app.get("/", response_class=HTMLResponse)
-    async def index() -> str:
-        return _INDEX
+    @app.middleware("http")
+    async def harden(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    surfaces = delivered_surfaces(milestone)
+
+    async def shell_page() -> Response:
+        return FileResponse(STATIC_DIR / "index.html", media_type="text/html; charset=utf-8")
+
+    for surface in surfaces:
+        app.add_api_route(surface.path, shell_page, methods=["GET"], include_in_schema=False)
+
+    @app.get("/api/health")
+    async def health() -> dict[str, str]:
+        """Point de vie sous cookie : le front l'interroge pour savoir si l'application répond."""
+        return {"status": "ok"}
+
+    @app.get("/api/shell")
+    async def shell() -> JSONResponse:
+        """Surfaces livrées par le jalon courant, dans l'ordre de l'en-tête (AD-2)."""
+        return JSONResponse(
+            {
+                "milestone": milestone,
+                "surfaces": [
+                    {"key": s.key, "label": s.label, "path": s.path, "subtitle": s.subtitle}
+                    for s in surfaces
+                ],
+            }
+        )
+
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     return app
