@@ -64,16 +64,16 @@ development_status:
   3-2-ouvrir-une-pr-et-la-merger: done
   3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: review
   3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: done
-  3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: in-progress
+  3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: review
   epic-3-retrospective: optional
 
   epic-4: in-progress
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: done
   4-2-enregistrer-les-faits-du-premier-passage: done
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
-  4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
+  4-4-recommencer-un-scénario-sans-perdre-son-score: in-progress
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
-  4-6-ouvrir-des-indices-par-paliers: review
+  4-6-ouvrir-des-indices-par-paliers: done
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: done
   epic-4-retrospective: optional
 

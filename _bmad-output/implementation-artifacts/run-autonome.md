@@ -315,6 +315,13 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 01:12 · 5.3 · dev · fini, 993 passed / 41 skipped, CI verte ; front seul : designation.js (mode armé, answer-slot, champ SHA via resolve_sha, step_id toujours joint), data-designable dans repo.js ; correction affichée reportée à 5.5, liste filtrable à 5.4 ; contrôles navigateur pour Anaël · 4ad6a6d
 - 2026-10-19 01:12 · 5.3 · second-avis · lancé · —
 - 2026-10-19 01:12 · 2.9 · dev · lancé (dev-story Sonnet ; 2.8 done ; ouvre 2.10 avec 3.3) ; 5.4 attend 5.3 (même front), 7.4 ★ attend que github_sim se libère (3.3, 3.5) · —
+- 2026-10-19 01:15 · 5.3 · second-avis · aucun high, 2 medium (pas de garde synchrone sur Valider : double POST ; conflits prévisibles scenario.js et workspace.css avec 4.7 et 4.6), 4 low (resolve_sha sans contrôle de type ni doublon, refs non désignables au clavier, écouteurs cumulés, Échap avec la chaîne ouverte) ; reviewer Opus lancé (rebase sur 4.6) · —
+- 2026-10-19 01:17 · 3.5 · dev · fini, 994 passed / 41 skipped, CI verte sur trois OS (sh de PortableGit) ; paquet hooks, op install_hooks, core.hooksPath=../hooks dans origin.git (GIT_CONFIG_COUNT retiré par receive-pack), message terminal protected_branch ; empreinte de hooks/ dépendante du poste · 0745cb7
+- 2026-10-19 01:17 · 3.5 · second-avis · lancé · —
+- 2026-10-19 01:20 · 5.1 · review · rebase sans conflit, M1 corrigé (rebase déjà en cours refusé, code 1 exigé, test), L3 corrigé (commit -- fichiers), L2 écarté (date des commits rejoués), L4, L5 notés au contrat pour 5.6 à 5.8, L6 confirmé par la CI ; 1039 passed / 42 skipped, CI branche verte sur 6 jobs · 71265a3
+- 2026-10-19 01:24 · 4.6 · fusion · CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 4.4 et 6.2 (si 3.4, 4.5, 4.6, 6.1 done : oui) éligibles · a0f8127
+- 2026-10-19 01:24 · 4.4 · dev · lancé (dev-story Sonnet ; intention restart attendue par 4.5, 4.6, 4.7, 5.2) · —
+- 2026-10-19 01:24 · 5.1 · fusion · rebase sur main sans conflit, branche poussée, suite complète et CI en cours · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
