@@ -180,6 +180,9 @@ export function createStore() {
         if (payload.status === "passed") {
           patch.stepPanel = passStep(state.stepPanel, payload.step_id, payload.next_step_id);
         }
+      } else if (envelope.kind === "progress_updated") {
+        // Le bilan est écrit par le serveur : à la fin du scénario, on relit l'état pour l'avoir.
+        if ((payload.facts || []).includes("scenario_completed")) return "resync";
       } else if (envelope.kind === "step_explanation") {
         patch.stepPanel = explainStep(state.stepPanel, payload);
       } else if (envelope.kind === "quiz_altered" && state.stepPanel) {

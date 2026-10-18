@@ -31,7 +31,15 @@ from wavedevsecops.engine.operations import (
 )
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import StepObserved, StepVerdict
-from wavedevsecops.scenarios import STEP_TYPES, Scenario, ScenarioError, load_scenario
+from wavedevsecops.progress.facts import ProgressStore
+from wavedevsecops.progress.summary import build_summary
+from wavedevsecops.scenarios import (
+    STEP_TYPES,
+    Scenario,
+    ScenarioError,
+    load_scenario,
+    scenario_files,
+)
 from wavedevsecops.scenarios.steps import StepContext
 from wavedevsecops.wsfs import Layout
 
@@ -42,6 +50,9 @@ MODE_TEXTS = {
     "réel du dépôt, quelle que soit la commande tapée.",
     "B": "Mode B : un agent a déjà agi dans le dépôt ; vous relisez son travail.",
 }
+
+
+NO_NEXT_TEXT = "Aucun autre scénario n'est disponible pour l'instant."
 
 
 def _state_from_views(views: dict[str, Any] | None) -> RepoState | None:
@@ -67,8 +78,9 @@ def _public_quiz(quiz: Any) -> dict[str, Any] | None:
 class StepRunner:
     """Valide l'étape courante des espaces et décrit leur panneau Scénario."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, progress: ProgressStore | None = None) -> None:
         self._settings = settings
+        self._progress = progress
         self._cache: dict[Path, tuple[tuple[int, int], Scenario | None]] = {}
 
     def scenario(self, run: dict[str, Any]) -> Scenario | None:
@@ -267,6 +279,48 @@ class StepRunner:
             return []
         return self._facts_of(run, ids[: ids.index(current)], finished=False)
 
+    # ----------------------------------------------------------------- bilan
+    def _next_scenario(self, scenario: Scenario, track: str) -> dict[str, str] | None:
+        """Scénario suivant du catalogue (ordre des identifiants), même section, mode, parcours."""
+        found: dict[str, Scenario] = {}
+        for path in scenario_files(self._settings):
+            try:
+                other = load_scenario(path, self._settings).scenario
+            except (ScenarioError, OSError, UnicodeDecodeError):
+                continue
+            if (
+                other.catalogue
+                and other.mode == scenario.mode
+                and other.section == scenario.section
+                and track in other.tracks
+                and other.scenario_id > scenario.scenario_id
+            ):
+                found[other.scenario_id] = other
+        if not found:
+            return None
+        following = found[min(found)]
+        return {
+            "scenario_id": following.scenario_id,
+            "mode": following.mode,
+            "track": track,
+            "title_text": following.title_text,
+        }
+
+    def _summary(self, run: dict[str, Any], scenario: Scenario) -> dict[str, Any] | None:
+        """Bilan du scénario terminé, lu dans `progress.json` ; `None` si illisible."""
+        if self._progress is None:
+            return None
+        track = str(run.get("track") or "")
+        try:
+            derived = self._progress.progress(track, scenario.scenario_id, scenario.mode)
+            summary = build_summary(derived)
+        except Exception:  # noqa: BLE001 - un suivi illisible ne bloque pas le panneau
+            log.exception("Bilan de %s", scenario.key)
+            return None
+        summary["next"] = self._next_scenario(scenario, track)
+        summary["next_none_text"] = NO_NEXT_TEXT
+        return summary
+
     # --------------------------------------------------------------- panneau
     def panel(self, engine: WorkspaceEngine) -> dict[str, Any] | None:
         """Panneau Scénario de l'espace : `None` si l'espace n'a pas d'étape."""
@@ -305,4 +359,5 @@ class StepRunner:
             "mode_text": MODE_TEXTS[scenario.mode],
             "current_step_id": current if position < len(ids) else "",
             "steps": steps,
+            "summary": self._summary(run, scenario) if not current else None,
         }
