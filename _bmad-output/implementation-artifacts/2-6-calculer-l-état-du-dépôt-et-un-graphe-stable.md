@@ -75,3 +75,16 @@ Tracé d'une arête : nœud parent → (`column`, rang du parent + 1) → (`colu
 - Ordre de placement : deux commits créés dans la même seconde sur des lignes différentes peuvent passer l'un avant l'autre selon leur SHA ; sans effet sur les commits plus anciens.
 - Le surveillant (`external_change`) calcule désormais la projection complète pour comparer l'empreinte : à alléger (empreinte seule) si le coût se voit.
 - `lang` des sorties : fixé par l'appelant de `OpContext.output` (le terminal, 2.4).
+
+## Revue
+
+Revue unique (Opus), sur la liste du second avis (Haiku). Branche rebasée sur `main` (2.3, 7.1 et 8.2 comprises), sans conflit.
+
+- **medium** · second avis · corrigé · `graph.place` triait par date du committer : un commit daté avant les autres (collègue daté du setup, horloge reculée) déplaçait des commits publiés. Aucun ordre pur ne l'évite (un nouveau commit peut tomber n'importe où dans l'ordre) : `place(commits, previous)` garde désormais les cases et arêtes du graphe publié précédent (`projections.previous_graph`, lu dans `last_views`) et ne place que les nouveaux. Repris de zéro seulement si le passé change sous un commit placé (rang différent, parent nouveau). Sans graphe précédent (réouverture de l'espace), retour à l'ordre par date : un commit à date mensongère peut alors changer de place une fois, à la réouverture. Tests : 300 ajouts à date quelconque (sans mémoire, le déplacement existe bien), suite de 120 commits datés au hasard, projection réelle avec horloge reculée.
+- low · second avis · corrigé · `splitlines()` sur `for-each-ref` et `stash list` : un nom de ref avec U+2028/U+0085 cassait toute projection. Découpe sur `\n`, stash terminé par NUL. Test sur vrai git (branches `a b`, `c\u0085d`, stash avec U+2028).
+- low · second avis · corrigé · `%(*objectname)` ne déréférence qu'un niveau sur un git ancien (git 2.55 déréférence tout) : un tag de tag est résolu par `rev-parse <cible>^{commit}`.
+- low · second avis · corrigé · précheck d'`external_change` sur l'empreinte seule : `git branch -u` (configuration) n'était pas reprojeté. Le précheck compare aussi `views.repo`.
+- low · second avis · corrigé · `element_id("commit")` exige 40 caractères : `init --object-format=sha1` imposé au setup (origin et dépôt), exigence gardée.
+- low · second avis · corrigé · un `log -g` par ref : un seul appel groupé, repli par ref s'il échoue.
+- low · second avis · rejeté · vue complète dans chaque `state_projected`, journal borné en nombre : c'est le contrat d'AD-2 (le front ne déduit rien) ; borner le journal en octets relève du journal d'événements, pas de cette story. À mesurer si un dépôt d'exercice dépasse quelques centaines de commits.
+- info · revue · reporté (2.7) · écart de forme avec le store de 2.3 : `store.js` attend `views[pane_id].elements[{type}]`, la 2.6 publie `views = {schema_version, repo, graph, staging, prompt, announce_text}` (clés par vue, pas par volet ; éléments dans `graph.nodes`, `graph.edges`, `staging.*`). Aucun plantage (`acceptViews` ne valide rien faute d'`elements`), mais rien n'est contrôlé. À faire en 2.7 : table volet → vue (`graph` → volet graphe, `staging` → index, `prompt` → terminal) et types d'`element_id` déclarés par volet, `acceptViews` validant `graph.nodes[].element_id` et non un champ `elements`.
