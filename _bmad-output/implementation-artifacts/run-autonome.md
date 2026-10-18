@@ -171,3 +171,6 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 20:09 · 2.6 · review · rebase sans conflit, medium corrigé (placement à mémoire : un commit antidaté ne déplace plus les autres), 5 low ; écart store.js (2.3) ↔ forme state_projected noté pour 2.7 · e5268ad
 - 2026-10-18 20:09 · 2.6 · fusion · ff sur main, suite complète 498 passed / 36 skipped, CI branche verte, story done · e5268ad
 - 2026-10-18 20:09 · 4.1 · dev · lancé (dev-story Sonnet, chemin critique) · —
+- 2026-10-18 20:19 · 9.1 · review · 2 medium corrigés (bandeau en rangée de grille, plus de constante de hauteur), 3 low ; noms des stations en contenu reportés à 9.2 · 9d2249b
+- 2026-10-18 20:19 · 9.1 · fusion · rebase sur b3b0794 par l'orchestrateur, suite complète verte, CI branche verte, ff sur main, story done · ce247ef
+- 2026-10-18 20:19 · 6.6 · incident · worktree supprimé par erreur au nettoyage de l'orchestrateur avant tout code, story relancée · —
