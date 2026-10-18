@@ -50,7 +50,7 @@ development_status:
   2-2-faire-passer-chaque-action-par-la-file-d-opérations-de-l-esp: done
   2-3-afficher-la-disposition-principale-et-gérer-les-volets: done
   2-4-taper-de-vraies-commandes-git-dans-le-terminal: done
-  2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: review
+  2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: done
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: review
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: backlog

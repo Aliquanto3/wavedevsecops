@@ -228,6 +228,17 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 22:05 · 4.2 · second-avis · aucun high, 1 medium (test du Recommencer qui ne prouve que le rejeu), 7 low (atomicité non testée, verrou intra-processus, ordre du rejeu, progress.json corrompu bloquant, clé d'idempotence non vérifiée, champ manquant → fait perdu, émetteurs quiz/indice reportés) ; reviewer Opus lancé · —
 - 2026-10-18 22:15 · 9.2 · fusion · suite complète 757 passed / 37 skipped, CI branche verte sur 6 jobs, ff sur main, story done · fa3df43
 - 2026-10-18 22:15 · — · suivi · sprint-status aligné (2.5, 3.2, 4.2, 2.7, 6.6 en review ; 4.5 in-progress) · —
+- 2026-10-18 22:16 · 2.7 · fusion · rebase sur 0a06348 en conflit de fond (région role=status partagée : statut d'étape 4.1 / annonce de commande 2.7) → dev-story Opus pour finir le rebase · —
+- 2026-10-18 22:23 · 2.5 · review · rebase (wsfs trivial), high corrigé et élargi (jonction Windows traitée comme un lien : cp refuse, cp -r refuse un dossier qui en contient), cat borné à 256 Kio, echo >> sans relecture, noms non portables, parents absents, .git imbriqué, OSError ; lien sortant copié comme lien gardé (comme cp -R) ; 845 passed, CI branche verte · 407b90a
+- 2026-10-18 22:23 · — · décision pour Anaël · 2.5 : rm -rf * à la racine accepté comme dans un shell (Recommencer répare) ; ajouter une garde (confirmation ou refus) ? · —
+- 2026-10-18 22:23 · 2.5 · fusion · rebase sur 0a06348 sans conflit, suite complète et CI en cours · 049527b
+- 2026-10-18 22:23 · — · outillage · agent-cost-kit PR #11 (avancement-run : sans détail par story quand il y a des epics, barres █░), v0.6.4 non publiée · 98e0c68
+- 2026-10-18 22:25 · — · outillage · agent-cost-kit v0.6.4 publié (PR #11 fusionnée, tag et release), plugin mis à jour au niveau utilisateur, actif après redémarrage · 5d741ee
+- 2026-10-18 22:26 · — · décision Anaël · préparer un arrêt propre pour /clear : plus de nouveau lancement, on draine 2.5 (fusion), 2.7 (rebase), 3.2, 4.2, 6.6 (revues), 4.5 (dev) · —
+- 2026-10-18 22:27 · 6.6 · review · rebase sur 6860667 (snapshots de 4.3 gardés, instantané exercise vérifié par empreinte avant lancement), toolrun.spawn_module → procs.spawn (interruption, Job Object, codes 124/130), environnement réduit, HIGH et 4 MEDIUM corrigés ; uv sync non interruptible reporté à 7.2 ; 774 passed, CI branche verte ; vérifications Ollama réel pour Anaël · aa6aa74
+- 2026-10-18 22:30 · 3.2 · review · rebase sur 0a06348 sans conflit, medium corrigé (merge écrit dans origin reconnu, pas de second commit), 5 low corrigés (pr_updated sur refus, GitError distincte de la course, rien à merger, faux 409 sur lecture illisible, 5 tests dont câblage create_app), préflight hors file gardé (critère 409 synchrone) ; CI branche verte · 0c30c2f
+- 2026-10-18 22:32 · 4.2 · review · rebase sur 0a06348 sans conflit, medium trouvé en revue corrigé (rejeu par liste validated dans run.json, plus par position), medium du second avis corrigé (vrai rétablissement + seconde validation), test d'arrêt brutal, all_progress() ; low 3-7 écartés (motifs en spec) ; 775 passed, CI branche verte · 5349972
+- 2026-10-18 22:36 · 2.5 · fusion · suite complète 854 passed / 41 skipped, CI branche verte sur 6 jobs, ff sur main, story done ; 7.2 éligible · 049527b
 - 2026-10-18 22:01 · 9.2 · fusion · rebase sur 6860667 sans conflit, suite complète en cours · —
 
 
