@@ -247,8 +247,9 @@ def test_registre_refuse_un_type_emis_non_declare(tmp_path: Path) -> None:
         """
 import { registerPane, listPanes, assertElementType, getPane } from "@JS@/panes.js";
 import { createStore, acceptViews } from "@JS@/store.js";
-registerPane({ id: "repo", title: "Dépôt", elementTypes: ["commit", "ref"], render() {} });
-registerPane({ id: "later", title: "Plus tard", step: 9, elementTypes: [], render() {} });
+const ids = (view) => view.items.map((item) => item.element_id);
+registerPane({ id: "repo", title: "Dépôt", elementTypes: ["commit", "ref"], projection: { graph: ids }, render() {} });
+registerPane({ id: "later", title: "Plus tard", step: 9, elementTypes: [], projection: { staging: ids }, render() {} });
 const errors = [];
 const attempt = (fn) => { try { fn(); errors.push("ok"); } catch (e) { errors.push(e.message); } };
 attempt(() => assertElementType("repo", "commit"));
@@ -259,9 +260,12 @@ attempt(() => registerPane({ id: "bad", title: "x", elementTypes: [3], render() 
 attempt(() => registerPane({ title: "sans id", render() {} }));
 // Le magasin écarte la projection d'un volet qui émet un type non déclaré, garde les autres.
 const problems = [];
+const sha = "a".repeat(40);
 const kept = acceptViews({
-  repo: { elements: [{ type: "commit" }] },
-  later: { elements: [{ type: "ref" }] },
+  graph: { items: [{ element_id: `commit:${sha}` }, { element_id: "ref:refs/heads/main" }] },
+  staging: { items: [{ element_id: "path:worktree:a.txt" }] },
+  prompt: { text: "main" },
+  announce_text: "Rien.",
 }, problems);
 console.log(JSON.stringify({ errors, kept: Object.keys(kept), problems, steps: listPanes().map((p) => p.step),
   def: getPane("repo").row }));
@@ -272,7 +276,9 @@ console.log(JSON.stringify({ errors, kept: Object.keys(kept), problems, steps: l
     assert "sans l'avoir déclaré" in data["errors"][1]
     assert "inconnu" in data["errors"][2] and "déjà enregistré" in data["errors"][3]
     assert "elementTypes" in data["errors"][4] and "id" in data["errors"][5]
-    assert data["kept"] == ["repo"] and len(data["problems"]) == 1
+    # La vue du volet qui émet un type non déclaré (staging → « path ») est écartée ; les autres,
+    # y compris celles qu'aucun volet ne déclare, passent.
+    assert data["kept"] == ["graph", "prompt", "announce_text"] and len(data["problems"]) == 1
     assert data["steps"] == [1, 9] and data["def"] == 1
 
 
@@ -282,7 +288,8 @@ def test_magasin_de_projection_ordre_reprise_et_resynchronisation(tmp_path: Path
         """
 import { registerPane } from "@JS@/panes.js";
 import { createStore, connectWorkspace, LOADING } from "@JS@/store.js";
-registerPane({ id: "repo", title: "Dépôt", elementTypes: ["commit"], render() {} });
+registerPane({ id: "repo", title: "Dépôt", elementTypes: ["commit"],
+  projection: { graph: (g) => g.nodes.map((n) => n.element_id) }, render() {} });
 const store = createStore();
 const first = store.state.engineState;
 store.applySnapshot({ workspace_id: "no_ai.x.A", boot_id: "b1", seq: 4, epoch: 1, state: "setup",
@@ -291,8 +298,8 @@ const envelope = (seq, kind, payload, boot = "b1") => ({ boot_id: boot, seq, kin
 const results = [
   store.applyEvent(envelope(4, "engine_state", { state: "idle" })),          // déjà vu
   store.applyEvent(envelope(5, "engine_state", { state: "idle", reason_text: "" })),
-  store.applyEvent(envelope(6, "state_projected", { views: { repo: { elements: [{ type: "commit" }] } }, fingerprint: "f" })),
-  store.applyEvent(envelope(7, "state_projected", { views: { repo: { elements: [{ type: "nope" }] } }, fingerprint: "g" })),
+  store.applyEvent(envelope(6, "state_projected", { views: { graph: { nodes: [{ element_id: "commit:" + "b".repeat(40) }] } }, fingerprint: "f" })),
+  store.applyEvent(envelope(7, "state_projected", { views: { graph: { nodes: [{ element_id: "nope:x" }] } }, fingerprint: "g" })),
   store.applyEvent(envelope(8, "app_error", { cause_text: "Cause.", action_text: "Action." })),
   store.applyEvent(envelope(9, "engine_state", { state: "idle" }, "autre")),  // autre lancement
   store.applyEvent({ boot_id: "b1", seq: 9, kind: "resync_required", payload: {} }),
@@ -334,7 +341,7 @@ console.log(JSON.stringify({ first, LOADING, results, s: { seq: s.seq, state: s.
     ]
     assert data["s"]["seq"] == 8 and data["s"]["state"] == "idle" and data["s"]["fp"] == "g"
     assert data["s"]["error"] == "Cause. Action."
-    # La dernière projection (type non déclaré) est écartée : la vue repo n'y figure plus.
+    # La dernière projection (type non déclaré) est écartée : la vue graph n'y figure plus.
     assert data["s"]["views"] == [] and data["s"]["problems"] == 1
     assert data["sources"][0] == ["/api/ws/w/events?last_event_id=b1%3A3", True]
     assert data["sources"][1][0] == "/api/ws/w/events?last_event_id=b2%3A1"

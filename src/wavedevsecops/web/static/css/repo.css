@@ -1,0 +1,320 @@
+/* Vue « Dépôt local » : graphe, liste des commits et index (DESIGN.md > graph-*, commit-list, staging-index). */
+
+.repo-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: max-content;
+}
+
+.pane-tool-text {
+  padding: 0 var(--space-3);
+  font: var(--font-weight-label) var(--font-size-label) / 1 var(--font-family-label);
+}
+
+.graph-head-text {
+  margin: 0 0 var(--space-2);
+  font: var(--font-weight-code) var(--font-size-code) / var(--line-height-code) var(--font-family-code);
+  color: var(--color-ink-soft);
+}
+
+/* --- graphe : rangée de 28 px par commit, voies en SVG au-dessus des boutons --------------- */
+.graph {
+  position: relative;
+}
+
+.graph-lanes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.graph-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.graph-row {
+  height: var(--graph-row-height);
+}
+
+.graph-node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--graph-row-height);
+  height: var(--graph-row-height);
+  padding-block: 0;
+  padding-right: var(--space-3);
+  font: var(--font-weight-code) var(--font-size-code) / 1 var(--font-family-code);
+  color: var(--color-ink);
+  text-align: left;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.graph-node.is-selected,
+.staging-item.is-selected,
+.commit-pick.is-selected {
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 var(--stroke-min) var(--color-ink);
+}
+
+.sel-dot {
+  display: none;
+  flex: none;
+  font-size: var(--font-size-label);
+}
+
+.is-selected > .sel-dot {
+  display: inline;
+}
+
+.graph-sha {
+  flex: none;
+  font: inherit;
+  color: var(--color-ink);
+}
+
+.graph-subject {
+  font-family: var(--font-family-chat);
+}
+
+.graph-edge {
+  fill: none;
+  stroke: var(--color-ink-soft);
+  stroke-width: var(--stroke-min);
+}
+
+.graph-edge.is-lost {
+  stroke: var(--color-muted);
+  stroke-dasharray: 4 3;
+}
+
+.graph-commit {
+  fill: var(--color-surface-raised);
+  stroke: var(--color-discipline-prompt);
+  stroke-width: var(--stroke-path);
+}
+
+.graph-commit.is-lost {
+  fill: var(--color-surface);
+  stroke: var(--color-muted);
+  stroke-dasharray: 3 2;
+}
+
+.graph-commit.is-selected {
+  stroke: var(--color-ink);
+}
+
+.graph-lost {
+  color: var(--color-ink-soft);
+  font: var(--font-weight-label) var(--font-size-label) / 1 var(--font-family-label);
+}
+
+/* --- étiquettes de refs ------------------------------------------------------------------- */
+.graph-head,
+.graph-branch,
+.graph-remote-ref,
+.graph-tag,
+.graph-actor,
+.new-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  font: var(--font-weight-label) var(--font-size-label) / 1.2 var(--font-family-label);
+}
+
+.graph-head {
+  color: var(--color-on-ink);
+  background: var(--color-ink-fill);
+  border-radius: var(--radius-sm);
+}
+
+.graph-branch {
+  color: var(--color-primary-deep);
+  background: var(--color-primary-soft);
+  border: var(--stroke-min) solid var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.graph-remote-ref {
+  color: var(--color-ink);
+  background: var(--color-discipline-context-soft);
+  border: 4px double var(--color-discipline-context);
+  border-radius: var(--radius-full);
+}
+
+.graph-tag {
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: var(--stroke-min) solid var(--color-ink);
+  border-radius: var(--radius-sm);
+}
+
+.graph-branch.is-current .ref-name {
+  text-decoration: underline;
+}
+
+.ref-name {
+  font-family: var(--font-family-code);
+  font-weight: var(--font-weight-code);
+}
+
+.graph-head .ref-name {
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+.graph-actor.is-colleague {
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-ink);
+  border-radius: var(--radius-sm);
+}
+
+.graph-actor.is-agent {
+  color: var(--color-primary-deep);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-sm);
+}
+
+.new-mark {
+  color: var(--color-on-ink);
+  background: var(--color-ink-fill);
+  border-radius: var(--radius-sm);
+}
+
+.ico {
+  flex: none;
+}
+
+/* --- liste des commits -------------------------------------------------------------------- */
+.commit-list {
+  border-collapse: collapse;
+  font: var(--font-weight-code) var(--font-size-code) / var(--line-height-code) var(--font-family-code);
+}
+
+.commit-list th {
+  padding: var(--space-1) var(--space-3);
+  font: var(--font-weight-label) var(--font-size-label) / 1.2 var(--font-family-label);
+  color: var(--color-ink-soft);
+  text-align: left;
+  border-bottom: var(--stroke-min) solid var(--color-line);
+}
+
+.commit-list td {
+  height: var(--graph-row-height);
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.commit-list tr[data-select] {
+  cursor: pointer;
+}
+
+.commit-list tr.is-selected {
+  background: var(--color-primary-soft);
+}
+
+.commit-list tr.is-lost td {
+  color: var(--color-ink-soft);
+}
+
+.commit-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: var(--hit-target-dense);
+  min-height: var(--hit-target-dense);
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* --- index -------------------------------------------------------------------------------- */
+.staging-index {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.staging-title,
+.staging-group-title {
+  margin: 0;
+  font: var(--font-weight-label) var(--font-size-chat) / 1.2 var(--font-family-label);
+}
+
+.staging-group-title {
+  font-size: var(--font-size-label);
+  color: var(--color-ink-soft);
+}
+
+.staging-group {
+  padding: var(--space-2);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-md);
+}
+
+.staging-group.is-staged {
+  background: var(--color-accent-soft);
+}
+
+.staging-group.is-untracked {
+  border-style: dashed;
+}
+
+.staging-group .staging-group-title {
+  color: var(--color-ink);
+}
+
+.staging-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staging-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit-target-dense);
+  padding: 0 var(--space-2);
+  font: var(--font-weight-code) var(--font-size-code) / 1 var(--font-family-code);
+  color: var(--color-ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.status-letter {
+  flex: none;
+  min-width: 1.5ch;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+}
+
+.staging-clean {
+  margin: 0;
+  color: var(--color-ink-soft);
+}

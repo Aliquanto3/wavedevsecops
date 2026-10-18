@@ -13,6 +13,7 @@ import { LOADING } from "./store.js";
 export { buildChainBand };
 export const PREPARING_TEXT = "Préparation du bac à sable…";
 export const READY_TEXT = "Le bac à sable est prêt. Les consignes du scénario s'afficheront ici.";
+export const COMMAND_DONE_TEXT = "Commande terminée.";
 export const LAST_VIEW_TEXT = "Au moins une vue reste visible.";
 
 const TOOL_HIDE = "—";
@@ -67,14 +68,28 @@ export function mountWorkspace(
   container.replaceChildren(workspace);
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
+  // Région role="status" unique du panneau : « Commande terminée. Vues mises à jour : … » (FR-4).
+  let announced = null;
   const unsubscribe = store.subscribe((state) => {
     const preparing = state.engineState === LOADING || state.engineState === "setup";
     const stepStatus = scenarioView.update(state);
-    panelStatus.textContent = state.errorText
-      ? ""
-      : preparing
-        ? PREPARING_TEXT
-        : stepStatus || READY_TEXT;
+    // Annonce de la commande d'abord, puis le statut d'étape : l'un n'écrase pas l'autre.
+    let line = PREPARING_TEXT;
+    if (!preparing) {
+      const parts = [];
+      if (state.announce) {
+        parts.push(
+          state.announce.command
+            ? `${COMMAND_DONE_TEXT} ${state.announce.text}`
+            : state.announce.text,
+        );
+      }
+      if (stepStatus) parts.push(stepStatus);
+      line = parts.length ? parts.join(" ") : READY_TEXT;
+    }
+    if (state.announce !== announced) panelStatus.textContent = ""; // relit une annonce identique
+    announced = state.announce;
+    panelStatus.textContent = state.errorText ? "" : line;
     panelError.textContent = state.errorText;
   });
 

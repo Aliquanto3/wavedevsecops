@@ -3,6 +3,7 @@
 // terminal) arrive avec leurs stories ; la disposition ne connaît aucune de ces vues.
 import { richText } from "./dom.js";
 import { registerPane } from "./panes.js";
+import { renderRepo } from "./repo.js";
 import { EMPTY, renderTerminal } from "./terminal.js";
 
 /** Corps d'un volet tant qu'il n'a rien à montrer : un titre et une phrase, jamais un spinner. */
@@ -22,7 +23,13 @@ registerPane({
   id: "repo",
   title: "Dépôt local",
   subtitle: "Graphe des commits et index, comme `git log --all` et `git status`",
-  elementTypes: ["commit", "ref", "file"],
+  elementTypes: ["commit", "ref", "tag", "path"],
+  // Vues de state_projected affichées ici, avec leurs element_id (le magasin en contrôle les types).
+  projection: {
+    graph: (graph) => graph.nodes.flatMap((n) => [n.element_id, ...n.refs.map((r) => r.element_id)]),
+    staging: (staging) =>
+      [...staging.staged, ...staging.unstaged, ...staging.untracked].map((i) => i.element_id),
+  },
   row: 1,
   rowShare: 40,
   scroll: "both",
@@ -31,7 +38,7 @@ registerPane({
     title: "Aucun commit pour l'instant.",
     text: "Créez un fichier puis tapez `git add` et `git commit`.",
   },
-  render,
+  render: (body, ctx) => renderRepo(body, ctx, renderEmpty),
 });
 
 registerPane({
@@ -53,7 +60,7 @@ registerPane({
   id: "code",
   title: "Code",
   subtitle: "Fichiers du bac à sable, diff et éditeur",
-  elementTypes: ["file", "commit", "pr"],
+  elementTypes: ["path", "commit", "pr"],
   row: 2,
   rowShare: 33,
   scroll: "both",
