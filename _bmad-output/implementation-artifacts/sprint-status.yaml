@@ -51,7 +51,7 @@ development_status:
   2-3-afficher-la-disposition-principale-et-gérer-les-volets: done
   2-4-taper-de-vraies-commandes-git-dans-le-terminal: in-progress
   2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: backlog
-  2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: in-progress
+  2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: backlog
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: backlog
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: backlog
@@ -67,8 +67,8 @@ development_status:
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-valider-une-étape-sur-l-état-réel-du-dépôt: backlog
+  epic-4: in-progress
+  4-1-valider-une-étape-sur-l-état-réel-du-dépôt: in-progress
   4-2-enregistrer-les-faits-du-premier-passage: backlog
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: backlog
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
@@ -88,13 +88,13 @@ development_status:
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
   epic-5-retrospective: optional
 
-  epic-6: backlog
+  epic-6: in-progress
   6-1-choisir-son-parcours-et-parcourir-le-catalogue: backlog
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: backlog
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
   6-5-exporter-mon-rapport-de-progression: backlog
-  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: backlog
+  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: in-progress
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
   epic-6-retrospective: optional
 

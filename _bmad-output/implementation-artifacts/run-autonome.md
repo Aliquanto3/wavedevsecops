@@ -166,3 +166,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 19:56 · 7.1 · fusion · ff sur main, suite complète verte, CI branche verte sur 6 jobs, story done · 159685f
 - 2026-10-18 19:56 · 7.2 · dev · lancé (dev-story Sonnet) · —
 - 2026-10-18 19:56 · 7.2 · report · non lancé : même module que 2.4 (terminal, liste blanche AD-4), attend la fusion de 2.4 · —
+- 2026-10-18 19:59 · 9.1 · second-avis · 2 medium (hauteurs CSS : min-height et bandeau sur deux lignes font défiler la page), 4 low · —
+- 2026-10-18 20:07 · 6.6 · dev · lancé (dev-story Sonnet ; éligible depuis 2.2, repéré par l'outil d'avancement) · —
+- 2026-10-18 20:09 · 2.6 · review · rebase sans conflit, medium corrigé (placement à mémoire : un commit antidaté ne déplace plus les autres), 5 low ; écart store.js (2.3) ↔ forme state_projected noté pour 2.7 · e5268ad
+- 2026-10-18 20:09 · 2.6 · fusion · ff sur main, suite complète 498 passed / 36 skipped, CI branche verte, story done · e5268ad
+- 2026-10-18 20:09 · 4.1 · dev · lancé (dev-story Sonnet, chemin critique) · —
