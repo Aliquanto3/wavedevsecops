@@ -111,3 +111,15 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.3 · review · rebase propre, 3 medium corrigés (délai du point de vie, test JS sous Node, contraste du lien d'évitement en sombre + test WCAG) · b9dcac0
 - 2026-10-18 · 1.3 · fusion · ff sur main, suite complète 175 passed, CI branche verte sur les trois OS, story done · b9dcac0
 - 2026-10-18 · 1.5 · dev · lancé (dev-story Sonnet, worktree) · —
+- 2026-10-18 · 1.6 · dev · fini, 165 tests dont 15 en simulation PowerShell 5.1 ; parcours réel (poste Windows non admin, proxy, 10 min) à vérifier par Anaël · 543ef4c
+- 2026-10-18 · 1.6 · second-avis · 5 medium (barre de progression, proxy de l'amorçage et d'uv, voie iex cassée en simulation, GPO), 2 low · —
+- 2026-10-18 · 1.5 · dev · fini, 194 tests (sans SSE, redirection / → /diagnostic au premier lancement) · 98efad4
+- 2026-10-18 · 1.6 · review · rebase propre, 7 constats corrigés (proxy amorçage et uv, voie iex testée, GPO, dossier app protégé) · b5eb587
+- 2026-10-18 · 1.6 · CI · rouge sous Windows seulement (sortie PowerShell en page OEM 437 dans 3 tests) ; renvoyé au reviewer · b5eb587
+- 2026-10-18 · 1.5 · second-avis · 10 low, aucun high/medium · —
+- 2026-10-18 · 2.1 · dev · fini, 192 tests, CI branche verte sur les trois OS (empreintes identiques) · a3274bb
+- 2026-10-18 · 2.1 · second-avis · 2 medium prouvés (ignore global XDG non isolé → empreinte, confinement .git contournable sous Windows), 7 low · —
+- 2026-10-18 · 1.6 · CI · tests PowerShell forcés en UTF-8, CI branche verte sur les trois OS · 95c0cf9
+- 2026-10-18 · 1.6 · fusion · ff sur main, suite complète 195 passed, story done ; vérification sur vrai poste Windows non admin (8 points, section Revue de la spec) en attente d'Anaël · 95c0cf9
+- 2026-10-18 · 1.5 · review · 5 low corrigés, aucun medium ; diagnostic_seen à ajouter à AD-5 · c72d1c4
+- 2026-10-18 · 1.7 · dev · lancé (dev-story Sonnet, worktree) · —
