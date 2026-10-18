@@ -165,3 +165,4 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 19:56 · 7.1 · review · 2 rebases sans conflit, 2 medium corrigés (garde réseau : IP loopback littérale seulement, sendto/DNS refusés), 3 low corrigés · 159685f
 - 2026-10-18 19:56 · 7.1 · fusion · ff sur main, suite complète verte, CI branche verte sur 6 jobs, story done · 159685f
 - 2026-10-18 19:56 · 7.2 · dev · lancé (dev-story Sonnet) · —
+- 2026-10-18 19:56 · 7.2 · report · non lancé : même module que 2.4 (terminal, liste blanche AD-4), attend la fusion de 2.4 · —

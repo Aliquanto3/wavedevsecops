@@ -100,7 +100,7 @@ development_status:
 
   epic-7: in-progress
   7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: done
-  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: in-progress
+  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: backlog
   7-3-être-protégé-par-le-hook-pre-commit-gitleaks: backlog
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: backlog
   7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: backlog
