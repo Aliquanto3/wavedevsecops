@@ -1,6 +1,7 @@
 """Config et client LLM : aucun appel réseau, `send` est remplacé."""
 
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -17,7 +18,7 @@ def test_default_endpoint_is_local_ollama() -> None:
 def test_allowed_endpoints_are_loopback_only() -> None:
     config = load_config()
     for url in config.allowed_endpoints:
-        assert url.startswith(("http://127.0.0.1", "http://localhost"))
+        assert urlsplit(url).hostname in {"127.0.0.1", "localhost", "::1"}, url
 
 
 def test_endpoint_outside_the_allow_list_is_refused() -> None:

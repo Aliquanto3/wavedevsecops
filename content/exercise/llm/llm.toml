@@ -4,5 +4,7 @@ base_url = "http://127.0.0.1:11434/v1"
 model = "llama3.2"
 timeout_seconds = 60
 
-# Seuls ces endpoints peuvent être appelés (le code refuse tout autre `base_url`).
+# Endpoints que ce projet accepte d'appeler : `llm_config.py` refuse un `base_url` absent
+# de cette liste, et les tests vérifient qu'elle ne contient que des adresses locales.
+# Y ajouter un service distant fait sortir vos données du poste : à faire relire.
 allowed_endpoints = ["http://127.0.0.1:11434/v1"]

@@ -102,17 +102,28 @@ def _prepare(track: str, stage: str, tmp_path: Path, git_path: Path) -> Path:
     return prepared.layout.repo
 
 
+USE_TEMPLATE_LOCK = os.environ.get("WDS_EXERCISE_UV") == "1"
+"""En CI : les tests du gabarit tournent dans son environnement verrouillé, créé par
+`uv sync --offline --frozen` depuis le cache uv préchargé (AD-12), `httpx` compris.
+Sinon : avec l'interpréteur de l'application, sans `httpx`."""
+
+
 def _run_tests(repo: Path) -> subprocess.CompletedProcess[str]:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("PYTHON", "WDS_"))}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    return subprocess.run(  # noqa: S603 - sous-processus de test, argv fixe
-        [sys.executable, "-I", "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider"],
-        cwd=repo,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=120,
+    pytest_args = ["pytest", "-q", "--tb=short", "-rs", "-p", "no:cacheprovider"]
+    if USE_TEMPLATE_LOCK:
+        env["UV_PROJECT_ENVIRONMENT"] = str(repo.parent / "cache" / "venv")
+        argv = ["uv", "run", "--offline", "--frozen", *pytest_args]
+    else:
+        argv = [sys.executable, "-I", "-m", *pytest_args]
+    result = subprocess.run(  # noqa: S603 - sous-processus de test, argv fixe
+        argv, cwd=repo, env=env, capture_output=True, text=True, timeout=300
     )
+    if USE_TEMPLATE_LOCK:
+        # Dans l'environnement du gabarit, aucun test n'est sauté (chemin `httpx` compris).
+        assert "skipped" not in result.stdout, result.stdout
+    return result
 
 
 def test_parcours_sans_ia_pose_le_gabarit_et_ses_tests_passent(

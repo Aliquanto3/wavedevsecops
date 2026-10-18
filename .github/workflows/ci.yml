@@ -31,6 +31,17 @@ jobs:
       - name: Installer Python 3.14 et les dépendances (uv.lock figé)
         run: uv sync --locked --group chain
 
+      # AD-12 : précharge le cache uv avec les verrous des gabarits d'exercice (seule étape
+      # réseau). Les tests des gabarits tournent ensuite dans un environnement créé par
+      # `uv sync --offline --frozen`, `httpx` compris (WDS_EXERCISE_UV, tests/test_exercise.py).
+      - name: Précharger le cache uv des gabarits d'exercice
+        shell: bash
+        run: |
+          for track in llm no_ai; do
+            UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/venv-$track" \
+              uv sync --frozen --project "content/exercise/$track"
+          done
+
       - name: ruff
         run: uv run ruff check .
 
@@ -38,11 +49,15 @@ jobs:
       # socket.connect), les règles de dépendance d'AD-1 et la cohérence des versions d'AD-16.
       - name: pytest
         run: uv run pytest -q --tb=short
+        env:
+          WDS_EXERCISE_UV: "1"
 
       # AD-13, contrôle (4) : la suite de scénarios rejouée sans réseau, sous-processus
       # (git) compris. L'espace de noms est créé par root, les tests tournent en runner.
       - name: Scénarios sans réseau (unshare -n)
         if: runner.os == 'Linux'
+        env:
+          WDS_EXERCISE_UV: "1"
         run: >
           sudo unshare --net --
           sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"

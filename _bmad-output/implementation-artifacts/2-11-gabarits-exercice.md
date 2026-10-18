@@ -35,3 +35,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.11 ».
 - `httpx` (0.28.1) n'est pas dans la table Stack du spine : à y ajouter, avec une ligne pour le gabarit LLM.
 - Vérification de FR-28 sur le vrai modèle et exécution de `llmrun` : hors périmètre ; aucun vrai modèle ni réseau utilisé ici.
 - `uv.lock` des gabarits généré avec uv 0.12.23 en ligne ; la préchargement de `uv-cache` pour ces verrous relève de l'installeur (AD-12).
+
+## Revue
+
+Revue Opus, avec la liste du second avis (Haiku). Aucun constat high.
+
+- medium · second avis 1 · corrigé : `allowed_endpoints` n'est pas une frontière de sécurité (l'apprenant édite les deux clés ; la frontière réseau est `llmrun`, AD-13). Le commentaire de `llm.toml` dit désormais ce que fait le code et invite à faire relire l'ajout d'un service distant ; l'oracle de `test_allowed_endpoints_are_loopback_only` comparait des préfixes (`http://localhost.exemple.test` passait) et compare maintenant le nom d'hôte. Le contrôle reste dans le gabarit, au niveau pédagogique.
+- medium · second avis 2 · rejeté pour 2.11, reporté : les tests du gabarit lancés ici remplacent `send` et tournent sous `unshare -n` en CI Linux (AD-13, contrôle 4, sous-processus compris). L'exécution des tests du gabarit par `toolrun` (hook pre-commit, pipeline) n'existe pas encore ; la story qui la livre (station 1, hooks/`toolrun`, FR-21) doit vérifier qu'un test du gabarit ne peut pas sortir (proxy retiré ne suffit pas contre une connexion directe).
+- medium · second avis 3 · corrigé : en CI (`WDS_EXERCISE_UV=1`), les tests des gabarits tournent dans leur environnement verrouillé, `httpx` 0.28.1 compris ; aucun test sauté n'est toléré, donc `test_post_json_uses_httpx_without_network` s'exécute (vérifié en local : 13 tests passés au stade `loop`).
+- medium · second avis 4 · corrigé : la CI précharge le cache uv avec les deux `uv.lock` (seule étape réseau), puis `tests/test_exercise.py` crée l'environnement de l'espace (`cache/venv/`) par `uv run --offline --frozen`, comme AD-12 ; y compris sous `unshare -n`. Sans la variable (poste de dev), repli sur l'interpréteur de l'application.
+- low · second avis 5 · reporté, décision à remonter : `httpx==0.28.1` absent de la table Stack du spine ; le test de cohérence AD-16 ne le couvre pas. Le spine n'est pas modifié ici.
+- low · second avis 6 · corrigé : hooks `ruff` et `pytest` des deux gabarits en `uv run --offline --frozen` (un `uv run` sans `--frozen` peut réécrire `uv.lock`). Empreintes régénérées.
+- low · second avis 7 · rejeté : `content/exercise/` est écrit par l'auteur, pas par l'apprenant ; un lien ou un binaire y ferait échouer `read_text` bruyamment au setup et en CI, sans effet silencieux.
+- low · second avis 8 · rejeté : les scénarios `gabarit-*.A` portent les empreintes de référence des gabarits sur les trois systèmes (AD-18), comme `bac-a-sable-libre`. Leur visibilité au catalogue est à trancher par la story du catalogue.
