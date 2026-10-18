@@ -53,7 +53,7 @@ development_status:
   2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: done
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
-  2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: backlog
+  2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: in-progress
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: backlog
   2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: backlog
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
@@ -63,7 +63,7 @@ development_status:
   3-1-tenir-un-modèle-de-pr-complet-prêt-pour-les-stations: done
   3-2-ouvrir-une-pr-et-la-merger: done
   3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: backlog
-  3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: backlog
+  3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: in-progress
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
   epic-3-retrospective: optional
 
@@ -79,7 +79,7 @@ development_status:
 
   epic-5: backlog
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: backlog
-  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: backlog
+  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: in-progress
   5-3-désigner-un-élément-dans-les-vues: backlog
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
