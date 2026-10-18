@@ -93,3 +93,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.1 · second-avis · 3 medium, 5 low · —
 - 2026-10-18 · 1.1 · review · 4 medium corrigés (dont DNS du hook d'audit), point 8 reporté à 1.4 (`--group chain` en CI) · 413664e
 - 2026-10-18 · 1.1 · fusion · ff sur main, suite complète 80 passed · 413664e
+- 2026-10-18 · 1.1 · CI · verte sur les trois OS, story done · 0429d97
+- 2026-10-18 · 1.2, 1.4 · dev · vague V1 lancée (dev-story Sonnet, worktrees) · —
+- 2026-10-18 · 1.2 · dev · fini, 94 tests, CI verte sur la branche · c19fdc1
+- 2026-10-18 · 1.4 · dev · fini, 126 tests (gitleaks absent du poste, signalé missing) · 6e81819
+- 2026-10-18 · 1.2 · second-avis · 2 medium, 5 low · —
+- 2026-10-18 · 1.2 · review · 6 corrigés (verrou atomique, OSError, second lancement sans écriture…), vivacité par pid reportée · 6d1c425
+- 2026-10-18 · 1.2 · fusion · ff sur main, suite complète 100 passed · 6d1c425
+- 2026-10-18 · 1.4 · second-avis · 1 high (terminate_tree n'arrête pas l'arbre si le chef est sorti), 2 medium, 5 low · —
