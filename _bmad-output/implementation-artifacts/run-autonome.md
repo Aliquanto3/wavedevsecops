@@ -151,3 +151,12 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.3 · second-avis · 2 medium (gabarits listés au catalogue, critères DOM testés par grep), 4 low ; décision orchestrateur : scénarios gabarit-* internes, masqués du catalogue · —
 - 2026-10-18 · 8.2 · review · rebase (conflit app.py trivial), medium corrigé (corps borné au flux, Origin étrangère refusée), 4 low corrigés (échec fermé, partie locale, extrait atomique) · 1db409a
 - 2026-10-18 · 8.2 · fusion · ff sur main, suite complète 386 passed / 34 skipped, CI branche verte, story done · 1db409a
+- 2026-10-18 · 7.1 · dev · fini, CI verte sur 6 jobs (install.ps1 réel ajouté), garde réseau .pth dans le venv du gabarit, branchement toolrun reporté à 7.2 · c0d474b
+- 2026-10-18 · 7.1 · second-avis · 2 medium prouvés (garde réseau : nom 127.* non résolu autorisé, sendto UDP non audité), 7 low · —
+- 2026-10-18 · 2.6 · dev · fini, 389 tests, CI verte ; placement par génération, indépendant des refs · 9dd49eb
+- 2026-10-18 · 3.1 · dev · fini, 355 tests, CI verte, 4 empreintes de référence régénérées (github.json inclus) · 61f0532
+- 2026-10-18 · 3.1 · second-avis · 1 medium (refresh seulement au setup), 8 low ; décision pour Anaël : une approbation survit-elle à un nouveau push ? (défaut actuel : oui, comme GitHub sans dismiss_stale_reviews) · —
+- 2026-10-18 · 2.3 · review · rebase sur de2df2c, 2 medium corrigés (scénarios internes catalogue: false, tests DOM réels sur doublure minidom), 4 low · de83bb3
+- 2026-10-18 · 2.6 · second-avis · 1 medium prouvé (placement par date : un commit antidaté déplace les existants), 6 low · —
+- 2026-10-18 · 2.3 · fusion · ff sur main, suite complète 409 passed / 36 skipped, CI branche verte, story done ; rendu navigateur à vérifier par Anaël · de83bb3
+- 2026-10-18 · 2.4, 9.1 · dev · lancés (Sonnet) · —
