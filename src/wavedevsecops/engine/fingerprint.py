@@ -8,7 +8,9 @@ Empreinte : sha256 d'une sérialisation triée de l'état de l'espace :
 - chemin et contenu (sha256) de chaque fichier suivi ou non ignoré de l'arbre de travail
   (un lien symbolique vaut sa cible écrite : il n'est jamais suivi) ;
 - liste ordonnée du stash ;
-- chemin et contenu de chaque fichier de `hooks/`.
+- chemin et contenu de chaque fichier de `hooks/` ;
+- `github.json` sérialisé de façon canonique, sans `checks[].output`, durées ni horodatages
+  (`github_sim.canonical_digest`, son seul propriétaire).
 
 Les dates de fichier, les fichiers ignorés, `ci/` et `cache/` en sont exclus. « Identique
 octet pour octet » veut dire : même empreinte.
@@ -21,7 +23,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from wavedevsecops import gitio, wsfs
+from wavedevsecops import github_sim, gitio, wsfs
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.gitio import Git
 from wavedevsecops.wsfs import Layout
@@ -48,6 +50,7 @@ def canonical_records(layout: Layout, git: Git) -> list[str]:
         records.append(f"repo stash {position} {sha}")
     for rel in wsfs.iter_files(layout.hooks):
         records.append(f"hooks {rel} {_digest(wsfs.read_entry(layout.hooks, rel))}")
+    records.append(f"github {github_sim.canonical_digest(layout) or 'absent'}")
     return sorted(records)
 
 

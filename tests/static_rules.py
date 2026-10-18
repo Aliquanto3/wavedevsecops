@@ -345,3 +345,42 @@ def explanation_publish_violations(src: Path = SRC, package: str = PACKAGE) -> l
                 line = getattr(node, "lineno", 0)
                 violations.append(f"{module}:{line} publie {name} hors de la file d'opérations")
     return violations
+
+
+# `github.json` n'a qu'un écrivain : `github_sim` (AD-5, AD-8). `wsfs` déclare son chemin.
+GITHUB_JSON_OWNERS = frozenset({"github_sim", "wsfs"})
+GITHUB_JSON_ATTRIBUTE = "github_json"
+GITHUB_JSON_FILE = "github.json"
+
+
+def _docstrings(tree: ast.AST) -> set[int]:
+    found = set()
+    for owner in ast.walk(tree):
+        body = getattr(owner, "body", None)
+        if isinstance(body, list) and body:
+            first = body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                found.add(id(first.value))
+    return found
+
+
+def github_json_violations(src: Path = SRC, package: str = PACKAGE) -> list[str]:
+    """Aucun module hors de `github_sim` ne nomme le chemin de `github.json` (attribut
+    `github_json` ou nom de fichier hors docstring) : les autres le lisent par `github_sim`."""
+    violations = []
+    for module, path in iter_modules(src, package):
+        if component(module) in GITHUB_JSON_OWNERS:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        docstrings = _docstrings(tree)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == GITHUB_JSON_ATTRIBUTE:
+                violations.append(f"{module}:{node.lineno} nomme .github_json hors de github_sim")
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and GITHUB_JSON_FILE in node.value
+                and id(node) not in docstrings
+            ):
+                violations.append(f"{module}:{node.lineno} nomme github.json hors de github_sim")
+    return violations

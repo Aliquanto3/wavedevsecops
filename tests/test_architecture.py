@@ -9,9 +9,32 @@ from static_rules import (
     dependency_violations,
     env_read_violations,
     explanation_publish_violations,
+    github_json_violations,
     iter_modules,
     sandbox_write_violations,
 )
+
+
+def test_seul_github_sim_nomme_github_json() -> None:
+    assert github_json_violations() == []
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "layout = None\nlayout.github_json\n",
+        "from pathlib import Path\nPath('ws') / 'github.json'\n",
+    ],
+)
+def test_ecrivain_de_github_json_detecte(tmp_path: Path, code: str) -> None:
+    doc = '"""Lit github.json par github_sim."""\n'
+    src = _write(
+        tmp_path,
+        {"engine/x.py": doc + code, "github_sim/__init__.py": code, "wsfs/__init__.py": code},
+    )
+    violations = github_json_violations(src, "pkg")
+    assert len(violations) == 1, violations
+    assert violations[0].startswith("pkg.engine.x")
 
 
 def test_seule_la_file_publie_une_explication() -> None:

@@ -1,9 +1,9 @@
 {
   "fingerprints": {
-    "llm/bac-a-sable-libre.A": "c96e570dffb5914af707fe201757d3daf6a33ec79bffc62bf6a92919dab4e9b2",
-    "llm/gabarit-llm.A": "457d28d9dce36befc12773cfae1c6a2393faf4a2460a34f3484ae910de8daa46",
-    "no_ai/bac-a-sable-libre.A": "c96e570dffb5914af707fe201757d3daf6a33ec79bffc62bf6a92919dab4e9b2",
-    "no_ai/gabarit-sans-ia.A": "b86b5e8976bf0150b54c33faf60b1d10ed2b9c5dfb5fe34eeb7aeb90a4e70c2d"
+    "llm/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
+    "llm/gabarit-llm.A": "c7b3b99d93b7931197af61d7f673c1540d92bce875147e1ce75161937eba2b4b",
+    "no_ai/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
+    "no_ai/gabarit-sans-ia.A": "ab1816d045e819f32c9e986a5c62d93cf95f4f4aee7c12ae8215e8ed684f1094"
   },
   "schema_version": 1
 }
