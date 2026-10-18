@@ -80,6 +80,7 @@ RESTORE_FAILED_TEXT = (
     "L'état n'a pas pu être rétabli : cette action est refusée pour ne pas vous laisser sur un "
     "état faux. Recommencez le scénario."
 )
+REFUSED_IN_QUEUE_ACTION = "L'action n'a pas été faite. Relisez l'état de l'espace, puis réessayez."
 RESTART_INTENT = "restart"
 """Seule intention d'écriture admise après un rétablissement échoué (story 4.4)."""
 
@@ -419,15 +420,9 @@ class WorkspaceEngine:
                     "Réessayez."
                 )
             self._check_epoch(op)
-            if (
-                op.writes
-                and op.state != "setup"
-                and op.intent != RESTART_INTENT
-                and self._restore_failed()
-            ):
-                raise OperationRefused(RESTORE_FAILED_TEXT)
-            if op.writes and self._rest == "quiz_altered":
-                raise OperationRefused(QUIZ_REFUSED_TEXT)
+            refusal = self._write_refusal(op)
+            if refusal:
+                raise OperationRefused(refusal)
             if len(self._pending) >= self.settings.max_pending_ops:
                 raise OperationRefused(
                     "Trop d'actions sont en attente dans cet espace. Attendez la fin des "
@@ -437,6 +432,21 @@ class WorkspaceEngine:
             self._pending.append((op, future))
             self._queue.put((op, future))
             return future
+
+    def _write_refusal(self, op: Operation) -> str:
+        """Texte du refus d'une écriture (`restore_failed`, `quiz_altered`), vide si admise.
+
+        Vérifié à la soumission et de nouveau à l'exécution : une écriture placée dans la file
+        avant qu'un choix de quiz ou un rétablissement échoué ne change l'état ne passe pas.
+        « Recommencer » (`restart`) et l'installation restent admises : elles reconstruisent.
+        """
+        if not op.writes or op.state == "setup" or op.intent == RESTART_INTENT:
+            return ""
+        if self._restore_failed():
+            return RESTORE_FAILED_TEXT
+        if self._rest == "quiz_altered":
+            return QUIZ_REFUSED_TEXT
+        return ""
 
     def _check_epoch(self, op: Operation) -> None:
         if op.epoch is not None and op.epoch != self.epoch:
@@ -599,6 +609,10 @@ class WorkspaceEngine:
         # L'epoch est revérifié à l'exécution : un Recommencer passé devant l'a peut-être changé.
         self._check_epoch(op)
         ctx = OpContext(self, op)
+        refusal = self._write_refusal(op)
+        if refusal:
+            self._fail(ctx, refusal, REFUSED_IN_QUEUE_ACTION)
+            return OpResult(op.op_id, None, None)
         if op.precheck is not None:
             try:
                 wanted = op.precheck(ctx)

@@ -127,7 +127,8 @@ class StepRunner:
             published = StepVerdict(
                 step_id=step.step_id, passed=True, status="passed", next_step_id=following or ""
             )
-            facts = self._facts_of(run, [step.step_id], finished=following is None)
+            facts = self._quiz_facts(run, [step.step_id])
+            facts += self._facts_of(run, [step.step_id], finished=following is None)
             return replace(
                 StepOutcome.explained(published, step.explanation_text, step.explain_ref),
                 facts=tuple(facts),
@@ -140,7 +141,7 @@ class StepRunner:
             expected_text=verdict.expected_text,
             observed=[StepObserved(text=o.text, element_id=o.element_id) for o in verdict.observed],
         )
-        return StepOutcome(published)
+        return StepOutcome(published, facts=tuple(self._quiz_facts(run, [step.step_id])))
 
     # ----------------------------------------------------------------- faits
     @staticmethod
@@ -156,6 +157,34 @@ class StepRunner:
             facts.append({"kind": "scenario_completed", **where})
         return facts
 
+    @staticmethod
+    def _quiz_facts(run: dict[str, Any], step_ids: list[str] | None = None) -> list[dict]:
+        """Premiers essais de quiz (AD-14) consignés dans `run.json.quiz_first` par le choix.
+
+        Le magasin garde le premier fait de chaque étape : un essai suivant, ou le même essai
+        rejoué après un arrêt brutal, n'ajoute rien.
+        """
+        first = run.get("quiz_first")
+        if not isinstance(first, dict):
+            return []
+        where = {
+            "track": run.get("track"),
+            "scenario_id": run.get("scenario_id"),
+            "mode": run.get("mode"),
+        }
+        return [
+            {
+                "kind": "quiz_first_attempt",
+                "step_id": sid,
+                "correct": entry.get("correct") is True,
+                **where,
+            }
+            for sid, entry in first.items()
+            if isinstance(sid, str)
+            and isinstance(entry, dict)
+            and (step_ids is None or sid in step_ids)
+        ]
+
     def replay(self, engine: WorkspaceEngine) -> list[dict[str, Any]]:
         """Faits que `run.json` établit déjà : l'écriture de `run.json` précède celle des faits,
         un arrêt brutal entre les deux en laisse des manquants (le magasin ignore les doublons).
@@ -167,6 +196,9 @@ class StepRunner:
         scenario = self.scenario(run) if run is not None else None
         if run is None or scenario is None:
             return []
+        return self._quiz_facts(run) + self._replay_steps(run, scenario)
+
+    def _replay_steps(self, run: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
         ids = [s.step_id for s in scenario.steps]
         current = run.get("step_id")
         validated = run.get("validated")

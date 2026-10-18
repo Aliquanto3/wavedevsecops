@@ -27,13 +27,26 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 4.5 » ; F
 - Le quiz vit dans `terminal/` (il réutilise `_run_git`, la garde et la liste blanche) : `engine` n'importe pas `terminal`, et `restore_state` n'a pas besoin d'un module à part.
 - `quiz` est consigné dans `run.json` avant la commande, pas après : un arrêt entre les deux laisse un quiz à rétablir plutôt qu'un état modifié sans bandeau.
 - `restore_failed` ne devient pas un état du moteur (AD-1 en fixe la liste) : c'est une clé de `run.json`, lue par la file pour refuser les écritures.
-- Le premier essai (AD-14) est conservé dans `run.json.quiz_first` et porté par `quiz_altered.first_attempt` ; `progress.json` n'est pas écrit ici (voir Reports).
+- Le premier essai (AD-14) est consigné dans `run.json.quiz_first` par le choix, porté par `quiz_altered.first_attempt`, puis enregistré comme fait `quiz_first_attempt{correct}` de `progress.json` (story 4.2) : `StepRunner.validate` ajoute le brouillon au verdict (juste ou faux), `StepRunner.replay` le rejoue au réveil depuis `run.json.quiz_first`. Le magasin garde le premier fait par étape, y compris après un Recommencer qui viderait `quiz_first`.
 
 ## Reports
 
-- Enregistrement du premier essai dans `progress.json` (faits du premier passage, story 4.2) : lire `run.json.quiz_first[step_id]` ou l'événement `quiz_altered.first_attempt`. Pour une bonne réponse du premier coup, seule l'entrée `quiz_first` existe (pas d'événement `quiz_altered`).
-- Recommencer (4.4) : enregistrer l'intention `restart` (déjà exemptée du refus après `restore_failed`), effacer `restore_failed`, `quiz` et `quiz_first` à la reconstruction. Le bouton « Recommencer » de l'encart poste déjà `restart` ; sans l'intention, le serveur répond 404 et le texte s'affiche dans la zone d'erreur.
+- Recommencer (4.4) : enregistrer l'intention `restart` (exemptée des refus `restore_failed` et `quiz_altered`), effacer `restore_failed`, `quiz` et `quiz_first` à la reconstruction et remettre l'état de repos à `idle` (`ctx.set_rest_state("idle")`) : après un rétablissement échoué, l'espace reste en `quiz_altered`. Le bouton « Recommencer » de l'encart poste déjà `restart` ; sans l'intention, le serveur répond 404 et le texte s'affiche dans la zone d'erreur.
 - Marque « Rétabli » sur les éléments des vues : la projection la porte déjà (`restored`, `a11y_name_text`) ; son rendu visuel revient aux vues concernées (graphe). Ici, l'annonce « Rétabli. » est dans le panneau.
 - Terminal en lecture seule (`aria-readonly`) pendant l'état modifié (UX-DR10) : non appliqué, car l'AC de la story veut que le terminal accepte les commandes de lecture ; le serveur refuse les autres.
 - Vue Code : ses écritures seront refusées par la même règle de file dès qu'elle soumettra des opérations `writes=True`.
 - Aucun scénario de `content/scenarios/` ne contient encore d'étape `quiz` : les scénarios des épics suivants les déclarent.
+
+## Revue
+
+Reviewer (Opus), après rebase sur `origin/main` (4.2, 3.2, 6.6, 2.7, 2.5). Conflits d'ajout seulement : `store.js` (`announce` et `restored` gardés) et `workspace.js` (annonce de la 2.7 suivie du statut, où `quizStatus` passe avant le statut d'étape ; bandeau du quiz mis à jour à chaque état).
+
+- high, second avis H1 : « Recommencer » refusée après `restore_failed` (garde `quiz_altered` toujours active). Corrigé : `restart` exemptée des deux refus (`_write_refusal`) ; test `test_un_vrai_retablissement_echoue_laisse_recommencer_seulement` sur un vrai échec (manifeste d'instantané retiré).
+- high, second avis H2 : deux `quiz_choice` en file passaient la garde (vérifiée à la soumission seulement). Corrigé : la garde d'écriture est revérifiée à l'exécution (`app_error` « Refusée pendant l'état modifié par le quiz… »), et le choix a un `precheck` (étape toujours en cours, aucun quiz en attente). Couvre aussi une ligne de terminal en écriture placée derrière un mauvais choix. Tests `test_deux_choix_envoyes_d_affilee_n_en_executent_qu_un`, `test_une_ecriture_en_file_derriere_un_mauvais_choix_est_refusee`.
+- medium, second avis M3 : `run.json.quiz` posé mais repos `idle` si git lève. Corrigé : `set_rest_state` avant la commande, `quiz_altered` publié dans un `finally` ; test `test_un_git_en_echec_laisse_l_etat_modifie_coherent`.
+- medium, second avis M4 : « score du premier coup conservé » sans écriture dans `progress.json`. Corrigé : fait `quiz_first_attempt` (voir Décisions) ; tests dans `test_seul_le_premier_essai_est_retenu` et `test_le_premier_essai_est_rejoue_au_reveil`.
+- medium, second avis M5 : vrai `restore_failed` et soumissions concurrentes non testés. Corrigé par les tests ci-dessus (les six nouveaux tests échouent sur le code d'avant la revue).
+- low, second avis L6 : `restore_state` admis après `restore_failed`. Corrigé (l'AC ne laisse que « Recommencer ») : refus à la construction.
+- low, second avis L7 : exemption des opérations `setup`. Rejeté : saine, l'installation reconstruit l'espace.
+- low, second avis L8 : une écriture déclarée `writes=False` contournerait la garde. Rejeté : le drapeau est la déclaration de l'opération (AD-1), posé par `parse_line` pour le terminal ; pas de cas réel.
+- low, Complexité, reviewer : `_write_refusal` relit `run.json` à la soumission et à l'exécution de chaque écriture (quelques Ko, O(1) par opération) ; `_quiz_facts` parcourt `quiz_first`, borné par le nombre d'étapes. Aucun parcours d'une structure qui grossit : rien à corriger. Complexité : 0 constat à impact.

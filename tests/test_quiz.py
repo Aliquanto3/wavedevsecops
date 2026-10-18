@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import threading
+import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,10 +26,12 @@ from wavedevsecops.engine import (
     list_snapshots,
     load_run,
     save_run,
+    snapshots,
 )
 from wavedevsecops.engine.operations import QUIZ_REFUSED_TEXT, RESTORE_FAILED_TEXT
 from wavedevsecops.events import Envelope, Kind
 from wavedevsecops.gitio import Git
+from wavedevsecops.progress.facts import ProgressStore
 from wavedevsecops.scenarios import load_scenario
 from wavedevsecops.scenarios.steps.quiz import Args
 
@@ -257,6 +262,40 @@ def test_seul_le_premier_essai_est_retenu(make_box) -> None:
     assert load_run(box.engine.layout)["quiz_first"] == {
         "annuler": {"choice_id": "branche", "correct": False}
     }
+    # Le premier essai est le fait du score (story 4.2), un seul par étape.
+    quiz = [
+        f
+        for f in ProgressStore.for_dir(box.settings.resolved_data_dir()).facts()
+        if f["kind"] == "quiz_first_attempt"
+    ]
+    assert [(f["step_id"], f["correct"]) for f in quiz] == [("annuler", False)]
+
+
+def test_le_premier_essai_est_rejoue_au_reveil(make_box, git_path: Path) -> None:
+    box = make_box()
+    box.choose("revert")
+    store = ProgressStore.for_dir(box.settings.resolved_data_dir())
+    assert [
+        (f["kind"], f["correct"]) for f in store.facts() if f["kind"] == "quiz_first_attempt"
+    ] == [("quiz_first_attempt", True)]
+    assert store.progress("llm", "quiz", "A").first_try_score == 100
+    box.manager.close()
+    # Arrêt brutal entre `run.json` et `progress.json` : le fait manquant revient au réveil.
+    path = box.settings.resolved_data_dir() / "progress.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["facts"] = [f for f in data["facts"] if f["kind"] != "quiz_first_attempt"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    reopened = WorkspaceManager(box.settings, git_path=git_path, watch=False)
+    try:
+        reopened.get("llm.quiz.A")
+        deadline = time.monotonic() + WAIT
+        while time.monotonic() < deadline:
+            facts = [f for f in store.facts() if f["kind"] == "quiz_first_attempt"]
+            if facts:
+                break
+        assert [(f["step_id"], f["correct"]) for f in facts] == [("annuler", True)]
+    finally:
+        reopened.close()
 
 
 def test_l_etat_modifie_survit_a_la_reouverture(make_box, git_path: Path) -> None:
@@ -286,6 +325,90 @@ def test_apres_un_retablissement_echoue_seules_les_lectures_passent(make_box) ->
     assert box.engine.snapshot()["step_panel"]["restore_failed"] == {"reason_text": "x"}
     # « Recommencer » (4.4) reste admise.
     box.engine.submit(Operation("restart", lambda ctx: 0)).result(WAIT)
+
+
+def test_un_vrai_retablissement_echoue_laisse_recommencer_seulement(make_box) -> None:
+    box = make_box()
+    box.choose("reset_hard")
+    # Instantané perdu : la restauration échoue pour de vrai.
+    snapshot_id = load_run(box.engine.layout)["quiz"]["snapshot_id"]
+    (box.engine.layout.snapshots / str(snapshot_id) / snapshots.MANIFEST_FILE).unlink()
+    ended = _of(box.restore(), Kind.RESTORE_ENDED)[0].payload
+    assert ended["status"] == "restore_failed"
+    assert load_run(box.engine.layout)["restore_failed"]
+    assert box.engine.snapshot()["step_panel"]["restore_failed"]["reason_text"]
+    for intent, body in (
+        ("terminal_line", {"line": "git commit --allow-empty -m x"}),
+        ("quiz_choice", {"choice_id": "revert"}),
+    ):
+        with pytest.raises(OperationRefused) as refused:
+            box.engine.submit(build_operation(box.engine, intent, body))
+        assert refused.value.reason_text == RESTORE_FAILED_TEXT
+    # « Seule action : Recommencer » : un nouveau rétablissement n'est pas proposé.
+    with pytest.raises(OperationRefused) as again:
+        build_operation(box.engine, "restore_state", {})
+    assert again.value.reason_text == RESTORE_FAILED_TEXT
+    read = build_operation(box.engine, "terminal_line", {"line": "git status"})
+    assert box.engine.submit(read).result(WAIT).code == 0
+    # « Recommencer » (4.4) passe, même si l'espace est resté en `quiz_altered`.
+    assert box.engine.rest_state == "quiz_altered"
+    box.engine.submit(Operation("restart", lambda ctx: 0, validate=False)).result(WAIT)
+
+
+def _blocked(box: Box) -> threading.Event:
+    """Occupe la file : les opérations suivantes attendent derrière."""
+    gate = threading.Event()
+    box.engine.submit(Operation("block", lambda ctx: gate.wait(WAIT), writes=False, validate=False))
+    return gate
+
+
+def test_deux_choix_envoyes_d_affilee_n_en_executent_qu_un(make_box) -> None:
+    box = make_box()
+    before = box.fingerprint()
+    gate = _blocked(box)
+    first = box.engine.submit(build_operation(box.engine, "quiz_choice", {"choice_id": "branche"}))
+    second = box.engine.submit(
+        build_operation(box.engine, "quiz_choice", {"choice_id": "reset_hard"})
+    )
+    start = len(box.events)
+    gate.set()
+    first.result(WAIT)
+    second.result(WAIT)
+    assert len(_of(box.events[start:], Kind.QUIZ_ALTERED)) == 1
+    assert load_run(box.engine.layout)["quiz"]["choice_id"] == "branche"
+    assert box.log() == ["Ajoute les notes", "Ajoute le README"]
+    box.restore()
+    assert box.fingerprint() == before
+
+
+def test_une_ecriture_en_file_derriere_un_mauvais_choix_est_refusee(make_box) -> None:
+    box = make_box()
+    gate = _blocked(box)
+    box.engine.submit(build_operation(box.engine, "quiz_choice", {"choice_id": "branche"}))
+    write = box.engine.submit(
+        build_operation(box.engine, "terminal_line", {"line": "git commit --allow-empty -m x"})
+    )
+    start = len(box.events)
+    gate.set()
+    assert write.result(WAIT).code is None
+    errors = _of(box.events[start:], Kind.APP_ERROR)
+    assert [e.payload["cause_text"] for e in errors] == [QUIZ_REFUSED_TEXT]
+    assert box.log() == ["Ajoute les notes", "Ajoute le README"]
+
+
+def test_un_git_en_echec_laisse_l_etat_modifie_coherent(make_box, monkeypatch) -> None:
+    box = make_box()
+    from wavedevsecops.terminal import quiz as quiz_module
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("git introuvable")
+
+    monkeypatch.setattr(quiz_module, "_run_git", boom)
+    events = box.choose("branche")
+    assert load_run(box.engine.layout)["quiz"]["choice_id"] == "branche"
+    assert box.engine.rest_state == "quiz_altered"
+    assert box.engine.state == "quiz_altered"
+    assert _of(events, Kind.QUIZ_ALTERED)
 
 
 def test_refus_d_un_choix_hors_quiz_ou_inconnu(make_box) -> None:

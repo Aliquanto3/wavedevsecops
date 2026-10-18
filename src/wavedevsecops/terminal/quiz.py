@@ -10,8 +10,8 @@ Une bonne réponse laisse l'état produit et valide l'étape. Une mauvaise passe
 L'état revient à `idle` et `run.json.quiz` est effacé par la restauration elle-même.
 
 Premier essai (AD-14) : `run.json.quiz_first[step_id]` garde le premier choix de l'étape, et
-`quiz_altered.first_attempt` dit si le choix en cours est ce premier essai. L'enregistrement
-dans `progress.json` revient à la story des faits du premier passage.
+`quiz_altered.first_attempt` dit si le choix en cours est ce premier essai. La validation de
+l'étape en tire le fait `quiz_first_attempt` de `progress.json` (story 4.2), rejoué au réveil.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from wavedevsecops.engine import (
     save_run,
     take_snapshot,
 )
+from wavedevsecops.engine.operations import RESTORE_FAILED_TEXT
 from wavedevsecops.events import Kind
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios.steps.quiz import CHOICE_KEY, QUIZ_INTENT
@@ -101,25 +102,37 @@ def build_quiz_choice(engine: WorkspaceEngine, body: QuizChoice) -> Operation:
                 "snapshot_id": snapshot.snapshot_id,
             }
         save_run(ctx.layout, {**data, "quiz_first": first, "quiz": pending})
-        ctx.output(choice.command_text, "input")
-        code = _run_git(ctx, command, allow)
         if pending is not None:
+            # Avant la commande, comme `run.json.quiz` : un git en échec laisse l'espace en
+            # `quiz_altered`, cohérent avec ce qui est consigné.
             ctx.set_rest_state("quiz_altered")
-            ctx.emit(
-                Kind.QUIZ_ALTERED,
-                {
-                    **{k: v for k, v in pending.items() if k != "snapshot_id"},
-                    "first_attempt": first_attempt,
-                },
-            )
-        return code
+        ctx.output(choice.command_text, "input")
+        try:
+            return _run_git(ctx, command, allow)
+        finally:
+            if pending is not None:
+                ctx.emit(
+                    Kind.QUIZ_ALTERED,
+                    {
+                        **{k: v for k, v in pending.items() if k != "snapshot_id"},
+                        "first_attempt": first_attempt,
+                    },
+                )
 
-    return Operation(QUIZ_INTENT, run_choice)
+    def still_open(ctx: OpContext) -> bool:
+        """Revérifié dans la file : un double envoi ne rejoue pas un quiz déjà répondu."""
+        data = load_run(ctx.layout)
+        return data.get("step_id") == step.step_id and not data.get("quiz")
+
+    return Operation(QUIZ_INTENT, run_choice, precheck=still_open)
 
 
 def build_restore_state(engine: WorkspaceEngine, body: RestoreState) -> Operation:
     """Rétablit l'instantané pris avant le choix de quiz en attente."""
-    quiz = load_run(engine.layout).get("quiz")
+    run = load_run(engine.layout)
+    if run.get("restore_failed"):
+        raise OperationRefused(RESTORE_FAILED_TEXT)
+    quiz = run.get("quiz")
     if engine.rest_state != "quiz_altered" or not isinstance(quiz, dict):
         raise OperationRefused(NOTHING_TO_RESTORE_TEXT)
     try:
