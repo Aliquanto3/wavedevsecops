@@ -289,3 +289,14 @@ def test_empreinte_inchangee_par_l_heure_des_revues(
     monkeypatch.setattr(github_sim, "now_iso", lambda: "2027-05-05T05:05:05.000+00:00")
     second, _ = _prepare(Settings(data_dir=settings.data_dir / "bis"), git_path, extra)
     assert github_sim.canonical_digest(second.layout) == one
+
+
+def test_empreinte_d_un_github_json_d_avant_la_3_4_inchangee(tmp_path: Path) -> None:
+    """Un `github.json` sans `reactions` (écrit avant la story) garde son empreinte de référence."""
+    from types import SimpleNamespace
+
+    path = tmp_path / "github.json"
+    path.write_text('{"schema_version": 1, "next_number": 1, "protections": [], "pulls": []}')
+    layout = SimpleNamespace(github_json=path)
+    reference = "229bf5c60bc1744d3720ae73bf4ad9a2c4ea1f75b51bc4f7bbf5f767efa42c9a"
+    assert github_sim.canonical_digest(layout) == reference  # type: ignore[arg-type]

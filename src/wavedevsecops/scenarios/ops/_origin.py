@@ -45,7 +45,9 @@ def commit_on_origin(
     Plomberie git sans worktree (index temporaire) : le nouvel arbre est celui de `branch`
     (ou de `start` si `branch` n'existe pas encore sur `origin`) plus `files` (chemin posix ->
     contenu UTF-8, LF). `branch` est avancée avec `update-ref` ; si elle n'existe pas et que
-    `start` est vide, le commit est une racine. Identité et date sont celles du setup (AD-3) :
+    `start` est vide, le commit est une racine ; si elle existe, `start` est ignoré (toujours
+    fast-forward : un push forcé demanderait un parent explicite). Identité et date sont celles
+    du setup (AD-3) :
     le SHA est le même sur les trois systèmes. Rend le SHA du commit."""
     git, bare = ctx.git, ctx.layout.origin
     name = origin_branch(ctx, branch)

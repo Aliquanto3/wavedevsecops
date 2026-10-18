@@ -20,7 +20,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.4 » ; F
 
 ## Registre d'ops et de réactions (pour 5.1)
 
-- Une op = un module de `scenarios/ops/` avec `Args` (`op: Literal["<nom>"]`) et `apply(args, ctx) -> element_id` ; le registre découvre le module, aucune autre modification. Pour agir sur `origin` sous une identité fixe, 5.1 réutilise `ops/_origin.commit_on_origin(ctx, persona, branch, files, message, date, start)` (`persona` : `learner`, `colleague` ou `agent`) : `agent_commit` et `agent_push_force` n'ont qu'à l'appeler ou à s'en inspirer, avec `PERSONAS["agent"]`.
+- Une op = un module de `scenarios/ops/` avec `Args` (`op: Literal["<nom>"]`) et `apply(args, ctx) -> element_id` ; le registre découvre le module, aucune autre modification. Pour agir sur `origin` sous une identité fixe, 5.1 réutilise `ops/_origin.commit_on_origin(ctx, persona, branch, files, message, date, start)` (`persona` : `learner`, `colleague` ou `agent`) : `agent_commit` n'a qu'à l'appeler avec `PERSONAS["agent"]`. `agent_push_force` ne peut pas l'appeler tel quel : sur une branche existante, le parent est toujours son sommet (`start` ne sert qu'à une branche absente), donc le commit est toujours fast-forward ; 5.1 devra ajouter un parent explicite (et un `update-ref` qui accepte la réécriture).
 - Les réactions sont une liste ordonnée dans `github.json` ; un nouveau déclencheur s'ajoute à `ReactionTrigger` (`contracts/github.py`) et à `github_sim._react`. Un auteur `agent` est déjà accepté par `colleague_reaction`.
 - `github_sim.set_check_state` est le point d'entrée qu'un pipeline simulé (`ci`) ou un test appelle pour changer l'état d'un check ; il recalcule les PR et joue les réactions.
 - Clé YAML : le champ s'appelle `trigger` et non `on`, car YAML 1.1 lit `on` comme le booléen vrai.
@@ -35,8 +35,18 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.4 » ; F
 
 - Vue Distant + PR (`review-log`, compteur) : story 3.3 ; les données (`reviews[].author`, `created_at`, `approvals`) sont prêtes.
 - Réaction qui pousse un commit au déclenchement, déclencheur `push`, `closed` : plus tard si un scénario en a besoin.
-- Pipeline simulé qui appelle `set_check_state` (ci, AD-10) : hors périmètre ; aucun scénario du catalogue ne déclare encore de réaction.
+- Pipeline simulé qui appelle `set_check_state` (ci, AD-10), depuis la file de l'espace (AR-2) : hors périmètre ; aucun scénario du catalogue ne déclare encore de réaction.
 
 ## Tests
 
 `tests/test_colleague.py` : commit sur `origin` (identité, date, arbre conservé, local intact), `pull` et badge, SHA de référence, nouvelle branche et racine, refus (`start` absent, chemin hors dépôt, doublon), revues dans l'ordre avec heure et compteur, non-rejeu et filtre `head`, approbation automatique aux checks verts et réarmement après un push, absence d'approbation sur check en échec, empreinte indépendante de l'heure.
+
+## Revue
+
+Revue Opus (une passe), après rebase sur `origin/main` (4.5). Complexité : 0 constat (`_react` parcourt réactions × PR à chaque écriture, tailles de quelques unités).
+
+- low · second avis M1 · corrigé (spec) · `commit_on_origin` ignore `start` sur une branche existante, ce qui est le comportement documenté pour 3.4 ; seule l'affirmation « `agent_push_force` n'a qu'à l'appeler » était fausse : le registre précise maintenant que 5.1 devra ajouter un parent explicite. Pas de code spéculatif pour 5.1.
+- low · second avis L2 · rejeté · `add_reaction` et `set_check_state` suivent le même schéma load/_commit que `set_protection` et `open_pr` : l'exclusion vient de l'appelant (setup, ou intention dans la file). `add_reaction` n'est appelé que par le setup ; le pipeline 7.4 devra appeler `set_check_state` depuis la file (noté dans les reports).
+- low · second avis L3 · confirmé · le job `ruff + pytest` de la CI tourne sur windows, macos et ubuntu et exécute `tests/test_colleague.py` (`FIXED_SHA`) ; l'arbre est écrit en LF et `gitio` force `core.autocrlf=false`.
+- low · second avis L4 · corrigé · test `test_empreinte_d_un_github_json_d_avant_la_3_4_inchangee` : un `github.json` sans `reactions` garde une empreinte de référence écrite en dur.
+- info · revue · rejeté · critère 3 (checks verts) joignable seulement par `set_check_state` (tests) ou des checks déclarés `success` à l'ouverture tant que le pipeline simulé n'existe pas : report déjà consigné (AD-10, 7.4).
