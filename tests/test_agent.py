@@ -92,11 +92,14 @@ def test_agent_commit_identite_date_et_fichiers(settings: Settings, git_path: Pa
 
 
 def test_agent_commit_n_indexe_que_ses_fichiers(settings: Settings, git_path: Path) -> None:
-    extra = """\
+    extra = (
+        """\
   - op: write_file
     path: perso.txt
     content: "à moi\\n"
-""" + AGENT_COMMIT
+"""
+        + AGENT_COMMIT
+    )
     prepared, git = _prepare(settings, git_path, extra)
     layout = prepared.layout
     assert _repo(git, layout, "show", "--name-only", "--format=", "HEAD") == "app.py"
@@ -201,6 +204,21 @@ def test_rebase_sans_conflit_refuse(settings: Settings, git_path: Path) -> None:
 """
     with pytest.raises(Exception, match="sans conflit"):
         _prepare(settings, git_path, extra, feature="autre.py")
+
+
+def test_rebase_deja_en_cours_refuse(settings: Settings, git_path: Path) -> None:
+    # sans ce refus, le second `git rebase` échoue (code 128) et `rebase-merge` du premier
+    # ferait croire à un nouveau conflit (revue 5.1)
+    extra = (
+        AGENT_COMMIT
+        + REBASE
+        + """\
+  - op: agent_rebase_conflict
+    onto: main
+"""
+    )
+    with pytest.raises(Exception, match="déjà en cours"):
+        _prepare(settings, git_path, extra)
 
 
 def test_scenario_rejoue_deux_fois_donne_la_meme_empreinte(

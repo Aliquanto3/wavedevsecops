@@ -38,7 +38,10 @@ def apply(args: Args, ctx: SetupContext) -> str:
         wsfs.write_text(repo, file.path, file.content)
     ctx.git.internal("add", "--", *(f.path for f in args.files), cwd=repo)
     env = ctx.identity_env("agent", ctx.next_date(args.date))
+    # pathspec : seuls ces chemins entrent dans le commit, même si l'index en contient d'autres.
+    message = wsfs.to_lf(args.message)
+    paths = [f.path for f in args.files]
     ctx.git.internal(
-        "commit", "-q", "--no-verify", "-m", wsfs.to_lf(args.message), cwd=repo, extra_env=env
+        "commit", "-q", "--no-verify", "-m", message, "--", *paths, cwd=repo, extra_env=env
     )
     return element_id("commit", ctx.git.internal("rev-parse", "HEAD", cwd=repo).strip())

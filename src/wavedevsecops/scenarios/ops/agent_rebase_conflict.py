@@ -11,6 +11,8 @@ from wavedevsecops.scenarios.context import SetupError
 from wavedevsecops.scenarios.ops._base import OpArgs, check_branch, check_revision
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from wavedevsecops.scenarios.context import SetupContext
 
 
@@ -36,8 +38,20 @@ class Args(OpArgs):
         return None if value is None else check_branch(value)
 
 
+def _rebase_dir(ctx: SetupContext) -> Path | None:
+    """Dossier d'état d'un rebase en cours (`rebase-merge` ou `rebase-apply`), sinon None."""
+    repo = ctx.layout.repo
+    for name in ("rebase-merge", "rebase-apply"):
+        path = repo / ctx.git.internal("rev-parse", "--git-path", name, cwd=repo).strip()
+        if path.is_dir():
+            return path
+    return None
+
+
 def apply(args: Args, ctx: SetupContext) -> str:
     repo = ctx.layout.repo
+    if _rebase_dir(ctx) is not None:
+        raise SetupError("Un rebase est déjà en cours : impossible d'en lancer un autre.")
     argv = ["rebase", ctx.revision(args.onto)]
     if args.branch is None:
         name = ctx.git.internal("symbolic-ref", "--short", "HEAD", cwd=repo).strip()
@@ -48,7 +62,7 @@ def apply(args: Args, ctx: SetupContext) -> str:
     result = ctx.git.run(*argv, cwd=repo, extra_env=env)
     if result.ok:
         raise SetupError("Le rebase s'est terminé sans conflit : le scénario ne le provoque pas.")
-    state = ctx.git.run("rev-parse", "--git-path", "rebase-merge", cwd=repo)
-    if not (repo / state.stdout.strip()).is_dir():
+    # git rend 1 quand le rebase s'arrête sur un conflit ; tout autre code est une erreur.
+    if result.returncode != 1 or _rebase_dir(ctx) is None:
         raise SetupError(f"Le rebase a échoué sans rester en conflit : {result.stderr.strip()}")
     return element_id("ref", f"refs/heads/{name}")
