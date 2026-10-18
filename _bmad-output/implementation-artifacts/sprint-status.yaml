@@ -64,7 +64,7 @@ development_status:
   3-2-ouvrir-une-pr-et-la-merger: done
   3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: review
   3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: done
-  3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
+  3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: in-progress
   epic-3-retrospective: optional
 
   epic-4: in-progress
@@ -78,7 +78,7 @@ development_status:
   epic-4-retrospective: optional
 
   epic-5: backlog
-  5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: in-progress
+  5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: review
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: in-progress
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
@@ -100,7 +100,7 @@ development_status:
 
   epic-7: in-progress
   7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: done
-  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: in-progress
+  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: review
   7-3-être-protégé-par-le-hook-pre-commit-gitleaks: backlog
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: backlog
   7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: backlog

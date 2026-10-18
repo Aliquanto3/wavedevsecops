@@ -297,6 +297,13 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:42 · 3.3 · dev · fini, 975 passed / 41 skipped, CI verte ; projection views.remote (branches distantes, pr-card, checks, raisons liées, review-log), element_id pr:, check:, review: documentés pour 2.10 · 3a2c25a
 - 2026-10-19 00:42 · 3.3 · second-avis · lancé · —
 - 2026-10-19 00:42 · 5.3 · dev · lancé (dev-story Sonnet ; chemin critique de l'Epic 5) · —
+- 2026-10-19 00:42 · 4.6 · fusion · dev-story Opus lancé pour le rebase de fond sur la pile 4.7 (worktree existant, sans push) · —
+- 2026-10-19 00:43 · 4.7 · fusion · branche empilée (6.1 + 2.8 + 4.7 + alignement) poussée, CI branche en cours ; 2.8 CI branche en cours · 0959686
+- 2026-10-19 00:43 · 7.2 · dev · fini, 992 passed / 45 skipped, CI verte ; ruff et pytest dans la section tools de la liste blanche (déclarés par scénario), sortie tool-output, liens fichier:ligne par relance machine, fait evidence_seen, scénarios defaut-de-lint.A et test-casse.A, uv sync interruptible ; étapes à valider sur le résultat d'outil plus tard · d4a2799
+- 2026-10-19 00:43 · 7.2 · second-avis · lancé · —
+- 2026-10-19 00:44 · 5.1 · dev · fini, 966 passed / 41 skipped, CI verte (SHA épinglés identiques sur trois OS) ; ops agent_commit, agent_push_force, stash, agent_rebase_conflict ; commit_on_origin reçoit parent et force en ajout · 1c4c899
+- 2026-10-19 00:44 · 5.1 · second-avis · lancé · —
+- 2026-10-19 00:44 · 3.5 · dev · lancé (dev-story Sonnet ; ouvre 5.7 et 7.3) ; 5.4 attend 5.3 (même front), 4.4 attend 4.6 · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
