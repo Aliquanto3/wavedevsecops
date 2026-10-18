@@ -286,9 +286,10 @@ def test_lien_symbolique_sortant_n_est_ni_lu_ni_suivi(tmp_path: Path) -> None:
     (outside / "secret.txt").write_text("CONTENU-INTERDIT", encoding="utf-8")
     symlink_or_skip(root / "lien", outside)
     symlink_or_skip(root / "fichier-lien", outside / "secret.txt")
+    # `ls lien` ne montre que le nom du lien, sans lister sa cible.
+    assert text(sh(root, "ls lien")) == "lien\n"
     for line in (
         "cat lien/secret.txt",
-        "ls lien",
         "echo x > lien/n.txt",
         "touch lien/n.txt",
         "mkdir lien/d",
