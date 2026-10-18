@@ -189,6 +189,7 @@ def test_voie_zip(tmp_path: Path) -> None:
     record = json.loads((tmp_path / "install.json").read_text("utf-8"))
     assert record["method"] == "zip" and record["versions"]["app"] == "zip:main"
     assert (tmp_path / "app" / "pyproject.toml").exists()
+    assert "les exercices en ont besoin" in out.stdout
 
 
 def test_methode_inconnue_refusee(tmp_path: Path) -> None:

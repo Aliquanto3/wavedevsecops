@@ -553,6 +553,10 @@ function Invoke-Install {
         # La voie zip n'a pas besoin de git pour l'installation ; git sera provisionné au besoin au prochain lancement par clone.
         $git = Get-HostGit $dataDir $registry['git']
         if ($git) { $versions['git'] = $git.Version; $versions['git_source'] = $git.Source }
+        else {
+            Write-Info "Attention : git $($registry['git']['min_version']) ou plus est introuvable. La voie zip s'en passe pour l'installation, mais les exercices en ont besoin : relancez sans WDS_INSTALL_METHOD=zip pour que l'installeur le provisionne, ou installez git vous-même."
+            Add-SimLog 'zip: git absent, non provisionné'
+        }
     }
 
     Write-Step 'uv'

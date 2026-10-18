@@ -14,7 +14,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.7 ». Mo
 ## Livré
 
 - `install.sh` (racine, `sh` POSIX, testé avec sh et dash, aucun `sudo`). Tout le code est dans `main()`, appelée en dernière ligne : un téléchargement tronqué n'exécute rien. Étapes et `install.json` identiques à `install.ps1` : plateforme, dossier de données, proxy, registre `tools.toml`, git, uv, application, `uv sync --frozen`, gitleaks, `install.json`.
-- Dossier de données : `WDS_DATA_DIR`, sinon `~/Library/Application Support/WaveDevSecOps` (macOS) ou `${XDG_DATA_HOME:-~/.local/share}/WaveDevSecOps` (Linux), comme `resolved_data_dir()` (test d'égalité sous Linux et macOS en CI).
+- Dossier de données : `WDS_DATA_DIR`, sinon `$XDG_DATA_HOME/WaveDevSecOps` si `XDG_DATA_HOME` est absolu (Linux et macOS, comme platformdirs 4.13), sinon `~/Library/Application Support/WaveDevSecOps` (macOS) ou `~/.local/share/WaveDevSecOps` (Linux), comme `resolved_data_dir()` (test d'égalité sous Linux et macOS en CI, XDG absent, absolu ou relatif).
 - Registre : mini-lecteur awk de `tools.toml` (local à côté du script, sinon téléchargé de `raw.githubusercontent.com`). Versions jamais redéclarées dans le script.
 - git : git du poste gardé s'il atteint 2.38. Sous macOS, `/usr/bin/git` n'est appelé qu'après `xcode-select -p` réussi (sinon on l'ignore). Sinon pixi 0.82.0 (archive de la release, vérifiée par son `.sha256`) installé dans `<data>/tools/bin`, puis `pixi global install git==2.56.0` avec `PIXI_HOME=<data>/tools` : git exposé en `<data>/tools/bin/git`, chemin déjà attendu par `tools.toml` (`posix`). Un git provisionné suffisant est réutilisé.
 - uv : gardé s'il atteint 0.11.0, sinon installeur officiel d'astral 0.13.1 (profil de l'utilisateur, `~/.local/bin`), appelé ensuite par chemin complet.
@@ -44,3 +44,18 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.7 ». Mo
 6. Voie `zip` (`WDS_INSTALL_METHOD=zip`) sans git ; relance : `progress.json` intact, `run_count` incrémenté ; coupure réseau pendant le clone puis relance.
 7. `XDG_DATA_HOME` posé : l'application et l'installeur lisent le même dossier.
 8. Shell de login non POSIX (fish, zsh) : la commande `| sh` fonctionne ; le PATH de uv est visible dans un nouveau terminal.
+9. Coupure réseau pendant un clone qui remplace une installation par archive : l'application précédente reste en place ; un téléchargement ou un clone bloqué s'arrête au bout d'environ 60 s sous 1 Ko/s.
+
+## Revue
+
+Revue unique (Opus) après rebase sur `main` (7345b83) ; conflit `ci.yml` résolu en gardant les deux ajouts (`unshare -n`, `autocrlf`, puis `shellcheck` et le job `installeur-unix`).
+
+| Sévérité | Source | Constat | Décision |
+|---|---|---|---|
+| medium | revue | platformdirs 4.13.4 (verrouillé) lit `XDG_DATA_HOME` aussi sous macOS ; `install.sh` l'ignorait sous macOS, et le correctif CI eda7245 avait masqué l'écart en ne posant la variable que sous Linux : installeur et application visaient deux dossiers. | Corrigé : `XDG_DATA_HOME` absolu pris sous Linux et macOS ; test d'égalité rétabli sur les deux OS. |
+| low | second avis 1 | `XDG_DATA_HOME` relatif pris tel quel alors que platformdirs l'ignore. | Corrigé (même correctif) ; cas relatif ajouté au test d'égalité. |
+| medium | second avis 2 | Voie zip : git absent jamais provisionné, sans message (`install.sh` et `install.ps1`). | Corrigé en partie : avertissement en français dans les deux installeurs (git requis par les exercices, relancer sans `WDS_INSTALL_METHOD=zip` ou installer git). Provisionnement écarté sur cette voie : elle sert de repli quand le clone ou le provisionnement échoue (« sans git », spec point 6) ; le critère ne vise que le cas où le script provisionne. Tests sh et ps1. |
+| low | second avis 3 | Voie clone : `rm -rf app` avant le clone ; une coupure perdait l'application précédente. | Corrigé : `replace_app_dir` commun aux deux voies (clone dans `app.partial`, ancienne version mise de côté puis supprimée, restaurée si l'échange échoue). Test zip, clone en échec, clone réussi. |
+| low | second avis 4 | `mv` non vérifiés. | Corrigé : chaque `mv` arrête l'installation avec un message. |
+| low | second avis 5 | curl, wget, clone sans délai. | Corrigé : curl `--speed-limit 1024 --speed-time 60`, wget `--timeout=60 --tries=3`, git `http.lowSpeedLimit/Time`. `uv sync` : écarté, uv a déjà son délai (`UV_HTTP_TIMEOUT`, 30 s). |
+| low | second avis 6 | `pixi` absent d'`install.json` quand une relance réutilise le git provisionné. | Corrigé : version de pixi relue (sonde) si git provisionné et pixi présent ; test de relance. |

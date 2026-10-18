@@ -129,7 +129,7 @@ def test_sommes_sha256(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform not in ("linux", "darwin"), reason="platformdirs")
-@pytest.mark.parametrize("xdg", [None, "custom"])
+@pytest.mark.parametrize("xdg", [None, "absolu", "relatif/donnees"])
 def test_dossier_de_donnees_comme_l_application(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, xdg: str | None
 ) -> None:
@@ -137,8 +137,11 @@ def test_dossier_de_donnees_comme_l_application(
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
-    if xdg and sys.platform == "linux":  # macOS ignore XDG_DATA_HOME (platformdirs et install.sh)
+    # platformdirs lit XDG_DATA_HOME sous macOS aussi, et l'ignore s'il n'est pas absolu.
+    if xdg == "absolu":
         monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / xdg))
+    elif xdg:
+        monkeypatch.setenv("XDG_DATA_HOME", xdg)
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith("WDS_")}
     env["WDS_INSTALL_LIBONLY"] = "1"
     # Système réel (pas de simulation) : macOS lit ~/Library, Linux XDG_DATA_HOME ou ~/.local/share.
@@ -153,6 +156,7 @@ def test_dossier_de_donnees_macos(tmp_path: Path) -> None:
     out = _lib(
         "OS_NAME=macos; get_data_dir; printf '%s' \"$DATA_DIR\"",
         HOME=str(tmp_path),
+        XDG_DATA_HOME="",
     )
     assert out == f"{tmp_path}/Library/Application Support/WaveDevSecOps"
 
@@ -201,7 +205,10 @@ def test_git_provisionne_reutilise_a_la_relance(tmp_path: Path) -> None:
     log = _log(tmp_path)
     assert sum(line.startswith("pixi global install") for line in log) == 1
     assert sum("gitleaks-extract" in line for line in log) == 1
-    assert _record(tmp_path)["run_count"] == 2
+    record = _record(tmp_path)
+    assert record["run_count"] == 2
+    versions = record["versions"]
+    assert isinstance(versions, dict) and versions["pixi"] == "0.82.0"
 
 
 def test_force_provision_ignore_le_git_du_poste(tmp_path: Path) -> None:
@@ -319,6 +326,19 @@ def test_voie_archive_sans_git(tmp_path: Path) -> None:
     versions = record["versions"]
     assert isinstance(versions, dict) and versions["app"] == "zip:main" and "git" not in versions
     assert (tmp_path / "app" / "pyproject.toml").exists()
+    assert "les exercices en ont besoin" in out.stdout
+
+
+def test_voie_clone_remplace_une_archive_sans_la_perdre(tmp_path: Path) -> None:
+    env = {"WDS_INSTALL_SIMULATE_GIT": "2.43.0"}
+    assert _install(tmp_path, WDS_INSTALL_METHOD="zip", **env).returncode == 0
+    failed = _install(tmp_path, WDS_INSTALL_SIMULATE_FAIL="clone", **env)
+    assert failed.returncode == 1
+    assert (tmp_path / "app" / "pyproject.toml").exists()  # l'archive reste en place
+    assert _install(tmp_path, **env).returncode == 0
+    assert (tmp_path / "app" / ".git").is_dir()
+    assert not (tmp_path / "app" / "pyproject.toml").exists()
+    assert not (tmp_path / "app.partial").exists() and not (tmp_path / "app.old").exists()
 
 
 def test_methode_inconnue_refusee(tmp_path: Path) -> None:

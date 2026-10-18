@@ -149,16 +149,18 @@ get_data_dir() {
     if [ -z "${HOME:-}" ]; then
         fail 'la variable HOME est vide : le profil de l utilisateur est introuvable.' 'WDS_DATA_DIR (dossier des données)' ''
     fi
-    if [ "$OS_NAME" = macos ]; then
-        DATA_DIR="$HOME/Library/Application Support/WaveDevSecOps"
-    else
-        _xdg=$(trim "${XDG_DATA_HOME:-}")
-        if [ -n "$_xdg" ]; then
-            DATA_DIR="${XDG_DATA_HOME}/WaveDevSecOps"
-        else
-            DATA_DIR="$HOME/.local/share/WaveDevSecOps"
-        fi
-    fi
+    # platformdirs lit XDG_DATA_HOME sous Linux comme sous macOS, et l'ignore s'il n'est pas absolu.
+    _xdg=$(trim "${XDG_DATA_HOME:-}")
+    case $_xdg in
+        /*) DATA_DIR="$_xdg/WaveDevSecOps" ;;
+        *)
+            if [ "$OS_NAME" = macos ]; then
+                DATA_DIR="$HOME/Library/Application Support/WaveDevSecOps"
+            else
+                DATA_DIR="$HOME/.local/share/WaveDevSecOps"
+            fi
+            ;;
+    esac
 }
 
 # detect_platform : pose OS_NAME (macos|linux), ARCH (x64|arm64).
@@ -237,10 +239,10 @@ fetch() {
     _part="$2.part"
     rm -f "$_part"
     if command -v curl >/dev/null 2>&1; then
-        _fetch_err=$(curl -fsSL --retry 2 --connect-timeout 30 -o "$_part" "$1" 2>&1 </dev/null)
+        _fetch_err=$(curl -fsSL --retry 2 --connect-timeout 30 --speed-limit 1024 --speed-time 60 -o "$_part" "$1" 2>&1 </dev/null)
         _fetch_rc=$?
     elif command -v wget >/dev/null 2>&1; then
-        _fetch_err=$(wget -q -O "$_part" "$1" 2>&1 </dev/null)
+        _fetch_err=$(wget -q --timeout=60 --tries=3 -O "$_part" "$1" 2>&1 </dev/null)
         _fetch_rc=$?
     else
         fail 'ni curl ni wget ne sont disponibles.' '' "installez curl (paquet du système, ou demandez à l'administrateur), puis relancez ; ou $ROUTE_TEXT"
@@ -249,7 +251,7 @@ fetch() {
         rm -f "$_part"
         fail "Le téléchargement de $1 a échoué (code $_fetch_rc) : $_fetch_err" "$NETWORK_SETTINGS" "$ROUTE_TEXT"
     fi
-    mv "$_part" "$2"
+    mv -f "$_part" "$2" || fail "impossible d'écrire $2." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
 }
 
 # run_cmd <commande...> : exécutée sans stdin (le script peut venir d'un tube : curl | sh).
@@ -396,7 +398,7 @@ install_pixi() {
         fail "L'archive de pixi ne contient pas l'exécutable attendu." 'WDS_DATA_DIR (dossier accessible en écriture)' "$ROUTE_TEXT"
     fi
     chmod +x "$_tmp/pixi"
-    mv -f "$_tmp/pixi" "$PIXI_BIN"
+    mv -f "$_tmp/pixi" "$PIXI_BIN" || fail "impossible d'écrire $PIXI_BIN." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
     rm -rf "$_tmp"
     rm -f "$_dl/$_name" "$_dl/$_name.sha256"
 }
@@ -493,6 +495,21 @@ assert_app_dir_replaceable() {
     fail "Le dossier « $1 » existe et ne contient pas l'application : il n'est pas modifié." 'WDS_DATA_DIR (dossier réservé à WaveDevSecOps)' 'choisissez un autre WDS_DATA_DIR, ou videz ce dossier « app » vous-même, puis relancez la commande.'
 }
 
+# replace_app_dir <dossier prêt> : l'ancienne application (reste d'une voie zip, ou version
+# précédente) est mise de côté puis supprimée, jamais effacée avant que la nouvelle soit prête.
+replace_app_dir() {
+    _old="$APP_DIR.old"
+    rm -rf "$_old"
+    if [ -e "$APP_DIR" ]; then
+        mv "$APP_DIR" "$_old" || fail "impossible de déplacer $APP_DIR (fichier ouvert ?)." 'WDS_DATA_DIR (dossier accessible en écriture)' 'fermez l application, puis relancez la commande.'
+    fi
+    if ! mv "$1" "$APP_DIR"; then
+        [ -e "$_old" ] && mv "$_old" "$APP_DIR"
+        fail "impossible de mettre l'application en place dans $APP_DIR." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
+    fi
+    rm -rf "$_old"
+}
+
 # install_app_by_clone : pose APP_REV.
 install_app_by_clone() {
     assert_app_dir_replaceable "$APP_DIR"
@@ -504,14 +521,16 @@ install_app_by_clone() {
             sim_log "update-clone $APP_DIR"
         else
             sim_log "clone -c core.autocrlf=false $REPO_URL -> $APP_DIR"
-            mkdir -p "$APP_DIR/.git"
+            rm -rf "$APP_DIR.partial"
+            mkdir -p "$APP_DIR.partial/.git"
+            replace_app_dir "$APP_DIR.partial"
         fi
         APP_REV=simulation0000000000000000000000000000000000
         return
     fi
     if [ -d "$APP_DIR/.git" ]; then
         # Mise à jour : récupération puis alignement sur la branche (n'échoue pas sur des fichiers modifiés).
-        run_cmd "$GIT_PATH" -c core.autocrlf=false -C "$APP_DIR" fetch --depth 1 origin "$REF"
+        run_cmd "$GIT_PATH" -c core.autocrlf=false -c http.lowSpeedLimit=1024 -c http.lowSpeedTime=60 -C "$APP_DIR" fetch --depth 1 origin "$REF"
         _c1=$?
         _c2=$_c1
         [ "$_c1" -eq 0 ] && { run_cmd "$GIT_PATH" -c core.autocrlf=false -C "$APP_DIR" reset --hard FETCH_HEAD; _c2=$?; }
@@ -521,14 +540,13 @@ install_app_by_clone() {
     else
         _partial="$APP_DIR.partial"
         rm -rf "$_partial"   # clone interrompu
-        [ -e "$APP_DIR" ] && rm -rf "$APP_DIR"   # reste d'une voie zip
-        run_cmd "$GIT_PATH" -c core.autocrlf=false clone --depth 1 --branch "$REF" "$REPO_URL" "$_partial"
+        run_cmd "$GIT_PATH" -c core.autocrlf=false -c http.lowSpeedLimit=1024 -c http.lowSpeedTime=60 clone --depth 1 --branch "$REF" "$REPO_URL" "$_partial"
         _rc=$?
         if [ "$_rc" -ne 0 ]; then
             rm -rf "$_partial"
             fail "Le clone de $REPO_URL a échoué (code $_rc)." "$NETWORK_SETTINGS" "$ROUTE_TEXT"
         fi
-        mv "$_partial" "$APP_DIR"
+        replace_app_dir "$_partial"
     fi
     APP_REV=$(run_cmd "$GIT_PATH" -C "$APP_DIR" rev-parse HEAD 2>/dev/null | grep -Eo '[0-9a-f]{40}' | head -n 1)
 }
@@ -557,12 +575,7 @@ install_app_by_archive() {
             fail "L'archive ne contient pas l'application attendue (pyproject.toml absent)." 'WDS_INSTALL_REF' "$ROUTE_TEXT"
         fi
     fi
-    # Remplacement : l'ancienne version est mise de côté puis supprimée, jamais effacée avant que la nouvelle soit prête.
-    _old="$APP_DIR.old"
-    rm -rf "$_old"
-    [ -e "$APP_DIR" ] && mv "$APP_DIR" "$_old"
-    mv "$_staging" "$APP_DIR"
-    rm -rf "$_old"
+    replace_app_dir "$_staging"
     rm -f "$_arc"
 }
 
@@ -617,7 +630,7 @@ install_gitleaks() {
     fi
     chmod +x "$_new/gitleaks"
     rm -rf "$DATA_DIR/tools/gitleaks"
-    mv "$_new" "$DATA_DIR/tools/gitleaks"
+    mv "$_new" "$DATA_DIR/tools/gitleaks" || fail "impossible d'écrire $DATA_DIR/tools/gitleaks." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
     rm -f "$_dl/$_name" "$_dl/gitleaks_${GL_VERSION}_checksums.txt"
 }
 
@@ -671,7 +684,7 @@ write_install_json() {
         printf '  "versions": {\n%s\n  }\n' "$VERSIONS"
         printf '}\n'
     } >"$_tmp" || fail "impossible d'écrire install.json dans $DATA_DIR." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
-    mv -f "$_tmp" "$DATA_DIR/install.json"
+    mv -f "$_tmp" "$DATA_DIR/install.json" || fail "impossible d'écrire install.json dans $DATA_DIR." 'WDS_DATA_DIR (dossier accessible en écriture)' ''
 }
 
 # add_version <clé> <valeur> : ajoute une ligne à l'objet « versions » d'install.json.
@@ -730,12 +743,22 @@ main() {
         fi
         add_version git "$GIT_VERSION"
         add_version git_source "$GIT_SOURCE"
+        if [ "$GIT_SOURCE" = provisioned ] && [ -z "${PIXI_VERSION:-}" ] && [ -x "$DATA_DIR/tools/bin/pixi" ]; then
+            if [ "$SIMULATE" = 1 ]; then
+                PIXI_VERSION=$(tool_value pixi provisioned_version)
+            else
+                PIXI_VERSION=$(probe_version "$DATA_DIR/tools/bin/pixi" --version)
+            fi
+        fi
     else
         # La voie archive n'a pas besoin de git pour l'installation.
         find_host_git
         if [ -n "$GIT_PATH" ]; then
             add_version git "$GIT_VERSION"
             add_version git_source "$GIT_SOURCE"
+        else
+            info "Attention : git $GIT_MIN ou plus est introuvable. La voie archive s'en passe pour l'installation, mais les exercices en ont besoin : relancez sans WDS_INSTALL_METHOD=zip pour que l'installeur le provisionne, ou installez git vous-même."
+            sim_log 'zip: git absent, non provisionné'
         fi
     fi
 
