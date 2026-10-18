@@ -266,6 +266,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 23:39 · 2.8 · dev · fini, 955 passed / 41 skipped, CI verte sur 6 jobs ; save_file (base_hash, 409 revérifié dans la file), open_external via procs, GET code/tree, file, diff ; éditeur textarea natif (consigné en Deferred du spine) ; contrôles navigateur pour Anaël (gouttière, 24 px, lecteur d'écran, ouverture système, conflit) · 4423cef
 - 2026-10-18 23:39 · 2.8 · second-avis · lancé · —
 - 2026-10-18 23:39 · 4.7 · dev · lancé (dev-story Sonnet ; ouvre 6.5) ; 7.2 garde son tour (toolrun touché par 2.8) · —
+- 2026-10-18 23:44 · 2.8 · second-avis · aucun high, 6 medium (CRLF perdus à la sauvegarde, open_external exécute .bat/.exe via os.startfile, bit x perdu sous POSIX, restore_failed non gardé avant 4.5, fichiers créés absents du diff, aria-label sur div sans role), 4 low ; reviewer Opus lancé · —
+- 2026-10-18 23:45 · 5.2 · second-avis · aucun high, 3 medium (answer_submit sans step_id vise la désignation suivante, writes=False contourne la garde quiz_altered, branche partie avant 4.5 : rebase de fond sur steps.py et operations.py), 3 low (test de rejeu instable, assertions, annonce relancée) ; reviewer Opus lancé avec rebase soigné · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
