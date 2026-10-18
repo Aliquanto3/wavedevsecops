@@ -18,7 +18,7 @@ tools:
       missing: >-
         Installez uv (installeur de WaveDevSecOps, ou la commande indiquée sur le site
         d'uv), puis relancez le diagnostic.
-      too_old: "Mettez uv à jour avec la commande uv self update, puis relancez le diagnostic."
+      too_old: "Mettez uv à jour avec la commande `uv self update`, puis relancez le diagnostic."
   gitleaks:
     label: "gitleaks"
     todo:
@@ -29,8 +29,8 @@ tools:
         Relancez l'installeur de WaveDevSecOps pour obtenir la version de gitleaks attendue.
   _python_package:
     todo:
-      missing: "Lancez uv sync pour installer les outils de la chaîne."
-      mismatch: "L'environnement est abîmé : lancez uv sync pour le réparer."
+      missing: "Lancez `uv sync` pour installer les outils de la chaîne."
+      mismatch: "L'environnement est abîmé : lancez `uv sync` pour le réparer."
 
 statuses:
   ok: "Prêt"
@@ -60,6 +60,7 @@ git_language:
 proxy:
   label: "Proxy"
   none: "Aucun proxy détecté."
+  label_proxy: "Proxy"
   present: "Proxy détecté : {proxies}."
   no_proxy_ok: "NO_PROXY contient 127.0.0.1 et localhost."
   no_proxy_missing: "NO_PROXY ne contient pas {missing}."
@@ -67,9 +68,63 @@ proxy:
   system_certs_unset: "UV_SYSTEM_CERTS n'est pas posé."
   todo_none: ""
   todo_no_proxy: >-
-    Ajoutez 127.0.0.1 et localhost à la variable NO_PROXY : sans cela, votre proxy
+    Ajoutez `127.0.0.1` et `localhost` à la variable `NO_PROXY` : sans cela, votre proxy
     intercepte les appels de l'application à elle-même.
   todo_certs: >-
-    Si votre entreprise inspecte le trafic HTTPS, posez UV_SYSTEM_CERTS=true pour qu'uv
+    Si votre entreprise inspecte le trafic HTTPS, posez `UV_SYSTEM_CERTS=true` pour qu'uv
     utilise les certificats du système.
   todo_ok: ""
+
+part_statuses:
+  detected: "Détecté"
+  not_detected: "Aucun"
+  ok: "OK"
+  to_complete: "À compléter"
+  not_set: "Non posé"
+
+# Textes de la page Diagnostic (Story 1.5) : le front les affiche tels quels.
+ui:
+  title: "Diagnostic"
+  subtitle: "Outils, versions et réglages du poste, tels que WaveDevSecOps les voit"
+  rerun: "Relancer le diagnostic"
+  searching: "Recherche en cours…"
+  running: "En cours"
+  failed: >-
+    Le diagnostic n'a pas pu s'exécuter. Relancez-le ; si cela continue, consultez le
+    journal de l'application.
+  summary_prefix: "Recherche terminée : "
+  summary_ok: "tous les {total} outils sont prêts, aucun réglage n'est nécessaire."
+  summary_tools_one: "{count} outil sur {total} demande une action"
+  summary_tools_many: "{count} outils sur {total} demandent une action"
+  summary_tools_none: "aucun des {total} outils ne demande d'action"
+  summary_proxy: ", et NO_PROXY demande un réglage"
+  badge: "Diagnostic, {count} outils absents ou trop anciens"
+  group_required: "Outils requis ({milestone})"
+  group_chain: "Outils de la chaîne ({milestone})"
+  tools_title: "Outils"
+  tools_subtitle: "Version trouvée sur ce poste, version requise et marche à suivre"
+  tools_note: "Les versions requises sont celles du registre d'outils de l'application."
+  columns:
+    - "Outil"
+    - "Usage"
+    - "Version trouvée"
+    - "Version requise"
+    - "État"
+    - "Que faire ?"
+    - "Scénarios indisponibles"
+  todo_summary: "Que faire ?"
+  nothing_to_do: "—"
+  not_found: "absent"
+  proxy_title: "Proxy"
+  proxy_subtitle: "Ce que le poste déclare, et ce qui manque pour atteindre l'application en local"
+  proxy_columns:
+    - "Réglage"
+    - "Valeur détectée"
+    - "État"
+    - "Que faire ?"
+  git_notice_title: "git est indispensable"
+  continue: "Continuer vers le catalogue"
+  continue_hint: "Un outil manquant ne bloque que les scénarios qui en ont besoin."
+  console_title: "Diagnostic du poste :"
+  console_absent: "absent"
+  console_todo: "À faire :"

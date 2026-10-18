@@ -5,7 +5,11 @@ Aucune réponse ne porte d'en-tête CORS : aucun `CORSMiddleware`, et les refus 
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import secrets
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -18,6 +22,9 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
+from wavedevsecops import diagnostic
+from wavedevsecops.config import Settings, get_settings
+from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
 
 SESSION_COOKIE = "wds_session"
@@ -45,9 +52,27 @@ def _same(a: str, b: str) -> bool:
     return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
-def create_app(*, port: int, token: str, milestone: str = CURRENT_MILESTONE) -> FastAPI:
-    """Construit l'application pour une instance : `port` et `token` fixés au lancement."""
+SEEN_MARKER = "diagnostic_seen"
+"""Fichier de `<data>/` créé quand la page Diagnostic a été servie : fin du premier lancement."""
+DiagnosticListener = Callable[[list[DiagnosticCheck], dict], None]
+
+
+def create_app(
+    *,
+    port: int,
+    token: str,
+    milestone: str = CURRENT_MILESTONE,
+    settings: Settings | None = None,
+    on_diagnostic: DiagnosticListener | None = None,
+) -> FastAPI:
+    """Construit l'application pour une instance : `port` et `token` fixés au lancement.
+
+    `on_diagnostic(checks, texts)` est appelé après chaque diagnostic (la console de lancement).
+    """
+    settings = settings or get_settings()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    run_lock = threading.Lock()
+    last_report: dict[str, dict] = {}
     session = secrets.token_urlsafe(32)
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
 
@@ -96,8 +121,54 @@ def create_app(*, port: int, token: str, milestone: str = CURRENT_MILESTONE) -> 
     async def shell_page() -> Response:
         return FileResponse(STATIC_DIR / "index.html", media_type="text/html; charset=utf-8")
 
+    marker = settings.resolved_data_dir() / SEEN_MARKER
+
+    async def home_page() -> Response:
+        # Premier lancement : le diagnostic s'ouvre d'office ; ensuite, l'accueil.
+        if not marker.exists():
+            return RedirectResponse("/diagnostic", status_code=303)
+        return await shell_page()
+
+    async def diagnostic_page() -> Response:
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.touch()
+        except OSError:
+            logging.getLogger("wavedevsecops").warning("Marqueur de premier lancement illisible")
+        return await shell_page()
+
+    special = {"/": home_page, "/diagnostic": diagnostic_page}
     for surface in surfaces:
-        app.add_api_route(surface.path, shell_page, methods=["GET"], include_in_schema=False)
+        handler = special.get(surface.path, shell_page)
+        app.add_api_route(surface.path, handler, methods=["GET"], include_in_schema=False)
+
+    @app.get("/api/diagnostic")
+    async def diagnostic_state() -> JSONResponse:
+        """Plan (lignes « En cours », textes) et dernier rapport s'il existe (AD-2, AD-16)."""
+        body = diagnostic.plan(settings)
+        body["report"] = last_report.get("report")
+        return JSONResponse(body)
+
+    @app.post("/api/diagnostic/run")
+    async def diagnostic_run() -> JSONResponse:
+        """Relance toutes les sondes et renvoie le rapport ; le même texte va à la console."""
+
+        def work() -> dict:
+            with run_lock:
+                texts = diagnostic.load_texts(settings)
+                checks = diagnostic.run_diagnostic(settings)
+                report = diagnostic.build_report(checks, texts)
+                last_report["report"] = report
+                if on_diagnostic is not None:
+                    on_diagnostic(checks, texts)
+                return report
+
+        try:
+            return JSONResponse(await asyncio.to_thread(work))
+        except Exception:  # noqa: BLE001 - jamais de trace Python montrée à l'apprenant
+            logging.getLogger("wavedevsecops").exception("Diagnostic en échec")
+            texts = diagnostic.load_texts(settings)
+            return JSONResponse({"error_text": texts["ui"]["failed"]}, status_code=500)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:

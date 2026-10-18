@@ -21,8 +21,9 @@ from pathlib import Path
 
 import uvicorn
 
+from wavedevsecops import diagnostic
 from wavedevsecops.config import Settings, get_settings
-from wavedevsecops.contracts import AppError
+from wavedevsecops.contracts import AppError, DiagnosticCheck
 from wavedevsecops.progress import ensure_progress
 from wavedevsecops.web import create_app
 
@@ -173,7 +174,9 @@ def start_instance(settings: Settings, now: datetime | None = None) -> Instance:
         handler = setup_logging(data_dir, settings)
         ensure_progress(data_dir, now or datetime.now().astimezone())
         config = uvicorn.Config(
-            create_app(port=port, token=token),
+            create_app(
+                port=port, token=token, settings=settings, on_diagnostic=_print_diagnostic
+            ),
             log_config=None,
             access_log=False,  # l'URL de lancement contient le jeton
             lifespan="off",
@@ -200,6 +203,11 @@ def start_instance(settings: Settings, now: datetime | None = None) -> Instance:
         raise
     logging.getLogger("wavedevsecops").info("Serveur local démarré sur le port %d", port)
     return Instance(data_dir, port, token, server, thread, lock, handler, sock)
+
+
+def _print_diagnostic(checks: list[DiagnosticCheck], texts: dict) -> None:
+    """Écrit le diagnostic dans la console de lancement (même contenu que la page)."""
+    print("\n".join(diagnostic.console_lines(checks, texts)), flush=True)
 
 
 def _console(url: str, existing: bool) -> None:

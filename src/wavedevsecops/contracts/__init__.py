@@ -26,6 +26,18 @@ class AppError(Exception):
 CheckStatus = Literal["ok", "missing", "too_old", "mismatch", "info", "warn"]
 
 
+class CheckPart(BaseModel):
+    """Ligne détaillée d'une sonde (la section Proxy : valeur masquée, NO_PROXY, certificats)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    label_text: str
+    value_text: str = ""
+    status: CheckStatus
+    status_text: str
+    what_to_do_text: str = ""
+
+
 class DiagnosticCheck(BaseModel):
     """Résultat d'une sonde du diagnostic : charge utile de l'événement `diagnostic_check`.
 
@@ -46,3 +58,11 @@ class DiagnosticCheck(BaseModel):
     """Texte « Que faire ? » de `content/diagnostic.yaml` ; vide si rien à régler."""
     milestone: str = ""
     version: str = ""
+    usage_text: str = ""
+    """À quoi sert l'outil (colonne « Usage »)."""
+    required_version: str = ""
+    """Version requise, écrite par le serveur (« ≥ 2.38 » ou la version exacte)."""
+    unavailable_scenarios: list[str] = []
+    """Titres des scénarios que cet état rend indisponibles (AD-16) ; vide sans scénario."""
+    parts: list[CheckPart] = []
+    """Lignes détaillées (section Proxy) ; vide pour un outil."""

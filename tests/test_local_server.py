@@ -67,7 +67,7 @@ def test_jeton_echange_contre_cookie_puis_redirection(instance: cli.Instance) ->
     assert cookie.startswith(f"{SESSION_COOKIE}=")
     assert "HttpOnly" in cookie and "SameSite=strict" in cookie
     assert instance.token not in cookie
-    page = request(instance, "GET", "/", {"Cookie": cookie.split(";")[0]})
+    page = request(instance, "GET", "/diagnostic", {"Cookie": cookie.split(";")[0]})
     assert page.status == 200 and "WaveDevSecOps" in page.read().decode()
     assert_no_cors(page)
 
@@ -86,7 +86,7 @@ def test_refus_host_etranger(instance: cli.Instance) -> None:
         resp = request(instance, "GET", "/", {**cookie, "Host": host})
         assert resp.status == 403, host
         assert_no_cors(resp)
-    ok = request(instance, "GET", "/", {**cookie, "Host": f"localhost:{instance.port}"})
+    ok = request(instance, "GET", "/diagnostic", {**cookie, "Host": f"localhost:{instance.port}"})
     assert ok.status == 200
 
 

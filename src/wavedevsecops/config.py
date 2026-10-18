@@ -92,8 +92,17 @@ def read_proxy_environment(environ: Mapping[str, str] | None = None) -> dict[str
     source = os.environ if environ is None else environ
     found: dict[str, str] = {}
     for name, value in source.items():
-        if name.upper() in PROXY_VARIABLES and value.strip():
-            found.setdefault(name.upper(), value.strip())
+        upper = name.upper()
+        if upper not in PROXY_VARIABLES or not value.strip():
+            continue
+        if upper == "NO_PROXY" and upper in found:
+            # `NO_PROXY` et `no_proxy` peuvent différer : les outils lisent l'une ou l'autre,
+            # on garde donc l'union de leurs entrées plutôt que la première rencontrée.
+            known = [e.strip() for e in found[upper].split(",")]
+            extra = [e.strip() for e in value.split(",") if e.strip() not in known]
+            found[upper] = ",".join(known + extra)
+        else:
+            found.setdefault(upper, value.strip())
     return found
 
 

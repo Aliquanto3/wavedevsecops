@@ -63,6 +63,7 @@ def design_colors() -> dict[str, str]:
 def test_surfaces_livrees_servent_la_coquille(
     instance: cli.Instance, cookie: dict[str, str], path: str
 ) -> None:
+    get(instance, "/diagnostic", cookie)  # fin du premier lancement : « / » sert alors l'accueil
     resp, body = get(instance, path, cookie)
     assert resp.status == 200
     assert resp.getheader("Content-Type", "").startswith("text/html")
@@ -136,7 +137,7 @@ def test_aucune_url_externe_dans_static() -> None:
 def test_la_page_et_les_feuilles_ne_chargent_que_du_local(
     instance: cli.Instance, cookie: dict[str, str]
 ) -> None:
-    _, body = get(instance, "/", cookie)
+    _, body = get(instance, "/diagnostic", cookie)
     html = body.decode("utf-8")
     refs = re.findall(r'(?:href|src)="([^"#]+)"', html)
     assert refs
