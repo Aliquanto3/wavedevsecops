@@ -83,7 +83,13 @@
   color: var(--color-ink);
 }
 
+/* Sujet tronqué : les refs et « Nouveau » qui le suivent restent dans le champ du volet. */
 .graph-subject {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-family-chat);
 }
 

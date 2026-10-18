@@ -8,6 +8,7 @@ front. La doublure n'a ni mise en page ni lecteur d'écran : le rendu réel se v
 
 from __future__ import annotations
 
+import itertools
 import json
 import re
 from pathlib import Path
@@ -351,7 +352,11 @@ console.log(JSON.stringify({ start, emptyGraph: { ...emptyGraph, clean: emptyGra
 """,
     )
     assert out["start"] == "Aucun commit pour l'instant."
-    assert out["emptyGraph"] == {"title": "Aucun commit pour l'instant.", "items": 1, "clean": False}
+    assert out["emptyGraph"] == {
+        "title": "Aucun commit pour l'instant.",
+        "items": 1,
+        "clean": False,
+    }
     assert out["shown"] is None
     assert out["refused"]["title"] == "Aucun commit pour l'instant."
     assert out["refused"]["problems"] == 1 and "graph" not in out["refused"]["keys"]
@@ -453,7 +458,75 @@ def test_feuille_du_depot_local_sans_couleur_en_dur() -> None:
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", css) and "opacity" not in css
     for size in re.findall(r"font-size:\s*(\d+(?:\.\d+)?)px", css):
         assert float(size) >= 12
-    for rule in (".graph-commit", ".graph-edge", ".graph-head", ".graph-branch", ".graph-remote-ref",
-                 ".graph-tag", ".graph-commit.is-lost", ".commit-list", ".new-mark", ".staging-index"):
+    for rule in (
+        ".graph-commit",
+        ".graph-edge",
+        ".graph-head",
+        ".graph-branch",
+        ".graph-remote-ref",
+        ".graph-tag",
+        ".graph-commit.is-lost",
+        ".commit-list",
+        ".new-mark",
+        ".staging-index",
+    ):
         assert rule in css, rule
     assert "double" in css and "dasharray" in css and "dashed" in css
+
+
+def _segment_distance(
+    p: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    (px, py), (ax, ay), (bx, by) = p, a, b
+    dx, dy = bx - ax, by - ay
+    t = (
+        0.0
+        if dx == dy == 0
+        else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    )
+    return ((px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2) ** 0.5
+
+
+def test_aretes_ne_traversent_aucun_disque_quand_deux_commits_partagent_un_rang(
+    tmp_path: Path, git_path: Path
+) -> None:
+    """Revue : une branche qui continue après sa fusion met deux commits au même rang ; l'arête de
+    fusion ne doit pas passer par le disque de l'autre (elle ferait croire à une autre filiation)."""
+    settings = Settings(data_dir=tmp_path / "data")
+    prepared = prepare_workspace(
+        load_scenario(FREE, settings), "llm", settings=settings, git_path=git_path
+    )
+    box = Sandbox(Git.for_workspace(git_path, prepared.layout.root, settings), prepared.layout)
+    box.run("branch", "feature")
+    box.commit("B")
+    box.run("switch", "-q", "feature")
+    box.commit("C")
+    box.run("switch", "-q", "main")
+    box.run("merge", "-q", "--no-ff", "feature", "-m", "M")
+    box.run("switch", "-q", "feature")
+    box.commit("D")
+    views = build_views(box.state()).model_dump(mode="json")
+    ranks = [n["row"] for n in views["graph"]["nodes"]]
+    assert len(ranks) != len(set(ranks))  # précondition : deux commits au même rang
+    out = _js(
+        tmp_path,
+        {"shared": views},
+        """
+load("shared");
+console.log(JSON.stringify({
+  circles: $$("circle.graph-commit").map((c) => [Number(c.getAttribute("cx")), Number(c.getAttribute("cy"))]),
+  paths: $$("path.graph-edge").map((p) => p.getAttribute("d")),
+}));
+""",
+    )
+    circles = [tuple(c) for c in out["circles"]]
+    assert len(out["paths"]) == len(views["graph"]["edges"])
+    for d in out["paths"]:
+        points = [(float(x), float(y)) for x, y in re.findall(r"[ML](-?[\d.]+) (-?[\d.]+)", d)]
+        start, end = points[0], points[-1]
+        assert start in circles and end in circles and start[1] < end[1]
+        for center in circles:
+            if center in (start, end):
+                continue
+            near = min(_segment_distance(center, a, b) for a, b in itertools.pairwise(points))
+            assert near >= 7, f"{d} passe par le disque {center}"

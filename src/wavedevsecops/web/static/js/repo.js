@@ -22,18 +22,6 @@ export const STAGING_GROUPS = [
   ["unstaged", "Modifié, non indexé", "is-modified"],
   ["untracked", "Non suivi", "is-untracked"],
 ];
-// Lettres d'état de `git status --short`, dites en toutes lettres pour le nom accessible.
-export const LETTER_TEXT = {
-  M: "modifié",
-  A: "ajouté",
-  D: "supprimé",
-  R: "renommé",
-  C: "copié",
-  T: "type changé",
-  U: "en conflit",
-  "?": "non suivi",
-};
-
 const ICONS = {
   // poste : écran et pied
   poste: [
@@ -101,17 +89,27 @@ function dot() {
 
 // --- graphe ----------------------------------------------------------------------------------
 
-/** Tracé d'une arête (AD-2 : colonne et cases fournies par le serveur). */
+/**
+ * Tracé d'une arête (AD-2 : colonne et rangs fournis par le serveur). Une rangée par commit : les
+ * commits d'un même rang forment une bande de rangées consécutives, triées par colonne. L'arête
+ * descend dans la colonne de l'enfant jusqu'au bas de sa bande (aucun commit de la bande n'y est
+ * plus bas), rejoint `column` entre deux rangées, longe `column` à travers les rangs intermédiaires
+ * (le serveur y garantit l'absence de commit), puis gagne la colonne du parent au-dessus de sa bande.
+ * Elle ne traverse ainsi aucun disque, même quand deux commits partagent un rang.
+ */
 export function edgePath(edge, at) {
   const child = at.get(edge.child);
   const parent = at.get(edge.parent);
   if (!child || !parent) return null;
+  const below = child.bandEnd; // bord bas de la bande de l'enfant
+  const above = parent.bandStart; // bord haut de la bande du parent
+  if (above < below) return `M${child.x} ${child.y}L${parent.x} ${parent.y}`;
+  const q = ROW / 4; // entre deux rangées, hors des disques (rayon ROW / 4)
+  const start = `M${child.x} ${child.y}L${child.x} ${below - q}`;
+  const end = `L${parent.x} ${above + q}L${parent.x} ${parent.y}`;
+  if (above - below < ROW) return start + end; // bandes contiguës
   const column = LANE / 2 + edge.column * LANE;
-  if (parent.y - child.y <= ROW) return `M${child.x} ${child.y}L${parent.x} ${parent.y}`;
-  return (
-    `M${child.x} ${child.y}L${column} ${child.y + ROW}` +
-    `L${column} ${parent.y - ROW}L${parent.x} ${parent.y}`
-  );
+  return `${start}L${column} ${below + q}L${column} ${above - q}${end}`;
 }
 
 export function buildGraph(graph) {
@@ -119,9 +117,21 @@ export function buildGraph(graph) {
   const columns = Math.max(graph.columns || 0, ...nodes.map((node) => node.column + 1));
   const width = columns * LANE;
   const wrap = el("div", "graph", { role: "group", "aria-label": GRAPH_LABEL });
+  const bands = new Map(); // rang → [première rangée, dernière rangée]
+  nodes.forEach((node, index) => {
+    const band = bands.get(node.row);
+    if (band) band[1] = index;
+    else bands.set(node.row, [index, index]);
+  });
   const at = new Map();
   nodes.forEach((node, index) => {
-    at.set(node.element_id, { x: LANE / 2 + node.column * LANE, y: index * ROW + ROW / 2 });
+    const [first, last] = bands.get(node.row);
+    at.set(node.element_id, {
+      x: LANE / 2 + node.column * LANE,
+      y: index * ROW + ROW / 2,
+      bandStart: first * ROW,
+      bandEnd: (last + 1) * ROW,
+    });
   });
   const lanes = svg("svg", {
     class: "graph-lanes",
@@ -161,11 +171,9 @@ export function buildGraph(graph) {
       "aria-pressed": "false",
     });
     button.style.paddingLeft = `${width + 8}px`;
-    button.append(
-      dot(),
-      text("code", "graph-sha", node.short_sha),
-      text("span", "graph-subject", node.subject),
-    );
+    const subject = text("span", "graph-subject", node.subject);
+    subject.setAttribute("title", node.subject); // sujet tronqué à l'écran (repo.css)
+    button.append(dot(), text("code", "graph-sha", node.short_sha), subject);
     const badge = actorBadge(node.actor);
     if (badge) button.append(badge);
     if (node.lost) button.append(text("span", "graph-lost", LOST_TEXT));
@@ -209,7 +217,7 @@ export function buildCommitList(graph, repo) {
     button.append(dot(), text("code", "graph-sha", node.short_sha));
     const sha = el("td");
     sha.append(button);
-    const parents = node.parents.map((id) => (byId.get(id) ? byId.get(id).short_sha : id));
+    const parents = node.parents.map((id) => (byId.get(id) ? byId.get(id).short_sha : id.replace(/^commit:/, "").slice(0, 7)));
     const state = [
       node.lost && "perdu",
       node.new && NEW_TEXT.toLowerCase(),
@@ -258,12 +266,11 @@ export function buildStaging(staging, hasCommits) {
     const list = el("ul", "staging-items");
     for (const item of group) {
       const moved = item.orig_path ? `${item.orig_path} → ${item.path}` : item.path;
-      const word = LETTER_TEXT[item.letter] || item.letter;
       const button = el("button", "staging-item", {
         type: "button",
         "data-select": true,
         "data-element-id": item.element_id,
-        "aria-label": `${label} : ${moved}, ${word}`,
+        "aria-label": item.a11y_name_text || `${label} : ${moved}`,
         "aria-pressed": "false",
       });
       button.append(

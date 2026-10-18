@@ -50,6 +50,7 @@ export function acceptViews(views, problems = []) {
         }
       } catch (err) {
         problems.push(err.message);
+        console.warn(`Vue « ${key} » écartée : ${err.message}`); // diagnostic pour le développeur
         delete accepted[key];
       }
     }
@@ -151,7 +152,7 @@ export function createStore() {
         const text = (payload.views && payload.views.announce_text) || "";
         // Une commande est une opération de l'apprenant : ni l'ouverture (sans op_id) ni un
         // changement venu de l'extérieur (annoncé juste avant par `external_change`).
-        const command = Boolean(envelope.op_id) && !externalOps.has(envelope.op_id);
+        const command = Boolean(envelope.op_id) && !externalOps.delete(envelope.op_id);
         patch.announce = text ? { text, command } : null;
       } else if (envelope.kind === "external_change") {
         if (envelope.op_id) externalOps.add(envelope.op_id);
