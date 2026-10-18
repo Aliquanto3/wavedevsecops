@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from wavedevsecops.contracts.remote import RemoteView
 from wavedevsecops.contracts.repo import Actor, RepoState
 
 VIEWS_VERSION = 1
@@ -133,3 +134,5 @@ class Views(_Model):
     prompt: PromptView
     announce_text: str = ""
     """Résumé des changements pour la région `role="status"`."""
+    remote: RemoteView = RemoteView()
+    """Vue « Distant + PR » : refs de `origin`, PR, checks, journal de revue."""

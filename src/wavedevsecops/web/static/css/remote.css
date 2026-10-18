@@ -1,0 +1,343 @@
+/* Vue « Distant + PR » : refs de origin, pr-card, pr-check, merge-blocked, review-log (DESIGN.md > Distant + PR). */
+
+.remote-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.remote-title,
+.review-title {
+  margin: 0 0 var(--space-2);
+  font: var(--font-weight-label) var(--font-size-label) / 1.2 var(--font-family-label);
+  color: var(--color-ink-soft);
+}
+
+.remote-none,
+.review-none,
+.remote-error {
+  margin: 0;
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / var(--line-height-body-sm) var(--font-family-body-sm);
+  color: var(--color-ink-soft);
+}
+
+.remote-error {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* --- refs de origin ----------------------------------------------------------------------- */
+.remote-branches,
+.pr-checks,
+.merge-reasons,
+.review-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.remote-branch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.remote-ref,
+.pr-pick,
+.pr-check,
+.merge-reason-link,
+.review-pick {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.remote-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--graph-row-height);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  font: var(--font-weight-label) var(--font-size-label) / 1.2 var(--font-family-label);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: var(--stroke-min) solid var(--color-ink);
+  border-radius: var(--radius-sm);
+}
+
+.tag-required {
+  color: var(--color-on-ink);
+  background: var(--color-ink-fill);
+  border-color: var(--color-ink-fill-edge);
+}
+
+.tag-state.is-merged {
+  background: var(--color-accent-soft);
+}
+
+.btn-small {
+  min-height: var(--hit-target-min);
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-label);
+}
+
+/* --- pr-card ------------------------------------------------------------------------------ */
+.pr-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 2px solid var(--color-muted);
+  border-radius: var(--radius-md);
+}
+
+.pr-card.is-current {
+  border-color: var(--color-ink);
+}
+
+.pr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pr-title {
+  margin: 0;
+  font: var(--font-weight-heading) var(--font-size-heading) / var(--line-height-heading) var(--font-family-heading);
+}
+
+.pr-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.pr-branches {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.pr-pick.is-selected,
+.pr-check.is-selected,
+.remote-ref.is-selected,
+.merge-reason-link.is-selected,
+.review-pick.is-selected {
+  box-shadow: inset 0 0 0 var(--stroke-min) var(--color-ink);
+}
+
+/* --- pr-check : une ligne arrondie par check ---------------------------------------------- */
+.pr-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pr-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--graph-row-height);
+  padding: 2px var(--space-3);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.pr-check.is-success {
+  background: var(--color-accent-soft);
+}
+
+.pr-check.is-failure {
+  background: var(--color-danger-soft);
+}
+
+.pr-check.is-error {
+  background: var(--color-warning-soft);
+}
+
+.pr-check.is-running {
+  background: var(--color-primary-soft);
+}
+
+.pr-check.is-queued {
+  background: var(--color-surface);
+}
+
+.pr-check.is-stale {
+  border: var(--stroke-min) dashed var(--color-muted);
+}
+
+.check-glyph {
+  flex: none;
+  width: 1.2em;
+  text-align: center;
+}
+
+.check-job {
+  font: var(--font-weight-code) var(--font-size-code) / 1 var(--font-family-code);
+}
+
+.check-stale {
+  color: var(--color-ink-soft);
+  font: var(--font-weight-label) var(--font-size-label) / 1 var(--font-family-label);
+}
+
+.check-duration {
+  margin-left: auto;
+  font: var(--font-weight-code) var(--font-size-code) / 1 var(--font-family-code);
+  color: var(--color-ink-soft);
+}
+
+/* Seul « En cours » est animé : point cerclé d'encre pour rester visible sur fond clair. */
+.pending-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--color-state-active);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-full);
+  animation: pending-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pending-pulse {
+  50% {
+    transform: scale(0.7);
+  }
+}
+
+/* --- merge-blocked ------------------------------------------------------------------------ */
+.merge-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.merge-zone.merge-blocked {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-ink-soft);
+  background: var(--color-discipline-neutral-soft);
+  border-radius: var(--radius-sm);
+}
+
+.merge-done {
+  margin: 0;
+  font: var(--font-weight-label) var(--font-size-label) / 1.2 var(--font-family-label);
+}
+
+.merge-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.merge-reason-link {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: 2px var(--space-1);
+  color: var(--color-ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / var(--line-height-body-sm) var(--font-family-body-sm);
+}
+
+/* --- review-log : filet vertical, une entrée par événement, compteur à droite ------------- */
+.review-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.review-head .review-title {
+  margin: 0;
+}
+
+.review-counter {
+  margin: 0;
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / var(--line-height-body-sm) var(--font-family-body-sm);
+  color: var(--color-ink-soft);
+}
+
+.review-counter .number {
+  font: var(--font-weight-number) var(--font-size-number) / 1 var(--font-family-number);
+  color: var(--color-ink);
+}
+
+.review-entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-ink-soft);
+}
+
+.review-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--graph-row-height);
+  padding: 2px var(--space-2);
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / var(--line-height-body-sm) var(--font-family-body-sm);
+}
+
+.review-entry.is-approved .review-mark {
+  background: var(--color-accent-soft);
+}
+
+.review-entry.is-changes_requested .review-mark {
+  background: var(--color-danger-soft);
+}
+
+.review-mark {
+  flex: none;
+  width: 1.6em;
+  text-align: center;
+  border-radius: var(--radius-full);
+}
+
+.review-author {
+  font-weight: var(--font-weight-label);
+}
+
+.review-time,
+.review-stale {
+  color: var(--color-ink-soft);
+}
+
+.review-body {
+  flex-basis: 100%;
+  padding-left: calc(1.6em + var(--space-2));
+}

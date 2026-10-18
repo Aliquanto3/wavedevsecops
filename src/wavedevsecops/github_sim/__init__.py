@@ -641,6 +641,11 @@ def _is_ancestor(git: Git, layout: Layout, ancestor: str, descendant: str) -> bo
     return git.run(*args, cwd=layout.origin).returncode == 0
 
 
+def is_contained(git: Git, layout: Layout, sha: str, in_sha: str) -> bool:
+    """Vrai si `sha` est déjà accessible depuis `in_sha` dans `origin.git` (rien à merger)."""
+    return _is_ancestor(git, layout, sha, in_sha)
+
+
 def _record_merged(
     git: Git, layout: Layout, state: GithubState, pr: PullRequest, merge_sha: str
 ) -> PullRequest:
@@ -753,6 +758,7 @@ __all__ = [
     "evaluate",
     "has_conflict",
     "init",
+    "is_contained",
     "load",
     "open_pr",
     "origin_branches",
