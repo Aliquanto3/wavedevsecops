@@ -109,7 +109,13 @@ def test_setup_ecrit_un_github_json_vide_et_versionne(settings: Settings, git_pa
     raw = prepared.layout.github_json.read_bytes()
     assert b"\r" not in raw and raw.endswith(b"\n")
     data = json.loads(raw)
-    assert data == {"next_number": 1, "protections": [], "pulls": [], "schema_version": 1}
+    assert data == {
+        "next_number": 1,
+        "protections": [],
+        "pulls": [],
+        "reactions": [],
+        "schema_version": 1,
+    }
     assert list(data) == sorted(data)
 
 
@@ -357,6 +363,7 @@ def test_migrations_appliquees_au_chargement(
         "next_number": 1,
         "protections": [],
         "pulls": [],
+        "reactions": [],
         "schema_version": 2,
         "ajout": True,
     }

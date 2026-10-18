@@ -18,6 +18,7 @@ import hashlib
 import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -31,8 +32,12 @@ from wavedevsecops.contracts.github import (
     Check,
     CheckState,
     Finding,
+    Firing,
     GithubState,
     PullRequest,
+    Reaction,
+    ReactionReview,
+    ReactionTrigger,
     Review,
     ReviewState,
 )
@@ -44,6 +49,14 @@ MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {}
 
 FINGERPRINT_EXCLUDED_CHECK_FIELDS = frozenset({"output", "duration_ms", "updated_at"})
 """Champs d'un check exclus de l'empreinte (AD-6) : sortie, durée, horodatage."""
+FINGERPRINT_EXCLUDED_REVIEW_FIELDS = frozenset({"created_at"})
+"""Champs d'une revue exclus de l'empreinte : l'heure (celle d'une réaction est réelle)."""
+
+
+def now_iso() -> str:
+    """Heure courante en ISO 8601 à la milliseconde (UTC) ; les tests la remplacent."""
+    return datetime.now(UTC).isoformat(timespec="milliseconds")
+
 
 STATE_TEXT: dict[str, str] = {
     "queued": "est en attente",
@@ -159,6 +172,11 @@ def canonical_digest(layout: Layout) -> str | None:
         for check in pull["checks"]:
             for name in FINGERPRINT_EXCLUDED_CHECK_FIELDS:
                 check.pop(name, None)
+        for review in pull["reviews"]:
+            for name in FINGERPRINT_EXCLUDED_REVIEW_FIELDS:
+                review.pop(name, None)
+    if not data["reactions"]:
+        del data["reactions"]  # sans réaction, l'empreinte reste celle d'avant la 3.4
     text = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -345,9 +363,73 @@ def _recompute(git: Git, layout: Layout, state: GithubState) -> RefreshResult:
     return result
 
 
-def _commit(git: Git, layout: Layout, state: GithubState, *, force: bool = False) -> RefreshResult:
-    """Recalcule puis écrit, en une seule écriture atomique."""
+# --- Réactions du collègue simulé ---------------------------------------------------------------
+
+
+def _checks_green(pr: PullRequest) -> bool:
+    """Vrai si la PR a au moins un check obligatoire et que tous sont `success` (SHA courants :
+    un changement de SHA les a remis à `queued`)."""
+    required = [c for c in pr.checks if c.required]
+    return bool(required) and all(c.state == "success" for c in required)
+
+
+def _react(state: GithubState, opened: int | None) -> tuple[GithubState, list[int]]:
+    """Joue les réactions dues : revues ajoutées dans l'ordre, une seule fois par déclencheur.
+
+    `opened` : numéro de la PR qui vient d'être ouverte (déclencheur `pr_opened`). Rend l'état
+    et les numéros de PR modifiées ; ne recalcule pas les approbations (l'appelant le fait)."""
+    pulls = {p.number: p for p in state.pulls}
+    reactions = []
+    touched: set[int] = set()
+    for reaction in state.reactions:
+        fired = list(reaction.fired)
+        for number, pr in pulls.items():
+            if pr.state != "open" or reaction.head not in (None, pr.head):
+                continue
+            on_open = reaction.trigger == "pr_opened"
+            if not (number == opened if on_open else _checks_green(pr)):
+                continue
+            if any(f.number == number and (on_open or f.head_sha == pr.head_sha) for f in fired):
+                continue
+            first = max((r.review_id for r in pr.reviews), default=0) + 1
+            added = [
+                Review(
+                    review_id=first + offset,
+                    author=reaction.author,
+                    state=r.state,
+                    body_text=r.body_text,
+                    commit_sha=pr.head_sha,
+                    created_at=now_iso(),
+                )
+                for offset, r in enumerate(reaction.reviews)
+            ]
+            pulls[number] = pr.model_copy(update={"reviews": [*pr.reviews, *added]})
+            fired.append(Firing(number=number, head_sha=pr.head_sha))
+            touched.add(number)
+        reactions.append(reaction.model_copy(update={"fired": fired}))
+    new = state.model_copy(
+        update={"reactions": reactions, "pulls": [pulls[p.number] for p in state.pulls]}
+    )
+    return new, sorted(touched)
+
+
+def _commit(
+    git: Git,
+    layout: Layout,
+    state: GithubState,
+    *,
+    force: bool = False,
+    opened: int | None = None,
+) -> RefreshResult:
+    """Recalcule, joue les réactions dues (ouverture, checks verts), puis écrit, en une seule
+    écriture atomique."""
     result = _recompute(git, layout, state)
+    reacted, touched = _react(result.state, opened)
+    if touched:
+        again = _recompute(git, layout, reacted)
+        updated = sorted(set(result.updated) | set(touched) | set(again.updated))
+        result = RefreshResult(again.state, result.sha_changed, updated)
+        force = True
     if force or result.updated or not layout.github_json.is_file():
         _save(layout, result.state)
     return result
@@ -372,6 +454,70 @@ def set_protection(git: Git, layout: Layout, protection: BranchProtection) -> Re
     others = [p for p in state.protections if p.branch != protection.branch]
     protections = sorted([*others, protection], key=lambda p: p.branch)
     return _commit(git, layout, state.model_copy(update={"protections": protections}), force=True)
+
+
+def add_reaction(
+    layout: Layout,
+    trigger: ReactionTrigger,
+    author: str,
+    reviews: Iterable[ReactionReview],
+    *,
+    head: str | None = None,
+) -> Reaction:
+    """Déclare une réaction du collègue simulé (numérotée dans l'ordre de déclaration).
+
+    Elle joue aux événements de PR qui suivent : `pr_opened` à l'ouverture d'une PR (dont la
+    tête est `head`, ou toute PR), `checks_green` quand les checks obligatoires passent tous à
+    `success` (voir `_react`). Rien n'est joué à la déclaration."""
+    state = load(layout)
+    reaction = Reaction(
+        reaction_id=len(state.reactions) + 1,
+        trigger=trigger,
+        author=author,
+        head=head,
+        reviews=list(reviews),
+    )
+    _save(layout, state.model_copy(update={"reactions": [*state.reactions, reaction]}))
+    return reaction
+
+
+def set_check_state(
+    git: Git,
+    layout: Layout,
+    number: int,
+    job_id: str,
+    state: CheckState,
+    *,
+    output: str = "",
+    findings: Iterable[Finding] = (),
+) -> PullRequest:
+    """Fixe l'état d'un check d'une PR ouverte (le pipeline simulé, plus tard, ou un test).
+
+    Recalcule les PR et joue les réactions `checks_green` dues, dans la même écriture."""
+    current = load(layout)
+    pr = current.pull(number)
+    check = None if pr is None else next((c for c in pr.checks if c.job_id == job_id), None)
+    if pr is None or pr.state != "open" or check is None:
+        raise GithubSimError(
+            f"La PR n°{number} n'a pas de check « {job_id} » à mettre à jour.",
+            "Choisissez une PR ouverte et un check qu'elle déclare.",
+        )
+    updated = check.model_copy(
+        update={
+            "state": state,
+            "output": output,
+            "findings": list(findings),
+            "updated_at": now_iso(),
+        }
+    )
+    checks = [updated if c.job_id == job_id else c for c in pr.checks]
+    pulls = [
+        p.model_copy(update={"checks": checks}) if p.number == number else p for p in current.pulls
+    ]
+    written = _commit(git, layout, current.model_copy(update={"pulls": pulls}), force=True)
+    result = written.state.pull(number)
+    assert result is not None
+    return result
 
 
 def open_pr(
@@ -446,7 +592,7 @@ def open_pr(
         reviews=declared_reviews,
     )
     new_state = state.model_copy(update={"next_number": number + 1, "pulls": [*state.pulls, pr]})
-    written = _commit(git, layout, new_state, force=True).state.pull(number)
+    written = _commit(git, layout, new_state, force=True, opened=number).state.pull(number)
     assert written is not None
     return written
 
@@ -594,6 +740,9 @@ def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
 
 __all__ = [
     "DeclaredCheck",
+    "add_reaction",
+    "now_iso",
+    "set_check_state",
     "DeclaredReview",
     "GithubSimError",
     "MergeRaced",

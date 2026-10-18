@@ -23,6 +23,9 @@ CheckState = Literal["queued", "running", "success", "failure", "error"]
 PrState = Literal["open", "merged", "closed"]
 ReviewState = Literal["approved", "changes_requested", "commented"]
 BlockKind = Literal["check", "approvals", "conflict", "head_missing"]
+ReactionTrigger = Literal["pr_opened", "checks_green"]
+"""Événements de PR qui déclenchent une réaction du collègue simulé (AD-8) : l'ouverture
+de la PR, et le passage au vert de tous ses checks obligatoires."""
 
 
 class _Model(BaseModel):
@@ -70,6 +73,9 @@ class Review(_Model):
     body_text: str = ""
     commit_sha: str = Field(pattern=SHA_PATTERN)
     """`head_sha` de la PR au moment de la revue."""
+    created_at: str | None = None
+    """Horodatage ISO 8601 de la revue ; `None` si le scénario l'a déclarée à l'ouverture
+    (hors empreinte)."""
 
     def element(self, number: int) -> str:
         return element_id("review", str(number), str(self.review_id))
@@ -86,6 +92,36 @@ class BranchProtection(_Model):
     """Vrai : un push direct sur la branche est refusé (`pre-receive`, story 3.5)."""
     dismiss_stale_reviews: bool = False
     """Vrai : seules les revues du `head_sha` courant comptent (faux par défaut, comme GitHub)."""
+
+
+class ReactionReview(_Model):
+    """Une revue que la réaction publie, dans l'ordre où elle est déclarée."""
+
+    state: ReviewState
+    body_text: str = ""
+
+
+class Firing(_Model):
+    """Une PR (et son `head_sha` au moment du déclenchement) pour laquelle la réaction a joué."""
+
+    number: int = Field(ge=1)
+    head_sha: str = Field(pattern=SHA_PATTERN)
+
+
+class Reaction(_Model):
+    """Réaction déclarée par le scénario : à un événement de PR, le collègue publie ses revues.
+
+    `pr_opened` joue une fois par PR ; `checks_green` joue une fois par `head_sha` (un nouveau
+    push la réarme)."""
+
+    reaction_id: int = Field(ge=1)
+    trigger: ReactionTrigger
+    author: str = Field(min_length=1)
+    """Nom affiché de l'auteur des revues."""
+    head: str | None = None
+    """Branche de tête des PR concernées ; `None` : toutes."""
+    reviews: list[ReactionReview] = Field(min_length=1)
+    fired: list[Firing] = Field(default_factory=list)
 
 
 class BlockReason(_Model):
@@ -145,6 +181,8 @@ class GithubState(_Model):
     """Numéro de la prochaine PR : jamais réutilisé dans l'espace."""
     protections: list[BranchProtection] = Field(default_factory=list)
     pulls: list[PullRequest] = Field(default_factory=list)
+    reactions: list[Reaction] = Field(default_factory=list)
+    """Réactions du collègue simulé, dans l'ordre de déclaration (ordre de jeu)."""
 
     def protection(self, branch: str) -> BranchProtection | None:
         return next((p for p in self.protections if p.branch == branch), None)
