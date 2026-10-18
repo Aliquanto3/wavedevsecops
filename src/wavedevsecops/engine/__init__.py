@@ -2,8 +2,8 @@
 
 Story 2.1 : setup d'un espace et empreinte. Story 2.2 : file d'opérations par espace
 (`operations`), registre des intentions (`intents`), espaces actifs et veille (`manager`),
-surveillant de l'arbre (`watcher`), `run.json` versionné (`runfile`). Les instantanés
-arrivent avec les stories suivantes de l'Epic 2.
+surveillant de l'arbre (`watcher`), `run.json` versionné (`runfile`). Story 4.3 :
+instantanés et restauration exacte (`snapshots`).
 """
 
 from wavedevsecops.engine.fingerprint import (
@@ -41,6 +41,19 @@ from wavedevsecops.engine.operations import (
 )
 from wavedevsecops.engine.runfile import RUN_SCHEMA_VERSION, RunFileError, load_run, save_run
 from wavedevsecops.engine.steps import StepRunner
+from wavedevsecops.engine.snapshots import (
+    RestoreFailed,
+    Snapshot,
+    SnapshotError,
+    get_snapshot,
+    latest_snapshot,
+    list_snapshots,
+    prune_snapshots,
+    restore_operation,
+    restore_snapshot,
+    resume_restore,
+    take_snapshot,
+)
 from wavedevsecops.engine.workspace import (
     PreparedWorkspace,
     WorkspaceError,
@@ -83,4 +96,15 @@ __all__ = [
     "reference_key",
     "resolve_git",
     "write_references",
+    "RestoreFailed",
+    "Snapshot",
+    "SnapshotError",
+    "get_snapshot",
+    "latest_snapshot",
+    "list_snapshots",
+    "prune_snapshots",
+    "restore_operation",
+    "restore_snapshot",
+    "resume_restore",
+    "take_snapshot",
 ]

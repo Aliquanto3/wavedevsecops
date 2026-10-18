@@ -79,12 +79,20 @@ def project(
     previous_views: Mapping[str, Any] | None = None,
     *,
     restored: frozenset[str] = frozenset(),
+    after_restore: bool = False,
 ) -> Projected:
-    """Relit le dépôt de l'espace et calcule ses vues ; `previous_views` fixe les marques."""
+    """Relit le dépôt de l'espace et calcule ses vues ; `previous_views` fixe les marques.
+
+    `after_restore` (AD-6) : les commits revenus par la restauration (absents de l'état
+    précédent) portent la marque `restored` au lieu de `new`.
+    """
     state = read_repo_state(git, layout.repo, ACTORS)
-    views = build_views(
-        state, previous_state(previous_views), restored, previous_graph(previous_views)
-    )
+    previous = previous_state(previous_views)
+    if after_restore:
+        known = {c.sha for c in previous.commits} if previous is not None else set()
+        restored = restored | frozenset(c.sha for c in state.commits if c.sha not in known)
+        previous = None
+    views = build_views(state, previous, restored, previous_graph(previous_views))
     return Projected(views, Linker(state))
 
 

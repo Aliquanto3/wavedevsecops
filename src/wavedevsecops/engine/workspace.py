@@ -2,7 +2,8 @@
 
 `<data>/workspaces/<parcours>/<scenario_id>.<mode>/` reçoit `repo/`, `origin.git/`,
 `hooks/` et `run.json` (seul écrivain : le moteur). L'empreinte de fin de setup est
-enregistrée dans `run.json`.
+enregistrée dans `run.json`, et l'instantané 0 est pris dans `snapshots/0/` (AD-6), avant tout
+run du pipeline.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.runfile import RUN_SCHEMA_VERSION
+from wavedevsecops.engine.snapshots import take_snapshot
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios import LoadedScenario, run_setup
 from wavedevsecops.wsfs import Layout
@@ -72,6 +74,7 @@ def prepare_workspace(
     try:
         aliases = run_setup(scenario, layout, git, settings.content_path() / "exercise")
         digest = fingerprint(layout, git)
+        take_snapshot(layout, git, settings, reason="setup", expected=digest)
     except BaseException:
         wsfs.remove_tree(layout.root)
         raise
@@ -88,6 +91,7 @@ def prepare_workspace(
             "setup_fingerprint": digest,
             "aliases": aliases,
             "restoring": None,
+            "restore_failed": None,
         },
     )
     return PreparedWorkspace(layout, digest, aliases)

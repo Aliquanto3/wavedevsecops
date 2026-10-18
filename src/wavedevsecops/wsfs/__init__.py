@@ -44,6 +44,10 @@ class SandboxPathError(AppError):
         self.path = path
 
 
+SNAPSHOT_ENTRIES = ("repo", "origin.git", "github.json", "hooks")
+"""Entrées d'un espace copiées par un instantané et remplacées par une restauration (AD-6)."""
+
+
 @dataclass(frozen=True)
 class Layout:
     """Disposition d'un espace `<data>/workspaces/<parcours>/<scenario_id>.<mode>/` (AD-5)."""
@@ -82,6 +86,10 @@ class Layout:
     @property
     def snapshots(self) -> Path:
         return self.root / "snapshots"
+
+    def entries(self) -> tuple[Path, ...]:
+        """Chemins couverts par un instantané (AD-6), dans l'ordre de `SNAPSHOT_ENTRIES`."""
+        return tuple(self.root / name for name in SNAPSHOT_ENTRIES)
 
     @property
     def ci(self) -> Path:
@@ -243,3 +251,72 @@ def remove_tree(path: Path) -> None:
     """Supprime un espace (ou un de ses dossiers) ; absent : rien à faire."""
     if path.exists():
         shutil.rmtree(path, onexc=_clear_readonly)
+
+
+def remove_entry(path: Path) -> None:
+    """Supprime un fichier ou un dossier de l'espace ; absent : rien à faire."""
+    if path.is_dir() and not path.is_symlink():
+        remove_tree(path)
+    elif os.path.lexists(path):
+        try:
+            path.unlink()
+        except PermissionError:
+            os.chmod(path, stat.S_IWRITE)
+            path.unlink()
+
+
+GIT_LOCKS = frozenset({"index.lock", "HEAD.lock"})
+"""Verrous de git jamais copiés : un verrou périmé bloquerait le dépôt rétabli (AD-12)."""
+
+
+def _skip_git_locks(directory: str, names: list[str]) -> set[str]:
+    if os.path.basename(directory) in (".git", "origin.git"):
+        return GIT_LOCKS.intersection(names)
+    return set()
+
+
+def copy_entries(source: Path, names: tuple[str, ...], target: Path) -> None:
+    """Copie dans `target` (créé au besoin) ceux des `names` présents sous `source`.
+
+    Les dossiers sont copiés en entier, liens symboliques compris (jamais suivis), sans les
+    verrous de git (`GIT_LOCKS`) de `.git/` et `origin.git/`. Une copie interrompue reste
+    partielle : l'appelant la supprime (instantanés, AD-6).
+    """
+    target.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        entry = source / name
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.copytree(entry, target / name, symlinks=True, ignore=_skip_git_locks)
+        elif os.path.lexists(entry):
+            shutil.copy2(entry, target / name, follow_symlinks=False)
+
+
+MOVE_ATTEMPTS = 3
+"""Essais d'un renommage de restauration : un fichier tenu ouvert (Windows) le refuse."""
+
+
+def move(
+    source: Path,
+    target: Path,
+    *,
+    attempts: int = MOVE_ATTEMPTS,
+    pause_s: float = 0.2,
+    sleep: Any = time.sleep,
+) -> None:
+    """Renomme `source` en `target` (même volume), avec `attempts` essais espacés.
+
+    Entre deux essais refusés (`PermissionError`, verrou de fichier sous Windows), la pause
+    croît : `pause_s`, puis `2 × pause_s`… Le dernier refus est levé. `target` ne doit pas
+    exister : un renommage ne remplace jamais une entrée.
+    """
+    if os.path.lexists(target):
+        raise FileExistsError(f"cible déjà présente : {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(1, attempts + 1):
+        try:
+            os.rename(source, target)
+            return
+        except PermissionError:
+            if attempt >= attempts:
+                raise
+            sleep(pause_s * attempt)

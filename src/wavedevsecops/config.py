@@ -87,6 +87,12 @@ class Settings(BaseModel):
     terminal_timeout_s: float = Field(default=30.0, gt=0)
     """Délai d'une commande tapée dans le terminal ; au-delà, l'arbre est arrêté (AD-4, AD-12)."""
 
+    max_snapshots: int = Field(default=20, ge=2)
+    """Instantanés gardés par espace ; le 0 et le dernier le sont toujours (AD-6)."""
+
+    restore_retry_ms: int = Field(default=250, ge=0)
+    """Pause avant le 2e essai d'un renommage de restauration (doublée avant le 3e, AD-6)."""
+
     def gitconfig_path(self) -> Path:
         """`<data>/gitconfig`, désigné par `GIT_CONFIG_GLOBAL` (AD-3, AD-5)."""
         return self.resolved_data_dir() / "gitconfig"

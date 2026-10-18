@@ -36,6 +36,12 @@ from wavedevsecops.engine.operations import (
     WorkspaceEngine,
 )
 from wavedevsecops.engine.steps import StepRunner
+from wavedevsecops.engine.snapshots import (
+    RESTORED_KEY,
+    pending_restore,
+    restore_operation,
+    resume_operation,
+)
 from wavedevsecops.engine.watcher import TreeWatcher
 from wavedevsecops.engine.workspace import prepare_workspace, resolve_git
 from wavedevsecops.events import EngineStateName, EventLog, ExternalChange, Kind
@@ -45,6 +51,8 @@ from wavedevsecops.scenarios.model import KEBAB_PATTERN, Mode, Track
 from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger("wavedevsecops")
+STOP_WATCH_STATES: frozenset[EngineStateName] = frozenset({"restoring"})
+"""États pendant lesquels le surveillant est arrêté (et non suspendu) : restauration (AD-6)."""
 STILL_STOPPING_TEXT = (
     "Cet espace termine sa mise en veille : l'action en cours s'achève. Réessayez dans un instant."
 )
@@ -95,7 +103,9 @@ def repo_projector(settings: Settings, git_path: Path | None = None) -> Projecto
             resolved["git"] = git_path or resolve_git(settings)
         git = Git.for_workspace(resolved["git"], ctx.layout.root, settings)
         digest = fingerprint(ctx.layout, git)
-        projected = projections.project(git, ctx.layout, ctx.last_views)
+        projected = projections.project(
+            git, ctx.layout, ctx.last_views, after_restore=bool(ctx.data.get(RESTORED_KEY))
+        )
         return Projection(projected.views.model_dump(mode="json"), digest, projected.linker)
 
     return project
@@ -318,11 +328,37 @@ class WorkspaceManager:
             idle = [key for key in candidates if not self._active[key].engine.busy]
             evicted.append(self._retire((idle or candidates)[0]))
         engine.start()
+        pending = pending_restore(layout)
+        if pending is not None:
+            # Arrêt pendant une restauration : la reprise passe avant toute autre opération.
+            snapshot_id = pending.get("snapshot_id")
+            engine.submit(
+                resume_operation(
+                    snapshot_id if isinstance(snapshot_id, int) else None, self._resolved_git()
+                )
+            )
         return engine, evicted
+
+    def _resolved_git(self) -> Path:
+        if self._git_path is None:
+            self._git_path = resolve_git(self.settings)
+        return self._git_path
+
+    def restore(self, workspace_id: str, snapshot_id: int) -> Future[OpResult]:
+        """Rétablit l'instantané `snapshot_id` par une opération `restoring` de la file (AD-6)."""
+        engine = self.get(workspace_id)
+        return engine.submit(restore_operation(snapshot_id, self._resolved_git()))
 
     def _follow_state(self, active: _Active, state: EngineStateName) -> None:
         """Suspend ou reprend le surveillant selon l'état (appelé par le fil de la file)."""
         if self._watcher_factory is None or active.engine.closed:
+            return
+        if state in STOP_WATCH_STATES:
+            # Arrêté, pas seulement suspendu : sous Windows, son handle sur `repo/` empêcherait
+            # de renommer le dossier (AD-6). Un nouveau surveillant reprend au repos.
+            if active.watcher is not None:
+                active.watcher.stop()
+                active.watcher = None
             return
         if state in SILENT_STATES:
             if active.watcher is not None:

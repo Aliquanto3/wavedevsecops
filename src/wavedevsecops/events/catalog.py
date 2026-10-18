@@ -164,8 +164,18 @@ class StepExplanation(_Payload):
     explain_ref: str = ""
 
 
+class RestoreStarted(_Payload):
+    """Début d'une restauration (AD-6) : l'instantané rétabli."""
+
+    snapshot_id: int
+
+
 class RestoreEnded(_Payload):
     status: Literal["ok", "restore_failed"]
+    snapshot_id: int | None = None
+    """Instantané rétabli ; `None` s'il n'a pas pu être lu."""
+    reason_text: str = ""
+    """En `restore_failed` : la cause, en français ; l'action proposée est « Recommencer »."""
 
 
 class ExternalChange(_Payload):
@@ -190,10 +200,6 @@ class HintOpened(_OpenPayload):
 
 
 class QuizAltered(_OpenPayload):
-    pass
-
-
-class RestoreStarted(_OpenPayload):
     pass
 
 
