@@ -11,7 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from wavedevsecops.terminal.allowlist import Allowlist, GitSubcommand, ReadRule
+from wavedevsecops import wsfs
+from wavedevsecops.terminal.allowlist import Allowlist, GitSubcommand, ReadRule, ToolSpec
 
 _NUMBER = re.compile(r"-\d+")
 _NAME_START = re.compile(r"[A-Za-z0-9_{(@*#?$!\-]")
@@ -348,7 +349,103 @@ def check_file(name: str, tokens: list[Token], allow: Allowlist) -> FileCommand:
     )
 
 
-def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | None:
+@dataclass(frozen=True)
+class ToolCommand:
+    """Outil de la chaîne accepté par la garde (story 7.2) ; lancé par `terminal.tools`."""
+
+    name: str
+    args: tuple[str, ...]
+    """Arguments transmis à l'outil, tels que tapés (sous-commande comprise)."""
+    barrier_id: str
+    write: bool
+    """Vrai si une option écrit dans l'arbre de travail (`ruff check --fix`)."""
+
+    @property
+    def read(self) -> bool:
+        return not self.write
+
+
+def _tool_refuse(allow: Allowlist, reason: str) -> Refused:
+    return Refused(f"{reason} {allow.accepted()}")
+
+
+def check_tool(name: str, tokens: list[Token], allow: Allowlist) -> ToolCommand:
+    """Valide les arguments d'un outil (`tokens` : après son nom) contre la liste blanche."""
+    spec: ToolSpec = allow.tools[name]
+    rest = [token.text for token in tokens]
+    if spec.subcommands and (not rest or rest[0] not in spec.subcommands):
+        subcommands = ", ".join(spec.subcommands)
+        raise _tool_refuse(
+            allow, allow.message("tool_subcommand", tool=name, subcommands=subcommands)
+        )
+    allowed, valued = set(spec.options), set(spec.value_options)
+    shown = ", ".join(spec.options)
+
+    def unknown(option: str) -> Refused:
+        accepted = allow.message("tool_options", options=shown) if shown else ""
+        reason = allow.message("tool_unknown_option", tool=name, option=option, accepted=accepted)
+        return _tool_refuse(allow, reason)
+
+    def missing(option: str) -> Refused:
+        return _tool_refuse(allow, allow.message("tool_missing_value", tool=name, option=option))
+
+    options: set[str] = set()
+    positionals: list[str] = []
+    after_separator = False
+    i = 1 if spec.subcommands else 0
+    while i < len(rest):
+        token = rest[i]
+        i += 1
+        if after_separator or not token.startswith("-") or token == "-":
+            positionals.append(token)
+            continue
+        if token == "--":
+            after_separator = True
+            continue
+        if token.startswith("--"):
+            option, equals, _ = token.partition("=")
+            if option not in allowed:
+                raise unknown(option)
+            options.add(option)
+            if option in valued and not equals:
+                if i >= len(rest):
+                    raise missing(option)
+                i += 1
+            continue
+        if token in allowed:  # option courte exacte (`-q`, `-x`, `-k`)
+            options.add(token)
+            if token in valued:
+                if i >= len(rest):
+                    raise missing(token)
+                i += 1
+            continue
+        if token[:2] in valued:  # valeur collée : `-kmot`, `-rA`
+            options.add(token[:2])
+            continue
+        for char in token[1:]:  # regroupement : `-qx`
+            option = f"-{char}"
+            if option not in allowed or option in valued:
+                raise unknown(option if len(token) > 2 else token)
+            options.add(option)
+    if spec.paths:
+        for value in positionals:
+            # `tests/test_a.py::test_x` : seul le chemin est confiné au dépôt.
+            base = value.split("::", 1)[0]
+            if base == ".":
+                continue  # la racine du dépôt, cwd de l'outil
+            try:
+                wsfs.check_relative(base)
+            except wsfs.SandboxPathError:
+                raise _tool_refuse(allow, allow.message("tool_path", value=value)) from None
+    return ToolCommand(
+        name=name,
+        args=tuple(rest),
+        barrier_id=spec.barrier_id,
+        write=bool(options & set(spec.write_options)),
+    )
+
+
+def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | ToolCommand | None:
     """Ligne tapée -> commande acceptée, `None` si la ligne est vide ; sinon `Refused`."""
     tokens = tokenize(line, allow)
     if not tokens:
@@ -358,6 +455,11 @@ def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | None:
         raise Refused(f"{allow.message('metachar', found=head)} {allow.accepted()}")
     if head in allow.files:
         return check_file(head, tokens[1:], allow)
+    if head in allow.tools:
+        if any(token.operator for token in tokens):
+            symbol = next(token.text for token in tokens if token.operator)
+            raise Refused(f"{allow.message('metachar', found=symbol)} {allow.accepted()}")
+        return check_tool(head, tokens[1:], allow)
     if any(token.operator for token in tokens):
         # Une redirection n'est permise qu'après `echo` : ici, jamais.
         symbol = next(token.text for token in tokens if token.operator)

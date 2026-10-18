@@ -101,6 +101,9 @@ class TerminalOutput(_Payload):
     lang: str = ""
     """`fr` ou `en`, déterminé par le serveur ; vide si la sortie n'a pas de langue."""
     spans: list[Span] = []
+    tool: str = ""
+    """Nom de l'outil (`ruff`, `pytest`) dont la sortie verbatim est un bloc `tool-output` ;
+    vide pour une sortie ordinaire du terminal."""
 
 
 class OutputSpans(_Payload):

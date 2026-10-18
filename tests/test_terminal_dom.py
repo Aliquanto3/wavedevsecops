@@ -293,3 +293,54 @@ def test_le_front_ne_lit_pas_la_sortie_et_les_textes_viennent_du_serveur() -> No
     # AD-2 : aucune analyse de la sortie (pas d'expression régulière sur `entry.text`).
     assert "entry.text.match" not in js and "entry.text.replace" not in js
     assert ".test(entry.text" not in js
+
+
+def test_bloc_tool_output_etiquete_liens_et_designation(tmp_path: Path) -> None:
+    """Story 7.2 (UX-DR20) : sortie d'outil verbatim, liens du serveur, bloc désignable."""
+    out = _js(
+        tmp_path,
+        """
+const { selectionFor } = await import("@JS@/selection.js");
+const selection = selectionFor(store);
+const text = "𝄞 src/a.py:3:8: F401 import inutile\\nFound 1 error.\\n";
+const start = text.indexOf("src/a.py:3");
+const link = { start, end: start + "src/a.py:3".length, text: "src/a.py:3", element_id: "path:worktree:src/a.py" };
+store.applyEvent({ boot_id: "b", seq: ++seq, epoch: 0, op_id: "op1", kind: "terminal_output",
+  payload: { stream: "stdout", text, lang: "", tool: "ruff", spans: [link, { start: 900, end: 905, text: "x", element_id: "path:worktree:hors" }] } });
+out("stdout", "suite\\n");
+const block = $(".tool-output");
+const links = [...block.querySelectorAll(".terminal-link")];
+const before = selection.value;
+links[0].click();
+const afterLink = selection.value;
+block.click();
+const afterBlock = selection.value;
+block.click();
+console.log(JSON.stringify({
+  count: $$(".tool-output").length,
+  plain: $$(".terminal-chunk").length,
+  role: block.getAttribute("role"),
+  label: block.getAttribute("aria-label"),
+  tabindex: block.getAttribute("tabindex"),
+  elementId: block.getAttribute("data-element-id"),
+  tag: block.querySelector(".tool-output-label").textContent,
+  verbatim: block.querySelector(".tool-output-text").textContent,
+  links: links.map((l) => [l.textContent, l.getAttribute("data-element-id")]),
+  split: T.splitSpans("abcdef", [{ start: 4, end: 9 }, { start: 1, end: 3, element_id: "x" }]),
+  before, afterLink, afterBlock, afterSecondBlock: selection.value,
+}));
+""",
+    )
+    assert out["count"] == 1 and out["plain"] == 1  # le bloc d'outil n'est pas un morceau ordinaire
+    assert (out["role"], out["label"], out["tabindex"]) == ("group", "Sortie de ruff", "0")
+    assert out["elementId"] == "output:op1" and out["tag"] == "ruff"
+    assert out["verbatim"] == "𝄞 src/a.py:3:8: F401 import inutile\nFound 1 error.\n"
+    assert out["links"] == [["src/a.py:3", "path:worktree:src/a.py"]]  # le passage hors bornes saute
+    assert out["split"] == [
+        {"text": "a"},
+        {"text": "bc", "elementId": "x"},
+        {"text": "def"},
+    ]
+    assert out["before"] is None
+    assert out["afterLink"] == "path:worktree:src/a.py"
+    assert out["afterBlock"] == "output:op1" and out["afterSecondBlock"] is None

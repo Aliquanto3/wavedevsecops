@@ -116,6 +116,7 @@ def test_lancement_confirme_snapshot_etat_command_et_sortie(
         "text": "Deux articles sont sous le seuil.\n",
         "lang": "",
         "spans": [],
+        "tool": "",
     }
     assert mine[4]["payload"]["code"] == 0
     # Un instantané `exercise` existait déjà au lancement, après celui du setup (le 0).

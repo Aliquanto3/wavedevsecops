@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import stat
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -210,16 +212,22 @@ def test_sync_environment_hors_ligne(tmp_path: Path, monkeypatch: pytest.MonkeyP
     calls: list[tuple[list[str], dict[str, str]]] = []
     venv = _fake_venv(tmp_path / "ws", sys.platform, {})
 
-    def fake_run(argv, *, env, cwd, timeout):  # noqa: ANN001, ANN202
+    real_spawn = procs.spawn
+    started: list[procs.Handle] = []
+
+    def fake_spawn(argv, *, env, cwd, timeout):  # noqa: ANN001, ANN202
         calls.append(([str(a) for a in argv], env))
-        return procs.ProcResult(0)
+        return real_spawn([PY, "-c", "pass"], env=env, cwd=cwd, timeout=timeout)
 
     uv = toolrun.ToolStatus("uv", "ok", "0.13.1", PY, "host")
     monkeypatch.setattr(toolrun, "resolve", lambda tool_id, *a, **k: uv)
-    monkeypatch.setattr(toolrun.procs, "run", fake_run)
+    monkeypatch.setattr(toolrun.procs, "spawn", fake_spawn)
     project = tmp_path / "ws" / "repo"
-    result = toolrun.sync_environment(project, venv, Settings(data_dir=tmp_path / "data"))
-    assert result.ok
+    project.mkdir(parents=True)
+    result = toolrun.sync_environment(
+        project, venv, Settings(data_dir=tmp_path / "data"), on_start=started.append
+    )
+    assert result.ok and len(started) == 1  # `on_start` reçoit le Handle (arrêt possible)
     ((argv, env),) = calls
     assert argv == [str(PY), "sync", "--offline", "--frozen", "--project", str(project)]
     assert env["UV_PROJECT_ENVIRONMENT"] == str(venv) and env["UV_OFFLINE"] == "1"
@@ -233,6 +241,32 @@ def test_sync_environment_hors_ligne(tmp_path: Path, monkeypatch: pytest.MonkeyP
     )
     failed = toolrun.sync_environment(project, venv, Settings(data_dir=tmp_path / "data"))
     assert not failed.ok and failed.error == "absent"
+
+
+def test_sync_environment_est_interruptible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Report de la 6.6 : `uv sync` s'arrête sur `terminate` (Ctrl+C, mise en veille)."""
+    real_spawn = procs.spawn
+    sleeper = [PY, "-c", "import time; time.sleep(60)"]
+    uv = toolrun.ToolStatus("uv", "ok", "0.13.1", PY, "host")
+    monkeypatch.setattr(toolrun, "resolve", lambda tool_id, *a, **k: uv)
+    monkeypatch.setattr(
+        toolrun.procs,
+        "spawn",
+        lambda argv, *, env, cwd, timeout: real_spawn(sleeper, env=env, cwd=cwd, timeout=timeout),
+    )
+    project = tmp_path / "repo"
+    project.mkdir()
+    started = time.monotonic()
+    result = toolrun.sync_environment(
+        project,
+        tmp_path / "venv",
+        Settings(data_dir=tmp_path / "data"),
+        on_start=lambda handle: threading.Timer(0.5, handle.terminate).start(),
+    )
+    assert not result.ok and result.error == "interrompu"
+    assert time.monotonic() - started < 30
 
 
 _CONNECT = """

@@ -114,3 +114,48 @@
   color: var(--color-terminal-fg-soft);
   cursor: progress;
 }
+
+/* Sortie d'un outil de la chaîne (UX-DR20) : bloc verbatim, étiquette au nom de l'outil, désignable. */
+.tool-output {
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--pane-padding);
+  border-left: 3px solid var(--color-terminal-accent);
+  cursor: pointer;
+}
+
+.tool-output.is-selected,
+.tool-output:focus-visible {
+  outline: 2px solid var(--color-terminal-lit-ring);
+  outline-offset: 2px;
+  background: var(--color-terminal-lit-fill);
+}
+
+.tool-output-label {
+  display: block;
+  color: var(--color-terminal-accent);
+  font-weight: 600;
+}
+
+.tool-output-text {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Lien fichier:ligne vers la vue Code : un bouton qui garde l'apparence du texte, souligné. */
+.terminal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-terminal-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.terminal-link:focus-visible,
+.terminal-link.is-selected {
+  outline: 2px solid var(--color-terminal-lit-ring);
+  outline-offset: 1px;
+}

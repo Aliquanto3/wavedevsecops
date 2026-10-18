@@ -3,6 +3,7 @@
 // (`terminal_output`) dans l'ordre d'arrivée, et envoie les intentions `terminal_line` et
 // `interrupt` (AD-17). Les refus et les textes viennent du serveur.
 import { el, richText } from "./dom.js";
+import { selectionFor } from "./selection.js";
 
 export const MAX_LINES = 5000; // au-delà, les plus anciennes sont masquées avec leur nombre
 export const SLOW_AFTER_S = 1; // « En cours… n s » s'affiche après cette durée
@@ -39,7 +40,71 @@ export function promptText(state) {
   return branch ? `${branch} $` : "$";
 }
 
-function entryNode(entry) {
+export const TOOL_OUTPUT_LABEL = (tool) => `Sortie de ${tool}`;
+
+/**
+ * Découpe `text` selon les `spans` du serveur (positions UTF-16 de `slice`) : des textes et des
+ * liens `{text, elementId}`. Un passage hors bornes ou qui en chevauche un autre est ignoré.
+ */
+export function splitSpans(text, spans) {
+  const parts = [];
+  let at = 0;
+  for (const span of [...(spans || [])].sort((a, b) => a.start - b.start)) {
+    if (span.start < at || span.end > text.length || span.end <= span.start) continue;
+    if (span.start > at) parts.push({ text: text.slice(at, span.start) });
+    parts.push({ text: text.slice(span.start, span.end), elementId: span.element_id });
+    at = span.end;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at) });
+  return parts;
+}
+
+/** Bloc `tool-output` (UX-DR20) : sortie verbatim, étiquette au nom de l'outil, désignable. */
+function toolOutputNode(entry, selection) {
+  const block = el("div", "tool-output", {
+    role: "group",
+    tabindex: "0",
+    "aria-label": TOOL_OUTPUT_LABEL(entry.tool),
+    "data-tool": entry.tool,
+  });
+  const outputId = entry.opId ? `output:${entry.opId}` : "";
+  if (outputId) block.setAttribute("data-element-id", outputId);
+  const label = el("span", "tool-output-label", { "aria-hidden": "true" });
+  label.textContent = entry.tool;
+  const body = el("pre", "tool-output-text");
+  if (entry.lang === "en") body.setAttribute("lang", "en");
+  for (const part of splitSpans(entry.text, entry.spans)) {
+    if (!part.elementId) {
+      body.append(document.createTextNode(part.text));
+      continue;
+    }
+    const link = el("button", "terminal-link", { type: "button", "data-element-id": part.elementId });
+    link.textContent = part.text;
+    link.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selection.toggle(part.elementId);
+    });
+    body.append(link);
+  }
+  block.append(label, body);
+  if (outputId) {
+    const designate = () => selection.toggle(outputId);
+    block.addEventListener("click", (event) => {
+      if (!String(globalThis.getSelection?.() ?? "")) designate();
+      event.stopPropagation();
+    });
+    block.addEventListener("keydown", (event) => {
+      if (event.target === block && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        designate();
+      }
+    });
+  }
+  return block;
+}
+
+function entryNode(entry, selection) {
+  if (entry.tool) return toolOutputNode(entry, selection);
   if (entry.kind === "input") {
     const line = el("div", "terminal-line terminal-command");
     const prompt = el("span", "terminal-prompt");
@@ -109,6 +174,7 @@ export function createTerminal(body, { store, timers = globalThis }) {
   root.append(empty, note, log, running, form);
   body.replaceChildren(root);
 
+  const selection = selectionFor(store);
   const history = [];
   let historyIndex = null;
   let draft = "";
@@ -225,6 +291,16 @@ export function createTerminal(body, { store, timers = globalThis }) {
     if (!selectedText()) input.focus();
   });
 
+  function refreshSelection() {
+    for (const block of log.querySelectorAll?.("[data-element-id]") ?? []) {
+      const on = block.getAttribute("data-element-id") === selection.value;
+      if (on) block.classList.add("is-selected");
+      else block.classList.remove("is-selected");
+      if (block.tagName === "BUTTON") block.setAttribute("aria-pressed", String(on));
+    }
+  }
+  const unselect = selection.subscribe(refreshSelection);
+
   function reset() {
     for (const { node } of nodes) node.remove();
     nodes = [];
@@ -241,7 +317,7 @@ export function createTerminal(body, { store, timers = globalThis }) {
     let added = false;
     for (let index = Math.max(rendered, cleared); index < terminal.entries.length; index += 1) {
       const entry = terminal.entries[index];
-      const node = entryNode(entry);
+      const node = entryNode(entry, selection);
       const lines = countLines(entry.text);
       log.append(node);
       nodes.push({ node, lines });
@@ -308,6 +384,7 @@ export function createTerminal(body, { store, timers = globalThis }) {
     input,
     destroy() {
       unsubscribe();
+      unselect();
       if (timer !== null) timers.clearInterval?.(timer);
     },
   };

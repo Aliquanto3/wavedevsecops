@@ -9,6 +9,9 @@ et le code de sortie servent à expliquer `commit` ou `tag -a` sans message.
 Crochet `AFTER_COMMAND_HOOKS` : appelés après une commande qui agit sur `origin` (`push`,
 `pull`, `fetch`) avec `(ctx, commande, code de sortie)`. Le GitHub simulé (story 3.1) y
 branchera son `refresh` sans que ce module l'importe.
+
+Story 7.2 : `ruff check` et `pytest` (section `tools` de la liste blanche) tournent par `toolrun`
+dans l'environnement d'exercice, si le scénario les déclare ; voir `terminal.tools`.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -31,9 +35,17 @@ from wavedevsecops.engine import (
     register_intent,
     resolve_git,
 )
-from wavedevsecops.terminal import files
+from wavedevsecops.engine.runfile import load_run
+from wavedevsecops.scenarios import load_scenario
+from wavedevsecops.terminal import files, tools
 from wavedevsecops.terminal.allowlist import Allowlist, get_allowlist
-from wavedevsecops.terminal.parse import FileCommand, GitCommand, Refused, parse_line
+from wavedevsecops.terminal.parse import (
+    FileCommand,
+    GitCommand,
+    Refused,
+    ToolCommand,
+    parse_line,
+)
 
 log = logging.getLogger("wavedevsecops")
 
@@ -143,6 +155,29 @@ def _run_file(ctx: OpContext, command: FileCommand, allow: Allowlist) -> int:
     return result.code
 
 
+_DECLARED: dict[Path, tuple[tuple[int, int], frozenset[str]]] = {}
+
+
+def declared_tools(engine: WorkspaceEngine) -> frozenset[str]:
+    """Outils que le scénario de l'espace déclare (`tools`) : seuls ceux-là sont acceptés (AD-4).
+
+    Relu quand le fichier du scénario change ; illisible ou absent : aucun outil.
+    """
+    try:
+        run = load_run(engine.layout)
+        path = engine.settings.scenarios_path() / f"{run['scenario_id']}.{run['mode']}.yaml"
+        info = path.stat()
+        stamp = (info.st_mtime_ns, info.st_size)
+        cached = _DECLARED.get(path)
+        if cached is None or cached[0] != stamp:
+            declared = frozenset(load_scenario(path, engine.settings).scenario.tools)
+            cached = _DECLARED[path] = (stamp, declared)
+        return cached[1]
+    except Exception:  # noqa: BLE001 - un scénario illisible ne déclare aucun outil
+        log.warning("Outils déclarés illisibles pour %s", engine.workspace_id, exc_info=True)
+        return frozenset()
+
+
 def build_terminal_line(engine: WorkspaceEngine, body: TerminalLine) -> Operation:
     """Traduit une ligne tapée en opération : refusée à l'écran, ou git dans `repo/`."""
     allow = get_allowlist(engine.settings)
@@ -153,6 +188,16 @@ def build_terminal_line(engine: WorkspaceEngine, body: TerminalLine) -> Operatio
     if command is None:
         return Operation(
             INTENT, lambda ctx: 0, writes=False, validate=False, precheck=lambda ctx: False
+        )
+    if isinstance(command, ToolCommand):
+        if command.name not in declared_tools(engine):
+            reason = allow.message("tool_not_declared", tool=command.name)
+            return _refused_operation(f"{reason} {allow.accepted()}")
+        return Operation(
+            INTENT,
+            lambda ctx: tools.run(ctx, command, allow),
+            # En `quiz_altered`, seules les lectures passent : `ruff check --fix` écrit.
+            writes=command.write,
         )
     if isinstance(command, FileCommand):
         return Operation(

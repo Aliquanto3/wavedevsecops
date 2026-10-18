@@ -21,8 +21,10 @@ LLM_STAGES = ("simple_call", "system_prompt", "tools", "loop")
 
 class Args(OpArgs):
     op: Literal["exercise_stage"]
-    stage: Literal["base", "simple_call", "system_prompt", "tools", "loop"]
-    """`base` : le gabarit du parcours sans IA. Les autres : le parcours LLM à ce stade."""
+    stage: Literal["auto", "base", "simple_call", "system_prompt", "tools", "loop"]
+    """`base` : le gabarit du parcours sans IA. Les autres : le parcours LLM à ce stade.
+    `auto` : le premier stade du parcours de l'espace (`base`, ou `simple_call` pour le parcours
+    LLM), pour un scénario de station qui sert les deux parcours avec le même code d'exercice."""
 
 
 IGNORED_DIRS = frozenset({"__pycache__", ".ruff_cache", ".pytest_cache", ".venv"})
@@ -40,9 +42,12 @@ def template_files(root: Path) -> dict[str, Path]:
 
 def apply(args: Args, ctx: SetupContext) -> str:
     track = ctx.layout.track
-    if track == "no_ai" and args.stage != "base":
-        raise SetupError(f"Le stade « {args.stage} » n'existe pas pour le parcours « no_ai ».")
-    if track != "no_ai" and args.stage == "base":
+    stage = args.stage
+    if stage == "auto":
+        stage = "base" if track == "no_ai" else LLM_STAGES[0]
+    if track == "no_ai" and stage != "base":
+        raise SetupError(f"Le stade « {stage} » n'existe pas pour le parcours « no_ai ».")
+    if track != "no_ai" and stage == "base":
         raise SetupError(f"Le parcours « {track} » demande un stade du code LLM, pas « base ».")
     template = ctx.exercise_root / track
     if not template.is_dir():
@@ -52,9 +57,9 @@ def apply(args: Args, ctx: SetupContext) -> str:
         for path, source in template_files(template).items()
         if not path.startswith(f"{STAGES_DIR}/")
     }
-    if args.stage != "base":
+    if stage != "base":
         # Le stade remplace les fichiers de même chemin (le code d'exercice).
-        files.update(template_files(template / STAGES_DIR / args.stage))
+        files.update(template_files(template / STAGES_DIR / stage))
     for path, source in files.items():
         wsfs.write_text(ctx.layout.repo, path, source.read_text(encoding="utf-8"))
     return element_id("path", "worktree", "pyproject.toml")

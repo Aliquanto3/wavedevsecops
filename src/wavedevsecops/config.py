@@ -87,6 +87,9 @@ class Settings(BaseModel):
     terminal_timeout_s: float = Field(default=30.0, gt=0)
     """Délai d'une commande tapée dans le terminal ; au-delà, l'arbre est arrêté (AD-4, AD-12)."""
 
+    tool_timeout_s: float = Field(default=120.0, gt=0)
+    """Délai d'un outil de la chaîne (ruff, pytest) lancé depuis le terminal (AD-4, AD-12)."""
+
     max_snapshots: int = Field(default=20, ge=2)
     """Instantanés gardés par espace ; le 0 et le dernier le sont toujours (AD-6)."""
 

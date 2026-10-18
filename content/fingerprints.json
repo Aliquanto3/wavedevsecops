@@ -1,9 +1,13 @@
 {
   "fingerprints": {
     "llm/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
+    "llm/defaut-de-lint.A": "6af2b0dcbfda844cbf0086392d34a92f9563fc8f47843380dc12b1723ab6208e",
     "llm/gabarit-llm.A": "c7b3b99d93b7931197af61d7f673c1540d92bce875147e1ce75161937eba2b4b",
+    "llm/test-casse.A": "00d679f63cd30f81433900b17f49d56eabd90653ab7c344727a67c144cfec168",
     "no_ai/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
-    "no_ai/gabarit-sans-ia.A": "ab1816d045e819f32c9e986a5c62d93cf95f4f4aee7c12ae8215e8ed684f1094"
+    "no_ai/defaut-de-lint.A": "3e9d88a11ca67e46d63da4148fef803178ba6d968f2fe2f411a05addd32df7ff",
+    "no_ai/gabarit-sans-ia.A": "ab1816d045e819f32c9e986a5c62d93cf95f4f4aee7c12ae8215e8ed684f1094",
+    "no_ai/test-casse.A": "73ffce7857cb098ca275f70afaaff543f6a02d2583d50a470a7279e0f18ec171"
   },
   "schema_version": 1
 }

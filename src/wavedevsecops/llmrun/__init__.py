@@ -11,6 +11,7 @@ de l'appelant (`web`, `engine`).
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 
 from wavedevsecops import toolrun
 from wavedevsecops.config import (
@@ -105,16 +106,18 @@ def start_exercise(
     *,
     question: str = DEFAULT_QUESTION,
     environ: dict[str, str] | None = None,
+    on_sync: Callable[[toolrun.Handle], None] | None = None,
 ) -> toolrun.Handle:
     """Lance le point d'entrée dans `cache/venv/` de l'espace, cwd `repo/`, et rend son `Handle`.
 
     Si l'environnement n'existe pas encore, il est créé hors ligne depuis le `uv.lock` du dépôt.
+    `on_sync` reçoit le `Handle` de `uv sync` (création du venv) pour le rendre interruptible.
     Lève `ExerciseUnavailable` si rien n'a pu être lancé.
     """
     settings = settings or get_settings()
     venv = toolrun.venv_dir(layout.root)
     if toolrun.venv_python(venv) is None:
-        synced = toolrun.sync_environment(layout.repo, venv, settings)
+        synced = toolrun.sync_environment(layout.repo, venv, settings, on_start=on_sync)
         if not synced.ok:
             raise ExerciseUnavailable(synced.error or synced.stderr.strip() or "uv sync a échoué")
     try:

@@ -202,6 +202,10 @@ export function createStore() {
           kind: payload.stream,
           text: payload.text,
           lang: payload.lang || "",
+          // Bloc `tool-output` : nom de l'outil et liens fichier:ligne du serveur (AD-10).
+          tool: payload.tool || "",
+          spans: payload.spans || [],
+          opId: envelope.op_id || "",
         });
       } else if (envelope.kind === "step_verdict") {
         patch.verdict = payload;

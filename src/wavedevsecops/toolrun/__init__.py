@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import shutil
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
@@ -416,17 +416,36 @@ def install_network_guard(venv: Path, platform: str = sys.platform) -> bool:
     return True
 
 
+def collect(handle: procs.Handle) -> procs.ProcResult:
+    """Attend la fin de `handle` et rend sa sortie (arrêt par `terminate`, délai : voir `procs`)."""
+    out: list[str] = []
+    err: list[str] = []
+    for chunk in handle.chunks():
+        if chunk is not None:
+            (out if chunk.stream == "stdout" else err).append(chunk.text)
+    return procs.ProcResult(
+        returncode=handle.returncode,
+        stdout="".join(out),
+        stderr="".join(err),
+        timed_out=handle.timed_out,
+    )
+
+
 def sync_environment(
     project: Path,
     venv: Path,
     settings: Settings | None = None,
     *,
     timeout: float = 600.0,
+    on_start: Callable[[procs.Handle], None] | None = None,
 ) -> procs.ProcResult:
     """Crée ou met à jour `venv` par `uv sync --offline --frozen` depuis le `uv.lock` de `project`.
 
     Aucun accès réseau : tout vient du `uv-cache` préchargé à l'installation (AD-12), uv étant
     résolu par le registre. La garde réseau est posée dans l'environnement créé.
+
+    `on_start` reçoit le `Handle` dès le lancement : l'appelant peut ainsi arrêter l'arbre de
+    `uv sync` (Ctrl+C, mise en veille) par `handle.terminate`.
     """
     settings = settings or get_settings()
     uv = resolve("uv", settings)
@@ -435,7 +454,17 @@ def sync_environment(
     env = offline_environment(settings)
     env["UV_PROJECT_ENVIRONMENT"] = str(venv)
     argv = [uv.path, "sync", "--offline", "--frozen", "--project", str(project)]
-    result = procs.run(argv, env=env, cwd=project, timeout=timeout)
+    try:
+        handle = procs.spawn(argv, env=env, cwd=project, timeout=timeout)
+    except OSError as exc:
+        return procs.ProcResult(returncode=None, error=f"impossible de lancer uv ({exc})")
+    if on_start is not None:
+        on_start(handle)
+    result = collect(handle)
+    if handle.interrupted:
+        return procs.ProcResult(
+            returncode=None, stdout=result.stdout, stderr=result.stderr, error="interrompu"
+        )
     if result.ok and not install_network_guard(venv):
         return procs.ProcResult(
             returncode=None,
@@ -444,6 +473,45 @@ def sync_environment(
             error=f"environnement incomplet : site-packages introuvable dans {venv}",
         )
     return result
+
+
+def needs_environment(tool_ids: Sequence[str], settings: Settings | None = None) -> bool:
+    """Vrai si l'un des outils vit dans l'environnement d'exercice (résolution `uv-lock`)."""
+    try:
+        registry = load_registry(settings=settings or get_settings())
+        return any(tool.resolution == "uv-lock" for tool in registry.tool if tool.id in tool_ids)
+    except (OSError, ValueError):
+        return False
+
+
+class ToolUnavailable(Exception):
+    """Outil introuvable ou abîmé : `status` dit pourquoi (message du diagnostic)."""
+
+    def __init__(self, status: ToolStatus) -> None:
+        super().__init__(status.reason or status.state)
+        self.status = status
+
+
+def spawn_tool(
+    tool_id: str,
+    args: Sequence[str],
+    *,
+    cwd: Path,
+    venv: Path,
+    timeout: float,
+    settings: Settings | None = None,
+) -> procs.Handle:
+    """Lance un outil de la chaîne de `venv` sans attendre : sortie au fil de l'eau, arrêt d'arbre.
+
+    Lève `ToolUnavailable` (outil absent ou abîmé) ou `OSError` (le processus ne démarre pas).
+    """
+    settings = settings or get_settings()
+    status = resolve(tool_id, settings, venv=venv)
+    if not status.ok or status.path is None:
+        raise ToolUnavailable(status)
+    env = offline_environment(settings)
+    env["NO_COLOR"] = "1"
+    return procs.spawn([status.path, *args], env=env, cwd=cwd, timeout=timeout)
 
 
 def venv_python(venv: Path, platform: str = sys.platform) -> Path | None:
