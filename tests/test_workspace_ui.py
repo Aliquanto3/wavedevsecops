@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
+import pytest
 from static_rules import STATIC
+from test_shell_js import NODE
 
 JS = STATIC / "js"
 CSS = STATIC / "css"
@@ -12,20 +16,17 @@ def _read(path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_disposition_et_poignees_accessibles() -> None:
-    workspace = _read(JS / "workspace.js")
-    for needle in (
-        'role: "separator"',
-        "aria-valuenow",
-        "aria-valuemin",
-        "aria-valuemax",
-        "F6",
-        "Escape",
-    ):
-        assert needle in workspace, needle
+def test_feuille_de_style_de_la_disposition() -> None:
+    """Le comportement (poignées, focus, Échap, F6) s'exécute dans `test_workspace_dom.py`."""
     css = _read(CSS / "workspace.css")
     assert "var(--scenario-panel-width)" in css and "@media (max-width: 640px)" in css
     assert "/static/css/workspace.css" in _read(STATIC / "index.html")
+
+
+def test_node_present_en_ci() -> None:
+    """En CI, Node est exigé : les tests du front ne doivent pas y être sautés en silence."""
+    if os.environ.get("CI") and NODE is None:
+        pytest.fail("Node est absent de la CI : les tests JS du front seraient sautés.")
 
 
 def test_registre_des_volets_porte_les_vues_et_leurs_textes() -> None:

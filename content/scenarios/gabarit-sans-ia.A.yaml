@@ -3,6 +3,7 @@ schema_version: 1
 scenario_id: gabarit-sans-ia
 mode: A
 title_text: Dépôt d'exercice sans IA
+catalogue: false  # scénario interne : empreinte de référence du gabarit (Story 2.11)
 tracks: [no_ai]
 tools: [git]
 template: empty

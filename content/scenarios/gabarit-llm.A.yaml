@@ -4,6 +4,7 @@ schema_version: 1
 scenario_id: gabarit-llm
 mode: A
 title_text: Dépôt d'exercice avec assistant LLM
+catalogue: false  # scénario interne : empreinte de référence du gabarit (Story 2.11)
 tracks: [llm]
 tools: [git]
 template: empty

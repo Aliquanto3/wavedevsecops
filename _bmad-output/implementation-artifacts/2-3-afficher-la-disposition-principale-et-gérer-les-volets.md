@@ -29,7 +29,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.3 » ; U
 
 ## Décisions
 
-- Le catalogue 2.3 est la première version de 6.1 : pas de choix de parcours, ni d'états, ni de cartes indisponibles ; le parcours sans IA est ouvert par défaut. Les gabarits d'exercice (`gabarit-*`) y figurent tant qu'aucune `section` ne les en écarte.
+- Le catalogue 2.3 est la première version de 6.1 : pas de choix de parcours, ni d'états, ni de cartes indisponibles ; le parcours sans IA est ouvert par défaut. Les gabarits d'exercice (`gabarit-*`, empreintes de référence de 2.11) portent `catalogue: false` : scénarios internes, absents du catalogue et refusés par `/api/open` (revue).
 - Éléments des projections : une vue de `state_projected.views[<pane_id>]` peut porter `elements: [{type, …}]` ; seul le contrôle du type est posé ici, les schémas viennent avec 2.6.
 - Proportions stockées en parts relatives (jamais en px) ; un volet masqué garde sa part, donc il revient « à sa dernière taille ». Le redimensionnement convertit les tailles mesurées en parts sans fausser celles des volets masqués.
 - Le panneau Scénario ne se masque pas (`[ASSUMPTION]` de l'UX). Un repli automatique n'est pas mémorisé : seul le masquage voulu l'est ; une puce de vue repliée la réaffiche et replie une autre vue à sa place.
@@ -43,3 +43,26 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.3 » ; U
 - Menu Volets : sa position dans l'en-tête à côté de `path-menu` (6.1) à revoir quand celui-ci existera.
 - Écran 6.1 : choix du parcours, états des cartes, cartes indisponibles, « Reprendre ».
 - Interruption du `setup` quand la page se ferme pendant la préparation : comportement 2.2 inchangé.
+
+## Revue
+
+Revue unique (Opus), sur 35841d3, avec la liste du second avis (Haiku).
+
+| Sévérité | Source | Constat | Suite |
+|---|---|---|---|
+| medium | second avis 1 | `gabarit-sans-ia.A` et `gabarit-llm.A`, scénarios internes, proposés au catalogue | corrigé : champ `catalogue: bool = True` du modèle de scénario, `catalogue: false` sur les deux gabarits, filtrés du catalogue et de `/api/open` (404) ; `test_catalogue` mis à jour |
+| medium | second avis 2 | `test_workspace_ui` ne vérifiait les critères DOM que par recherche de chaînes | corrigé : doublure de DOM sans dépendance (`tests/js/minidom.mjs`, pas de jsdom ni de réseau) et `tests/test_workspace_dom.py`, qui monte le vrai `workspace.js` avec le vrai registre : proportions, sous-titres, états vides, « Préparation… », poignées `separator` et valeurs ARIA, focus sur la puce après « — » et sur le titre après réaffichage, dernière vue non masquable, mémorisation et rechargement, ⛶ puis Échap (menu Volets fermé d'abord, focus rendu), Échap dans le terminal, un arrêt de Tab par vue et flèches, boucle F6 et Maj+F6, poignée au clavier par 16 px bornée à 240 px, double-clic, une seule vue sous 1280 px. Vérifié par mutation (retrait du focus sur la puce, pas de poignée faussé : les tests échouent) |
+| low | second avis 3 | `open_it` non atomique : un double clic lançait deux `setup`, le second en `app_error` | corrigé : vérification et création sous verrou, `setup` en cours suivi par espace ; la seconde demande répond 202 sans second `setup` (test : `epoch` reste 1, échoue sur l'ancien code) |
+| low | second avis 4 | pas d'`onerror` sur l'`EventSource` ; arrêt de `connectWorkspace` jamais appelé | corrigé pour `onerror` : flux fermé pour de bon → message dans le panneau Scénario (`STREAM_LOST_TEXT`), reconnexion passagère laissée au navigateur ; test Node. Écarté pour l'arrêt : sans routeur côté client, quitter l'espace recharge la page, rien ne survit à fermer |
+| low | second avis 5 | `GET /api/workspaces/<id>` répondait 200 pour un espace jamais ouvert | corrigé : 404 sauf espace sur disque ou `setup` en cours (la redirection juste après `/api/open` reste servie) ; test |
+| low | second avis 6 | `skipif(NODE is None)` silencieux | corrigé à moindre coût : `test_node_present_en_ci` échoue si `CI` est posé et Node absent |
+
+### À vérifier dans un vrai navigateur
+
+La doublure de DOM n'a ni mise en page ni moteur de rendu. Restent à constater à la main :
+
+- tailles réelles à 1920 x 1080 (panneau de 440 px, rangées 40/33/27, largeurs 55/45), à 125 % et à 400 % de zoom, et la colonne unique à 640 px ou moins ;
+- glisser une poignée à la souris (capture du pointeur, zone de prise de 32 px) et le repli automatique quand on réduit la fenêtre (`ResizeObserver`) ;
+- ordre réel de Tab dans la page (en-tête, panneau, puces, vues, poignées), annonces du lecteur d'écran (`role="status"`, raison de « — » inactif) ;
+- apparence des poignées, des puces, du menu Volets et de l'anneau de focus, en thème clair et sombre ;
+- arrêt du serveur pendant que l'espace est ouvert : message du point de vie et de `STREAM_LOST_TEXT`.

@@ -340,3 +340,27 @@ console.log(JSON.stringify({ first, LOADING, results, s: { seq: s.seq, state: s.
     assert data["sources"][1][0] == "/api/ws/w/events?last_event_id=b2%3A1"
     assert data["during"] == "command" and data["after"] == "b2"
     assert data["urls"] == ["/api/ws/w/state", "/api/ws/w/state"]
+
+
+def test_flux_ferme_signale_sans_figer(tmp_path: Path) -> None:
+    out = _run(
+        tmp_path,
+        """
+import { createStore, connectWorkspace, STREAM_LOST_TEXT } from "@JS@/store.js";
+const sources = [];
+class Fake { constructor(url) { this.readyState = 0; sources.push(this); } close() {} }
+const fetchImpl = async () => ({ ok: true,
+  json: async () => ({ workspace_id: "w", boot_id: "b", seq: 1, epoch: 1, state: "idle", views: {} }) });
+const store = createStore();
+connectWorkspace(store, "w", { fetchImpl, EventSourceImpl: Fake });
+await new Promise((r) => setTimeout(r, 20));
+sources[0].onerror();                       // reconnexion en cours : rien à dire
+const transient = store.state.errorText;
+sources[0].readyState = 2;                  // flux fermé pour de bon
+sources[0].onerror();
+console.log(JSON.stringify({ transient, closed: store.state.errorText, expected: STREAM_LOST_TEXT }));
+""",
+    )
+    data = json.loads(out)
+    assert data["transient"] == ""
+    assert data["closed"] == data["expected"]

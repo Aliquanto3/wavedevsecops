@@ -4,6 +4,9 @@
 import { assertElementType } from "./panes.js";
 
 export const LOADING = "loading";
+export const STREAM_LOST_TEXT =
+  "Le suivi de l'espace s'est interrompu. Rechargez la page pour le reprendre.";
+const CLOSED = 2; // EventSource.CLOSED : le navigateur ne retentera plus
 
 function initial() {
   return {
@@ -132,7 +135,16 @@ export function connectWorkspace(store, workspaceId, options = {}) {
     store.applySnapshot(snapshot);
     if (!Source) return;
     const last = encodeURIComponent(`${snapshot.boot_id}:${snapshot.seq}`);
-    source = new Source(`/api/ws/${encodeURIComponent(workspaceId)}/events?last_event_id=${last}`);
+    const current = new Source(
+      `/api/ws/${encodeURIComponent(workspaceId)}/events?last_event_id=${last}`,
+    );
+    source = current;
+    // Erreur passagère : le navigateur se reconnecte seul. Flux fermé : on le dit, sans figer.
+    current.onerror = () => {
+      if (!stopped && source === current && current.readyState === CLOSED) {
+        store.fail(STREAM_LOST_TEXT);
+      }
+    };
     source.onmessage = (message) => {
       let envelope;
       try {

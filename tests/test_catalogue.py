@@ -60,7 +60,9 @@ def test_catalogue_liste_le_socle_git_avec_titres_et_modes(
     (section,) = body["sections"]
     assert section["title"] == "Socle git"
     by_id = {s["scenario_id"]: s for s in section["scenarios"]}
-    assert {"bac-a-sable-libre", "gabarit-sans-ia", "gabarit-llm"} <= by_id.keys()
+    assert "bac-a-sable-libre" in by_id
+    # Les gabarits d'exercice (`catalogue: false`) sont internes : jamais proposés (revue 2.3).
+    assert not {"gabarit-sans-ia", "gabarit-llm"} & by_id.keys()
     free = by_id["bac-a-sable-libre"]
     assert free["title"] == "Bac à sable libre"
     (mode,) = free["modes"]
@@ -71,7 +73,6 @@ def test_catalogue_liste_le_socle_git_avec_titres_et_modes(
         "track": "no_ai",
         "workspace_id": "no_ai.bac-a-sable-libre.A",
     }
-    assert by_id["gabarit-llm"]["modes"][0]["track"] == "llm"
 
 
 def test_catalogue_derriere_le_cookie(instance: cli.Instance) -> None:
@@ -84,12 +85,22 @@ def test_catalogue_derriere_le_cookie(instance: cli.Instance) -> None:
 def test_ouvrir_un_mode_prepare_l_espace_puis_le_rouvre(
     instance: cli.Instance, cookie: dict
 ) -> None:
+    workspace_id = "no_ai.bac-a-sable-libre.A"
+    # Un espace jamais ouvert n'a pas d'en-tête à servir.
+    status, _ = call(instance, "GET", f"/api/workspaces/{workspace_id}", cookie)
+    assert status == 404
     status, opened = call(
         instance, "POST", "/api/open", cookie, {"scenario_id": "bac-a-sable-libre", "mode": "A"}
     )
     assert status == 202
-    workspace_id = "no_ai.bac-a-sable-libre.A"
     assert opened == {"workspace_id": workspace_id, "title": "Bac à sable libre", "preparing": True}
+    # Double clic : la seconde demande voit la préparation en cours, sans second `setup`.
+    status, twice = call(
+        instance, "POST", "/api/open", cookie, {"scenario_id": "bac-a-sable-libre", "mode": "A"}
+    )
+    assert (status, twice["preparing"]) in {(202, True), (200, False)}
+    status, _ = call(instance, "GET", f"/api/workspaces/{workspace_id}", cookie)
+    assert status == 200
 
     # L'état de la projection arrive du serveur : repos atteint, `views` fourni (AD-2, AD-17).
     deadline = time.monotonic() + WAIT_S
@@ -106,6 +117,10 @@ def test_ouvrir_un_mode_prepare_l_espace_puis_le_rouvre(
         instance, "POST", "/api/open", cookie, {"scenario_id": "bac-a-sable-libre", "mode": "A"}
     )
     assert status == 200 and again["preparing"] is False
+    # Un seul `setup` a tourné (un second aurait ouvert l'`epoch` 2).
+    time.sleep(0.5)
+    status, state = call(instance, "GET", f"/api/ws/{workspace_id}/state", cookie)
+    assert (state["state"], state["epoch"]) == ("idle", 1), state
 
     status, info = call(instance, "GET", f"/api/workspaces/{workspace_id}", cookie)
     assert status == 200
@@ -133,9 +148,14 @@ def test_refus_d_ouverture(instance: cli.Instance, cookie: dict) -> None:
         "POST",
         "/api/open",
         cookie,
-        {"scenario_id": "gabarit-llm", "mode": "A", "track": "no_ai"},
+        {"scenario_id": "bac-a-sable-libre", "mode": "A", "track": "inconnu"},
     )
     assert status == 422 and "parcours" in body["reason_text"]
+    # Un scénario interne ne s'ouvre pas depuis le catalogue.
+    status, body = call(
+        instance, "POST", "/api/open", cookie, {"scenario_id": "gabarit-llm", "mode": "A"}
+    )
+    assert status == 404
     status, body = call(instance, "GET", "/api/workspaces/..%2Fx", cookie)
     assert status == 404
     status, body = call(instance, "GET", "/api/workspaces/no_ai.absent.A", cookie)

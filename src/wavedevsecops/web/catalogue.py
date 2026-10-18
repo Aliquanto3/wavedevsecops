@@ -14,6 +14,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
+from concurrent.futures import Future
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -63,7 +65,7 @@ def catalogue_body(settings: Settings) -> dict[str, Any]:
     grouped: dict[str, dict[str, Any]] = {}
     for loaded in load_catalogue(settings):
         scenario = loaded.scenario
-        if scenario.section not in (None, SOCLE_SECTION):
+        if not scenario.catalogue or scenario.section not in (None, SOCLE_SECTION):
             continue
         entry = grouped.setdefault(
             scenario.scenario_id,
@@ -95,11 +97,23 @@ def catalogue_body(settings: Settings) -> dict[str, Any]:
 
 
 def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: Settings) -> None:
+    open_lock = threading.Lock()
+    preparing: dict[str, Future[Any]] = {}  # setup en cours, par espace
+
     def find(scenario_id: str, mode: str) -> LoadedScenario | None:
         for loaded in load_catalogue(settings):
-            if loaded.scenario.scenario_id == scenario_id and loaded.scenario.mode == mode:
+            scenario = loaded.scenario
+            if scenario.catalogue and scenario.scenario_id == scenario_id and scenario.mode == mode:
                 return loaded
         return None
+
+    def known(workspace_id: str) -> bool:
+        """Vrai si l'espace existe sur disque ou si son `setup` est en cours."""
+        with open_lock:
+            pending = preparing.get(workspace_id)
+            if pending is not None and not pending.done():
+                return True
+        return manager.layout(workspace_id).root.is_dir()
 
     @app.get("/api/catalogue")
     async def catalogue() -> Response:
@@ -121,15 +135,25 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         workspace_id = workspace_id_for(track, loaded.scenario.key)
 
         def open_it() -> bool:
-            """Vrai si l'espace est en préparation, faux s'il existait déjà."""
-            if manager.layout(workspace_id).root.is_dir():
-                manager.get(workspace_id)
-                return False
-            manager.create(loaded, track)
-            return True
+            """Vrai si l'espace est en préparation, faux s'il existait déjà.
+
+            Vérifier puis créer se fait sous verrou, et un `setup` encore en cours compte comme
+            une préparation : un double clic ne lance qu'un `setup`.
+            """
+            with open_lock:
+                pending = preparing.get(workspace_id)
+                if pending is not None and not pending.done():
+                    return True
+                preparing.pop(workspace_id, None)
+                if manager.layout(workspace_id).root.is_dir():
+                    manager.get(workspace_id)
+                    return False
+                _engine, future = manager.create(loaded, track)
+                preparing[workspace_id] = future
+                return True
 
         try:
-            preparing = await asyncio.to_thread(open_it)
+            is_preparing = await asyncio.to_thread(open_it)
         except OperationRefused as refused:
             return _refusal(409, refused.reason_text)
         except AppError as error:
@@ -138,9 +162,9 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
             {
                 "workspace_id": workspace_id,
                 "title": loaded.scenario.title_text,
-                "preparing": preparing,
+                "preparing": is_preparing,
             },
-            status_code=202 if preparing else 200,
+            status_code=202 if is_preparing else 200,
         )
 
     @app.get("/api/workspaces/{workspace_id}")
@@ -152,6 +176,8 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         loaded = await asyncio.to_thread(find, scenario_id, mode)
         if loaded is None:
             return _refusal(404, "Ce scénario n'existe pas. Revenez au catalogue.")
+        if not await asyncio.to_thread(known, workspace_id):
+            return _refusal(404, "Cet espace n'a pas encore été ouvert. Revenez au catalogue.")
         return JSONResponse(
             {
                 "workspace_id": workspace_id,
