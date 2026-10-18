@@ -123,3 +123,4 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.6 · fusion · ff sur main, suite complète 195 passed, story done ; vérification sur vrai poste Windows non admin (8 points, section Revue de la spec) en attente d'Anaël · 95c0cf9
 - 2026-10-18 · 1.5 · review · 5 low corrigés, aucun medium ; diagnostic_seen à ajouter à AD-5 · c72d1c4
 - 2026-10-18 · 1.7 · dev · lancé (dev-story Sonnet, worktree) · —
+- 2026-10-18 · 1.5 · fusion · rebase sur 5a51a2a par l'orchestrateur, suite complète 219 passed, CI branche verte sur les trois OS, ff sur main, story done · 0ec4010
