@@ -277,6 +277,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:07 · 4.7 · dev · fini, 955 passed / 41 skipped, CI verte ; bilan calculé à la lecture par build_summary (rien d'écrit), Scénario suivant / Catalogue / Recommencer ; restart attend 4.4, émetteur hint_opened attend 4.6, désignations à brancher dans derive · cccbc8c
 - 2026-10-19 00:07 · 4.7 · second-avis · lancé · —
 - 2026-10-19 00:07 · 5.1 · dev · lancé (dev-story Sonnet ; chemin critique de l'Epic 5, réutilise le registre de 3.4) ; 3.3 au prochain créneau · —
+- 2026-10-19 00:07 · 4.6 · dev · fini, 964 passed / 41 skipped, CI verte ; hint_open en 3 paliers ordonnés (solution après un essai ou 20 s), fait hint_opened à la clôture de lecture, rejeu au réveil, tablist avec cadenas ; aucun scénario ne déclare encore hints · bffc618
+- 2026-10-19 00:07 · 4.6 · second-avis · lancé · —
+- 2026-10-19 00:07 · 3.3 · dev · lancé (dev-story Sonnet ; ouvre 2.10 ; vue review-log reportée par 3.4) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
