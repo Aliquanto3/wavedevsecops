@@ -143,3 +143,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.2 · review · 2 rebases sans conflit, high corrigé (réouverture refusée en 409 tant que l'ancien fil tourne, veille LRU au repos d'abord), 2 medium et 5 low corrigés ; interruption de l'opération à la veille reportée à 2.4 · e5eb028
 - 2026-10-18 · 2.2 · fusion · ff sur main, suite complète verte, CI branche verte sur les trois OS, story done · e5eb028
 - 2026-10-18 · 2.3 · dev · lancé (dev-story Sonnet) ; 2.6 ★ et 3.1 ★ éligibles, en attente d'un créneau (7.1 et 8.2 en dev) · —
+- 2026-10-18 · 8.2 · dev · fini, 38 tests dont pip-audit réel sur le serveur local, CI verte · f076b19
+- 2026-10-18 · 2.6 · dev · lancé (dev-story Opus ★) · —
+- 2026-10-18 · 8.2 · second-avis · 1 medium (corps lu en entier avant la limite de 64 Ko sur route publique), 4 low dont faux positif version locale · —
+- 2026-10-18 · 2.3 · dev · fini, 354 tests, CI verte ; rendu réel à voir dans un navigateur · 35841d3
+- 2026-10-18 · 3.1 · dev · lancé (dev-story Opus ★) · —
+- 2026-10-18 · 2.3 · second-avis · 2 medium (gabarits listés au catalogue, critères DOM testés par grep), 4 low ; décision orchestrateur : scénarios gabarit-* internes, masqués du catalogue · —
+- 2026-10-18 · 8.2 · review · rebase (conflit app.py trivial), medium corrigé (corps borné au flux, Origin étrangère refusée), 4 low corrigés (échec fermé, partie locale, extrait atomique) · 1db409a
+- 2026-10-18 · 8.2 · fusion · ff sur main, suite complète 386 passed / 34 skipped, CI branche verte, story done · 1db409a
