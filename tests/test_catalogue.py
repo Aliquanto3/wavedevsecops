@@ -12,6 +12,7 @@ import pytest
 
 from wavedevsecops import cli
 from wavedevsecops.config import Settings
+from wavedevsecops.web.catalogue import chain_body
 
 WAIT_S = 60.0
 
@@ -130,6 +131,7 @@ def test_ouvrir_un_mode_prepare_l_espace_puis_le_rouvre(
         "mode": "A",
         "track": "no_ai",
         "title": "Bac à sable libre",
+        "chain": chain_body(1),
     }
 
     status, page = call(instance, "GET", f"/espace/{workspace_id}", cookie)
@@ -165,3 +167,20 @@ def test_refus_d_ouverture(instance: cli.Instance, cookie: dict) -> None:
     conn.request("POST", "/api/open", body=b"{}", headers=cookie)
     assert conn.getresponse().status == 403
     conn.close()
+
+
+def test_bandeau_de_la_chaine_fourni_par_le_serveur() -> None:
+    assert chain_body(None) is None and chain_body(0) is None and chain_body(5) is None
+    chain = chain_body(3)
+    assert chain is not None and chain["current"] == 3
+    assert [s["text"] for s in chain["stations"]] == [
+        "Station 1 · Poste local",
+        "Station 2 · PR et CI",
+        "Station 3 · Sécurité et qualité",
+        "Station 4 · Livraison",
+    ]
+    assert (chain["here_text"], chain["boundary_text"], chain["boundary_after"]) == (
+        "Vous êtes ici",
+        "CI | CD",
+        3,
+    )

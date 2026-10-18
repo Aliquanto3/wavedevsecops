@@ -41,6 +41,28 @@ SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
 
 
+CHAIN_STATIONS = ("Poste local", "PR et CI", "Sécurité et qualité", "Livraison")
+CHAIN_BOUNDARY_AFTER = 3
+"""La frontière CI | CD sépare la Station 3 de la Station 4."""
+
+
+def chain_body(station: int | None) -> dict[str, Any] | None:
+    """Texte du bandeau de la chaîne (Story 9.1) ; rien si le scénario ne déclare pas de station."""
+    if station is None or not 1 <= station <= len(CHAIN_STATIONS):
+        return None
+    return {
+        "label": "Chaîne de livraison",
+        "current": station,
+        "here_text": "Vous êtes ici",
+        "boundary_text": "CI | CD",
+        "boundary_after": CHAIN_BOUNDARY_AFTER,
+        "stations": [
+            {"number": n, "name": name, "text": f"Station {n} · {name}"}
+            for n, name in enumerate(CHAIN_STATIONS, start=1)
+        ],
+    }
+
+
 def _refusal(status: int, reason_text: str) -> JSONResponse:
     return JSONResponse({"reason_text": reason_text}, status_code=status)
 
@@ -185,5 +207,6 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 "mode": mode,
                 "track": track,
                 "title": loaded.scenario.title_text,
+                "chain": chain_body(loaded.scenario.station),
             }
         )

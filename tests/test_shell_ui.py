@@ -301,6 +301,9 @@ CONTRAST_PAIRS = (
     ("primary", "primary-soft", 4.5),
     ("primary", "surface", 3),
     ("ink", "primary-soft", 4.5),
+    ("ink", "discipline-harness-soft", 4.5),
+    ("discipline-harness", "surface-raised", 3),
+    ("hosting-boundary", "surface-raised", 3),
 )
 
 

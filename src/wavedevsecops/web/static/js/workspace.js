@@ -14,8 +14,35 @@ export const LAST_VIEW_TEXT = "Au moins une vue reste visible.";
 const TOOL_HIDE = "—";
 const TOOL_MAXIMIZE = "⛶";
 
+/** Bandeau de la chaîne (Story 9.1) : textes et station courante fournis par le serveur (AD-2). */
+export function buildChainBand(chain) {
+  const band = el("section", "chain-band", { "aria-label": chain.label });
+  const list = el("ol", "chain-stations");
+  for (const station of chain.stations) {
+    const current = station.number === chain.current;
+    const item = el("li", current ? "chain-station is-current" : "chain-station", {
+      "data-station": station.number,
+      "aria-current": current ? "step" : false,
+    });
+    item.append(station.text);
+    if (current) {
+      const pill = el("span", "chain-here");
+      pill.textContent = chain.here_text;
+      item.append(" ", pill);
+    }
+    list.append(item);
+    if (station.number === chain.boundary_after) {
+      const boundary = el("li", "chain-boundary");
+      boundary.textContent = chain.boundary_text;
+      list.append(boundary);
+    }
+  }
+  band.append(list);
+  return band;
+}
+
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
-export function mountWorkspace(container, { title, store, storage }) {
+export function mountWorkspace(container, { title, store, storage, chain = null }) {
   const panes = listPanes();
   const byId = new Map(panes.map((pane) => [pane.id, pane]));
   let config = L.loadConfig(panes, storage);
@@ -47,7 +74,9 @@ export function mountWorkspace(container, { title, store, storage }) {
   const announce = el("p", "visually-hidden", { role: "status", id: "layout-status" });
   zone.append(chipBar, grid, announce);
   workspace.append(panel, zone);
-  container.replaceChildren(workspace);
+  const band = chain ? buildChainBand(chain) : null;
+  if (band) workspace.classList.add("has-chain-band");
+  container.replaceChildren(...(band ? [band, workspace] : [workspace]));
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
   const unsubscribe = store.subscribe((state) => {

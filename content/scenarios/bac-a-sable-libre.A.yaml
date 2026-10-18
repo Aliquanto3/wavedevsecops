@@ -4,6 +4,7 @@ schema_version: 1
 scenario_id: bac-a-sable-libre
 mode: A
 title_text: Bac à sable libre
+station: 1
 tracks: [llm, no_ai]
 tools: [git]
 template: empty
