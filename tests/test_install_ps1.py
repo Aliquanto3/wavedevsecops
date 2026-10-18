@@ -33,12 +33,18 @@ def _env(data: Path, **extra: str) -> dict[str, str]:
     return env
 
 
+# Sortie redirigée : PowerShell encode selon la page de code de la console, qui varie d'un poste
+# à l'autre (850 en local, 65001 ou 437 sur les runners). On la force en UTF-8 sans BOM.
+_UTF8_OUT = "try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false } catch { }; "
+
+
 def _run(args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    assert args[0] == "-Command" and len(args) == 2
     return subprocess.run(  # noqa: S603 - PowerShell du poste, script du dépôt
-        [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", *args],
+        [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _UTF8_OUT + args[1]],
         capture_output=True,
         text=True,
-        encoding="oem",  # page de code de la console Windows
+        encoding="utf-8",
         errors="replace",
         env=env,
         timeout=120,
@@ -48,7 +54,9 @@ def _run(args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[st
 
 
 def _install(data: Path, **extra: str) -> subprocess.CompletedProcess[str]:
-    return _run(["-File", str(SCRIPT)], _env(data, **extra))
+    # Lancé comme fichier ($PSCommandPath posé) : le code de sortie du script est rendu.
+    command = f"$global:LASTEXITCODE = 0; & '{SCRIPT}'; exit $LASTEXITCODE"
+    return _run(["-Command", command], _env(data, **extra))
 
 
 def _lib(expression: str, data: Path) -> str:

@@ -48,6 +48,7 @@ Revue unique (Opus), après rebase sans conflit sur `main` (stories 1.3 et 1.4).
 - medium · second avis 5 · corrigé · `-File` est bloqué par une politique d'exécution imposée par GPO : l'installeur d'astral est désormais lu puis passé à `iex` dans un PowerShell enfant (`-EncodedCommand`), comme sa commande officielle ; aucune politique d'exécution ne s'applique à `iex`. Test : commande enfant exécutée sur un faux installeur à bloc `param`, proxy vérifié.
 - low · second avis 6 · corrigé · un dossier `app` existant sans `.git` ni `pyproject.toml` et non vide n'est plus supprimé (clone et zip) : erreur claire, dossier intact (test).
 - low · second avis 7 · corrigé · sous `iex`, la préférence d'erreur de la console est rendue en fin d'installation (test). Les variables `$script:` restent dans la session : sans effet.
+- medium · CI windows-latest · corrigé · les tests décodaient la sortie de PowerShell avec la page OEM de Python, alors que la console du runner n'avait pas la même (« Pr├⌐paration ») : les tests forcent `[Console]::OutputEncoding` en UTF-8 et décodent en UTF-8 (vérifié sous les pages 65001, 437 et 850). L'installeur n'est pas modifié : dans une vraie console, l'hôte PowerShell 5.1 écrit en Unicode quelle que soit la page de code (point 8 ci-dessous).
 
 ### À vérifier sur un vrai poste Windows non administrateur
 
@@ -58,3 +59,4 @@ Revue unique (Opus), après rebase sans conflit sur `main` (stories 1.3 et 1.4).
 5. Voie zip (`$env:WDS_INSTALL_METHOD = 'zip'`) : extraction et remontée du dossier `wavedevsecops-main`.
 6. Relance : mise à jour (`fetch` + `reset --hard`), `progress.json` intact, `run_count` incrémenté ; puis coupure réseau pendant le clone et relance.
 7. Mode de langage restreint (AppLocker/WDAC) : comportement de l'installeur et de celui d'astral, message affiché.
+8. Accents des messages de l'installeur dans une console en page 437 ou 850 (attendu : corrects).
