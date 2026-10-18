@@ -207,3 +207,28 @@ def test_vue_sans_depot_distant_est_vide() -> None:
 )
 def test_duree_en_mots(ms: int | None, text: str) -> None:
     assert _duration_text(ms) == text
+
+
+def test_literal_redeclares_identiques_a_contracts_github() -> None:
+    """Revue : `contracts.remote` redéclare les états de `contracts.github` (cycle d'import)."""
+    from typing import get_args
+
+    from wavedevsecops.contracts import github, remote
+
+    for name in ("CheckState", "PrState", "ReviewState", "BlockKind"):
+        assert get_args(getattr(remote, name)) == get_args(getattr(github, name)), name
+
+
+def test_marques_designable_de_la_vue_distante(settings: Settings, git_path: Path) -> None:
+    """Revue (contrat 5.2) : une désignation marque aussi branches, PR, checks et revues."""
+    from wavedevsecops.engine.designation import mark_views
+
+    layout, git = _prepare(settings, git_path, PR_SETUP)
+    views = project(git, layout).views.model_dump(mode="json")
+    marked = mark_views(views, frozenset({"check"}))
+    remote = marked["remote"]
+    card = remote["pulls"][0]
+    assert all(c["designable"] for c in card["checks"])
+    assert not card["designable"] and not any(b["designable"] for b in remote["branches"])
+    assert not any(e["designable"] for e in card["review"]["entries"])
+    assert previous_remote(marked) is not None  # la vue marquée se relit (annonces)

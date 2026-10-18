@@ -3,7 +3,7 @@
 Le serveur calcule tout : textes d'état, durées, raisons de blocage liées à leur élément,
 compteurs d'approbations, disponibilité de « Merger » et d'« Ouvrir une PR ». Le front met en
 forme. `element_id` émis (et lisibles par 2.10) : `ref:refs/remotes/origin/<branche>`,
-`pr:<n>`, `check:<n>:<job_id>:<head_sha40>`, `review:<n>:<k>`. Ajouts seulement (AD-17).
+`pr:<n>`, `check:<n>:<job_id>:<head_sha40>`, `review:<n>:<review_id>`. Ajouts seulement (AD-17).
 """
 
 from __future__ import annotations
@@ -41,6 +41,8 @@ class RemoteBranch(_Model):
     can_open_pr: bool = False
     """Vrai : branche poussée, sans PR ouverte et avec du travail à merger (« Ouvrir une PR »)."""
     links: list[str] = []
+    designable: bool = True
+    """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
 
 
 class CheckRow(_Model):
@@ -58,6 +60,8 @@ class CheckRow(_Model):
     """Calculé pour un ancien `head_sha`/`base_sha` de la PR."""
     a11y_name_text: str
     links: list[str] = []
+    designable: bool = True
+    """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
 
 
 class ReviewEntry(_Model):
@@ -77,6 +81,8 @@ class ReviewEntry(_Model):
     stale_text: str = ""
     a11y_name_text: str
     links: list[str] = []
+    designable: bool = True
+    """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
 
 
 class ReviewLog(_Model):
@@ -127,6 +133,8 @@ class PrCard(_Model):
     merge: MergeState
     a11y_name_text: str
     links: list[str] = []
+    designable: bool = True
+    """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
 
 
 class RemoteView(_Model):

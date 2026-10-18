@@ -32,7 +32,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.3 » ; F
 | Branche de `origin` | `ref:refs/remotes/origin/<branche>` (le même que l'étiquette `graph-remote-ref` du graphe) | bouton `.remote-ref` | `commit:<sha40>`, `pr:<n>` |
 | PR | `pr:<n>` | bouton `.pr-pick` (titre de la carte) | `ref:…/origin/<head>`, `ref:…/origin/<base>` |
 | Check | `check:<n>:<job_id>:<head_sha40>` | bouton `.pr-check` | `pr:<n>` |
-| Revue | `review:<n>:<k>` | bouton `.review-pick` | `pr:<n>` |
+| Revue | `review:<n>:<review_id>` (`review_id` : numéro de la revue dans sa PR, à partir de 1) | bouton `.review-pick` | `pr:<n>` |
 
 - Une raison de `merge-blocked` n'a pas d'`element_id` propre : son bouton porte `data-link` (l'`element_id` de la cause : un check, `pr:<n>` ou la branche manquante) et sélectionne cet élément. Les boutons « Merger » et « Ouvrir une PR » ne sont pas des éléments sélectionnables.
 - La sélection est celle du magasin (`selectionFor`), partagée avec les autres vues : sélectionner `ref:refs/remotes/origin/main` ici marque aussi l'étiquette du graphe dans la vue Dépôt local dès que celle-ci écoute la même sélection. Cette vue ne vide jamais une sélection dont elle n'est pas propriétaire.
@@ -54,3 +54,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.3 » ; F
 - Contrôles à faire dans un navigateur par Anaël : disposition de la rangée haute à 45 % (cartes longues, défilement vertical du volet), animation du point « En cours », contraste réel sur fond sombre, ordre de lecture au lecteur d'écran (cartes, checks, journal), focus après un clic sur Merger.
 
 ## Revue
+
+Revue unique (reviewer Opus, liste du second avis Haiku), après rebase sur `main` (5.2, 6.1, 2.8).
+
+- **Medium · second avis M1 · corrigé** : conflits avec `main` (`views.js` : imports `renderCode` et `renderRemote` ; `index.html` : `code.css` et `remote.css`), les deux gardés.
+- **Medium · reviewer · corrigé** : contrat 5.2 non suivi, les éléments de `views.remote` ne portaient pas `designable` et `mark_views` les ignorait (une désignation de check, de PR ou de revue n'aurait rien marqué ; une vue marquée aurait aussi échoué à la relecture `extra="forbid"` de `previous_remote`). `designable` ajouté à `RemoteBranch`, `PrCard`, `CheckRow`, `ReviewEntry` ; `mark_views` les marque (test `test_marques_designable_de_la_vue_distante`). Le front ne lit pas encore `designable` (comme pour les autres vues, 5.2).
+- Low · second avis L2 · corrigé : après Merger ou Ouvrir une PR, le bouton disparaît ; le focus passe au titre de la carte (`pr:<n>`) ou à la branche (`fallbackKey`, testé).
+- Low · second avis L3 · rejeté : « Ouvrir une PR » reste masqué pour une branche déjà contenue dans `main`. Sans ce filtre, toute branche mergée le proposerait après le merge, et `merge_pr` refuse une tête contenue dans la base (« rien à merger »).
+- Low · second avis L4 · corrigé : test d'égalité des quatre `Literal` redéclarés avec `contracts.github`.
+- Low · second avis L5 · rejeté : sans approbation requise, « sur 0 » n'informe pas ; le compteur montre « Approbations : n » suivi de « Aucune approbation requise ».
+- Low · second avis L6 · corrigé : « Ouvrir une PR » est inactif pendant une action de la file, avec la même raison que Merger (testé).
+- Low · second avis L7 · rejeté : republier `views.remote` à chaque opération coûte un `merge-base --is-ancestor` par branche de `origin` (quelques branches dans un scénario) ; c'est ce qui permet la reprise du flux.
+- Low · second avis L8 · corrigé : doc alignée, `review:<n>:<review_id>`.
+- Complexité : 0 constat (listes bornées par le scénario ; rendu complet du volet seulement quand `views.remote` ou l'état occupé change).

@@ -326,3 +326,35 @@ def test_feuille_distante_sans_couleur_en_dur_ni_opacite() -> None:
     for rule in (".pr-card", ".pr-check.is-success", ".pr-check.is-failure", ".pending-dot", ".merge-blocked", ".review-log"):
         assert rule in css, rule
     assert css.count("animation:") == 1  # seul « En cours » est animé
+
+
+def test_ouvrir_une_pr_inactif_pendant_une_action_et_focus_apres_merger(
+    tmp_path: Path, snapshots: dict
+) -> None:
+    """Revue : « Ouvrir une PR » est inactif pendant une action de la file, comme Merger ; le
+    focus d'un bouton qui disparaît après son action passe à la carte (ou à la branche)."""
+    out = _js(
+        tmp_path,
+        snapshots,
+        """
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 80, epoch: 0, state: "command", views: snaps.nopr });
+const open = $('[data-action="open-pr"]');
+const busy = { disabled: open.getAttribute("aria-disabled"), reason: open.nextElementSibling.textContent };
+open.dispatchEvent(makeEvent("click"));
+await new Promise((r) => setTimeout(r, 0));
+const busyPosts = posts.length;
+load("free");
+$('[data-action="merge"]').focus();
+load("merged");
+const afterMerge = document.activeElement.getAttribute("data-key");
+load("nopr");
+$('[data-action="open-pr"]').focus();
+load("free");
+const afterOpen = document.activeElement.getAttribute("data-key");
+console.log(JSON.stringify({ busy, busyPosts, afterMerge, afterOpen }));
+""",
+    )
+    assert out["busy"] == {"disabled": "true", "reason": "Une action est en cours."}
+    assert out["busyPosts"] == 0
+    assert out["afterMerge"] == "pr:1"
+    assert out["afterOpen"] == "ref:refs/remotes/origin/feature"

@@ -74,6 +74,15 @@ def mark_views(views: dict[str, Any], accept: frozenset[str] | None) -> dict[str
     for group in VIEW_GROUPS:
         for item in staging.get(group) or []:
             _flag(item, accept)
+    remote = marked.get("remote") or {}
+    for branch in remote.get("branches") or []:
+        _flag(branch, accept)
+    for card in remote.get("pulls") or []:
+        _flag(card, accept)
+        for check in card.get("checks") or []:
+            _flag(check, accept)
+        for entry in (card.get("review") or {}).get("entries") or []:
+            _flag(entry, accept)
     return marked
 
 

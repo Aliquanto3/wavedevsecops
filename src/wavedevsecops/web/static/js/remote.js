@@ -5,7 +5,7 @@
 //
 // `element_id` sélectionnables (partagés avec les autres vues, 2.10) : `ref:refs/remotes/origin/<b>`
 // (branche), `pr:<n>` (titre de la carte), `check:<n>:<job_id>:<sha>` (ligne de check) et
-// `review:<n>:<k>` (entrée du journal). Les raisons de `merge-blocked` ne portent pas d'`element_id`
+// `review:<n>:<review_id>` (entrée du journal). Les raisons de `merge-blocked` ne portent pas d'`element_id`
 // propre : leur bouton porte `data-link` (l'élément en cause) et le sélectionne.
 import { bindAction } from "./actions.js";
 import { el } from "./dom.js";
@@ -53,7 +53,7 @@ function selectable(tag, className, id, label) {
 
 // --- refs de origin --------------------------------------------------------------------------
 
-export function buildRefs(remote) {
+export function buildRefs(remote, busy = false) {
   const section = el("section", "remote-refs", { "aria-labelledby": "remote-refs-title" });
   const heading = text("h3", "remote-title", REFS_TITLE);
   heading.id = "remote-refs-title";
@@ -79,7 +79,8 @@ export function buildRefs(remote) {
         "aria-label": `${OPEN_PR_LABEL} pour ${branch.name_text}`,
       });
       open.textContent = OPEN_PR_LABEL;
-      item.append(open);
+      item.append(open); // dans le DOM d'abord, comme Merger : sa raison se place après lui
+      bindAction(open, busy ? BUSY_TEXT : null);
     }
     list.append(item);
   }
@@ -207,6 +208,14 @@ export function buildCard(card, busy) {
 
 // --- volet -----------------------------------------------------------------------------------
 
+/** Élément qui reçoit le focus quand un bouton d'action disparaît après son action. */
+export function fallbackKey(key) {
+  if (!key) return null;
+  if (key.startsWith("merge:")) return `pr:${key.slice("merge:".length)}`;
+  if (key.startsWith("open:origin/")) return `ref:refs/remotes/origin/${key.slice("open:origin/".length)}`;
+  return null;
+}
+
 /** Remplit le corps du volet « Distant + PR » et le tient à jour d'après le magasin. */
 export function renderRemote(body, ctx, renderEmpty) {
   const { store, pane } = ctx;
@@ -256,7 +265,7 @@ export function renderRemote(body, ctx, renderEmpty) {
     if (remote.branches.length === 0 && remote.pulls.length === 0 && !remote.error_text) {
       renderEmpty(root, pane.empty);
     } else {
-      root.append(buildRefs(remote));
+      root.append(buildRefs(remote, busy));
       if (remote.pulls.length === 0) {
         const none = el("div", "remote-empty");
         renderEmpty(none, pane.empty);
@@ -265,13 +274,13 @@ export function renderRemote(body, ctx, renderEmpty) {
       for (const card of remote.pulls) root.append(buildCard(card, busy));
     }
     refreshSelection();
-    settleRoving(focusedKey);
-    if (focusedKey) {
-      const again = [...root.querySelectorAll("button")].find(
-        (b) => b.getAttribute("data-key") === focusedKey,
-      );
-      if (again) again.focus();
-    }
+    const buttons = [...root.querySelectorAll("button")];
+    const byKey = (key) => key && buttons.find((b) => b.getAttribute("data-key") === key);
+    // Merger (PR mergée) ou Ouvrir une PR (PR ouverte) disparaissent après leur action : le focus
+    // passe au titre de la carte, ou à la branche, plutôt que de tomber sur la page.
+    const again = byKey(focusedKey) || byKey(fallbackKey(focusedKey));
+    settleRoving(again ? again.getAttribute("data-key") : focusedKey);
+    if (again) again.focus();
   }
 
   // Un clic (ou Entrée, Espace) sélectionne ; Merger et Ouvrir une PR envoient leur intention.
