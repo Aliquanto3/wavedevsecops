@@ -14,13 +14,20 @@ let counter = 0;
 /** Ouvre l'espace du scénario suivant (même parcours) puis y navigue. */
 export async function openNext(next, { fetchImpl = (...a) => fetch(...a), assign } = {}) {
   const go = assign || ((path) => window.location.assign(path));
-  const response = await fetchImpl("/api/open", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scenario_id: next.scenario_id, mode: next.mode, track: next.track }),
-  });
-  const body = await response.json();
+  let response;
+  let body;
+  try {
+    response = await fetchImpl("/api/open", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario_id: next.scenario_id, mode: next.mode, track: next.track }),
+    });
+    body = await response.json();
+  } catch {
+    // Réseau coupé ou réponse illisible : jamais le message brut du navigateur (en anglais).
+    throw new Error(OPEN_FAILED_TEXT);
+  }
   if (!response.ok) throw new Error(body.reason_text || OPEN_FAILED_TEXT);
   go(`/espace/${encodeURIComponent(body.workspace_id)}`);
 }

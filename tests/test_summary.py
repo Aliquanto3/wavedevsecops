@@ -128,3 +128,38 @@ def test_scenario_suivant_du_catalogue(make_box) -> None:  # noqa: F811
         "track": "no_ai",
         "title_text": "Scénario suivant d'essai",
     }
+
+
+def test_total_vient_du_scenario_si_le_suivi_est_perdu() -> None:
+    # progress.json absent après la fin : le scénario pose 2 questions, pas « Aucune question ».
+    summary = build_summary(ScenarioProgress(), asked=2)
+    assert summary["text"] == "0 sur 2 du premier coup · 0 indice"
+    assert build_summary(ScenarioProgress(quiz_total=3, quiz_correct=3), asked=2)["quiz_total"] == 3
+
+
+def test_scenario_suivant_suit_l_ordre_du_socle(make_box) -> None:  # noqa: F811
+    # FR-9 : add-commit, push-pull, branche… et non l'ordre alphabétique (add-commit → branche).
+    box = make_box("no_ai")
+    folder = box.scenario_path.parent
+
+    def write(scenario_id: str, section: str | None) -> None:
+        text = NEXT.replace("scenario_id: zeta", f"scenario_id: {scenario_id}")
+        if section:
+            text += f"section: {section}\n"
+        (folder / f"{scenario_id}.A.yaml").write_text(text, encoding="utf-8", newline="\n")
+
+    write("add-commit", None)
+    write("branche", "socle-git")
+    write("push-pull", "socle-git")  # sans section ou « socle-git » : même section
+    write("aaa-autre", "securite")
+    runner = box.manager._steps
+    current = runner._load(folder / "add-commit.A.yaml")
+    assert runner._next_scenario(current, "no_ai")["scenario_id"] == "push-pull"
+    current = runner._load(folder / "push-pull.A.yaml")
+    assert runner._next_scenario(current, "no_ai")["scenario_id"] == "branche"
+    # Un scénario hors de la liste vient après le socle connu, par identifiant.
+    current = runner._load(folder / "branche.A.yaml")
+    assert runner._next_scenario(current, "no_ai")["scenario_id"] == "etapes"
+    # Le scénario d'une autre section n'est jamais proposé, même s'il vient avant.
+    current = runner._load(folder / "aaa-autre.A.yaml")
+    assert runner._next_scenario(current, "no_ai") is None

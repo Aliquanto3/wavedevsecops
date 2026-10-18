@@ -13,6 +13,8 @@ from typing import Any
 
 from wavedevsecops.progress.facts import ScenarioProgress
 
+FIRST_ATTEMPT_STEP_TYPES = frozenset({"quiz", "designate"})
+"""Types d'étape comptés dans le score du premier coup (quiz 4.5, désignation 5.2)."""
 NO_QUIZ_TEXT = "Aucune question dans ce scénario"
 SEPARATOR = " · "
 
@@ -27,17 +29,22 @@ def score_text(correct: int, total: int) -> str:
     return f"{correct} sur {total} du premier coup" if total else NO_QUIZ_TEXT
 
 
-def build_summary(progress: ScenarioProgress) -> dict[str, Any]:
+def build_summary(progress: ScenarioProgress, asked: int = 0) -> dict[str, Any]:
     """Bilan d'un scénario terminé.
+
+    `asked` : nombre de questions du scénario (étapes de `FIRST_ATTEMPT_STEP_TYPES`). Le total
+    vaut au moins ce nombre : un suivi perdu ne fait pas dire « Aucune question » à un scénario
+    qui en pose.
 
     Clés : `quiz_correct`, `quiz_total` (premiers essais justes / posés), `hints` (indices
     ouverts), `score_text`, `hints_text` et `text` (« 3 sur 4 du premier coup · 1 indice »).
     """
-    score = score_text(progress.quiz_correct, progress.quiz_total)
+    total = max(progress.quiz_total, asked)
+    score = score_text(progress.quiz_correct, total)
     hints = hints_text(progress.hints)
     return {
         "quiz_correct": progress.quiz_correct,
-        "quiz_total": progress.quiz_total,
+        "quiz_total": total,
         "hints": progress.hints,
         "score_text": score,
         "hints_text": hints,

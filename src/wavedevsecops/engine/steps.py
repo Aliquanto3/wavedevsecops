@@ -32,7 +32,7 @@ from wavedevsecops.engine.operations import (
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import StepObserved, StepVerdict
 from wavedevsecops.progress.facts import ProgressStore
-from wavedevsecops.progress.summary import build_summary
+from wavedevsecops.progress.summary import FIRST_ATTEMPT_STEP_TYPES, build_summary
 from wavedevsecops.scenarios import (
     STEP_TYPES,
     Scenario,
@@ -40,6 +40,7 @@ from wavedevsecops.scenarios import (
     load_scenario,
     scenario_files,
 )
+from wavedevsecops.scenarios.order import catalogue_rank, section_of
 from wavedevsecops.scenarios.steps import StepContext
 from wavedevsecops.wsfs import Layout
 
@@ -89,7 +90,10 @@ class StepRunner:
         scenario_id, mode = run.get("scenario_id"), run.get("mode")
         if not isinstance(scenario_id, str) or not isinstance(mode, str):
             return None
-        path = self._settings.scenarios_path() / f"{scenario_id}.{mode}.yaml"
+        return self._load(self._settings.scenarios_path() / f"{scenario_id}.{mode}.yaml")
+
+    def _load(self, path: Path) -> Scenario | None:
+        """Scénario du fichier, relu seulement quand il change (date, taille)."""
         try:
             info = path.stat()
             stamp = (info.st_mtime_ns, info.st_size)
@@ -281,24 +285,28 @@ class StepRunner:
 
     # ----------------------------------------------------------------- bilan
     def _next_scenario(self, scenario: Scenario, track: str) -> dict[str, str] | None:
-        """Scénario suivant du catalogue (ordre des identifiants), même section, mode, parcours."""
-        found: dict[str, Scenario] = {}
+        """Scénario suivant dans l'ordre du catalogue (FR-9, `scenarios.order`) : même section,
+        même mode, servant le même parcours ; `None` s'il n'y en a pas."""
+        section = section_of(scenario.section)
+        current = catalogue_rank(scenario.scenario_id)
+        following: Scenario | None = None
         for path in scenario_files(self._settings):
-            try:
-                other = load_scenario(path, self._settings).scenario
-            except (ScenarioError, OSError, UnicodeDecodeError):
-                continue
+            other = self._load(path)
             if (
-                other.catalogue
-                and other.mode == scenario.mode
-                and other.section == scenario.section
-                and track in other.tracks
-                and other.scenario_id > scenario.scenario_id
+                other is None
+                or not other.catalogue
+                or other.mode != scenario.mode
+                or section_of(other.section) != section
+                or track not in other.tracks
+                or catalogue_rank(other.scenario_id) <= current
             ):
-                found[other.scenario_id] = other
-        if not found:
+                continue
+            if following is None or catalogue_rank(other.scenario_id) < catalogue_rank(
+                following.scenario_id
+            ):
+                following = other
+        if following is None:
             return None
-        following = found[min(found)]
         return {
             "scenario_id": following.scenario_id,
             "mode": following.mode,
@@ -313,7 +321,8 @@ class StepRunner:
         track = str(run.get("track") or "")
         try:
             derived = self._progress.progress(track, scenario.scenario_id, scenario.mode)
-            summary = build_summary(derived)
+            asked = sum(1 for s in scenario.steps if s.type in FIRST_ATTEMPT_STEP_TYPES)
+            summary = build_summary(derived, asked)
         except Exception:  # noqa: BLE001 - un suivi illisible ne bloque pas le panneau
             log.exception("Bilan de %s", scenario.key)
             return None

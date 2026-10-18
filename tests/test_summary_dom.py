@@ -154,3 +154,21 @@ console.log(JSON.stringify({ other, done }));
 """,
     )
     assert out == {"other": "applied", "done": "resync"}
+
+
+def test_echec_reseau_du_suivant_en_francais(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const { openNext, OPEN_FAILED_TEXT } = await import("@JS@/summary.js");
+const failing = async () => { throw new TypeError("Failed to fetch"); };
+const notJson = async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError("Unexpected token"); } });
+const messages = [];
+for (const fetchImpl of [failing, notJson]) {
+  try { await openNext(SUMMARY.next, { fetchImpl, assign: () => {} }); }
+  catch (err) { messages.push(err.message === OPEN_FAILED_TEXT); }
+}
+console.log(JSON.stringify({ messages }));
+""",
+    )
+    assert out == {"messages": [True, True]}
