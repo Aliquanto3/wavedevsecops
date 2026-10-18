@@ -239,6 +239,13 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 22:30 · 3.2 · review · rebase sur 0a06348 sans conflit, medium corrigé (merge écrit dans origin reconnu, pas de second commit), 5 low corrigés (pr_updated sur refus, GitError distincte de la course, rien à merger, faux 409 sur lecture illisible, 5 tests dont câblage create_app), préflight hors file gardé (critère 409 synchrone) ; CI branche verte · 0c30c2f
 - 2026-10-18 22:32 · 4.2 · review · rebase sur 0a06348 sans conflit, medium trouvé en revue corrigé (rejeu par liste validated dans run.json, plus par position), medium du second avis corrigé (vrai rétablissement + seconde validation), test d'arrêt brutal, all_progress() ; low 3-7 écartés (motifs en spec) ; 775 passed, CI branche verte · 5349972
 - 2026-10-18 22:36 · 2.5 · fusion · suite complète 854 passed / 41 skipped, CI branche verte sur 6 jobs, ff sur main, story done ; 7.2 éligible · 049527b
+- 2026-10-18 22:37 · 2.7 · fusion · rebase par dev-story Opus (une région role=status : annonce de commande puis statut d'étape, test DOM combiné), 770 passed, CI verte · 42c695f
+- 2026-10-18 22:37 · 3.2, 4.2, 6.6, 2.7 · fusion · empilées dans cet ordre sur 8bb7571 (6.6 : conflits d'ajout app.py et workspace.js résolus par l'orchestrateur), 4 branches poussées pour CI, suite complète locale sur le sommet de pile en cours · 2.7 fbcb3ef
+- 2026-10-18 22:44 · 4.5 · dev · fini, 763 passed, CI verte (type d'étape quiz, restore_state, écritures refusées en quiz_altered et après restore_failed = H2 de 4.3) ; premier essai dans run.json.quiz_first à brancher sur ProgressStore (4.2) ; intention restart à créer par 4.4 · 9c3119a
+- 2026-10-18 22:44 · 4.5 · second-avis · lancé · —
+- 2026-10-18 22:45 · 3.2, 4.2, 6.6, 2.7 · fusion · suite complète sur le sommet de pile 922 passed / 41 skipped · fbcb3ef
+- 2026-10-18 22:45 · 3.2 · fusion · CI branche verte, ff sur main, story done ; 3.3, 3.5, 7.4 ★ éligibles · 8c4040d
+- 2026-10-18 22:45 · 4.2 · fusion · CI branche verte, ff sur main, story done ; 4.4 éligible (4.2 et 4.3 done) · d73cbef
 - 2026-10-18 22:01 · 9.2 · fusion · rebase sur 6860667 sans conflit, suite complète en cours · —
 
 
