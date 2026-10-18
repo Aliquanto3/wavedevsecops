@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from wavedevsecops import diagnostic, gitio, procs
+from wavedevsecops import diagnostic, gitio, procs, toolrun
 from wavedevsecops.config import Settings, read_proxy_environment
 from wavedevsecops.diagnostic import check_proxy, load_texts, mask_proxy
 
@@ -98,6 +98,26 @@ def test_diagnostic_sans_aucun_outil(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert by_id["proxy"].blocking is False
 
 
+def test_git_trop_ancien_garde_la_ligne_de_langue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old_git = toolrun.ToolStatus(
+        "git", "too_old", "2.20.0", tmp_path / "git", "host", "trop ancien"
+    )
+    real = toolrun.resolve
+    monkeypatch.setattr(
+        diagnostic.toolrun,
+        "resolve",
+        lambda tool_id, *a, **k: old_git if tool_id == "git" else real(tool_id, *a, **k),
+    )
+    monkeypatch.setattr(gitio, "probe_language", lambda git, settings=None: gitio.GitLanguage("en"))
+    by_id = {
+        c.check_id: c for c in diagnostic.run_diagnostic(Settings(data_dir=tmp_path), environ={})
+    }
+    assert by_id["tool.git"].status == "too_old" and by_id["tool.git"].blocking
+    assert by_id["git_language"].status == "info" and not by_id["git_language"].blocking
+
+
 @pytest.mark.skipif(GIT is None, reason="git absent du poste")
 def test_diagnostic_reel_emet_chaque_resultat(tmp_path: Path) -> None:
     events: list[tuple[str, dict]] = []
@@ -110,9 +130,9 @@ def test_diagnostic_reel_emet_chaque_resultat(tmp_path: Path) -> None:
     assert by_id["tool.git"].status in {"ok", "too_old"}
     assert by_id["tool.gitleaks"].status in {"ok", "missing", "too_old"}  # absent en CI
     line = by_id.get("git_language")
-    if by_id["tool.git"].status == "ok":
-        assert line and line.status == "info" and not line.blocking
-        assert line.detail_text.startswith("git parle ")
+    # git trouvé, à jour ou trop ancien : la ligne de langue est là.
+    assert line and line.status == "info" and not line.blocking
+    assert line.detail_text.startswith("git parle ")
     for check in checks:
         assert check.label_text and check.status_text and check.detail_text
         if check.status != "ok" and check.group == "tool":

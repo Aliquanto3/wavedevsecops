@@ -151,7 +151,8 @@ def run_diagnostic(
         if tool.milestone == INSTALLER_ONLY:
             continue
         status = toolrun.resolve(tool.id, settings, **options)
-        if tool.id == "git" and status.ok:
+        if tool.id == "git" and status.path is not None:
+            # Trouvé, même trop ancien : la langue de git reste une information utile.
             git_path = status.path
         checks.append(_tool_check(tool, status, texts))
     if git_path is not None:
