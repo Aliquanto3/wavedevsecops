@@ -123,9 +123,9 @@ def test_git_absent_donne_un_encart_d_erreur(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_un_seul_outil_au_singulier(monkeypatch: pytest.MonkeyPatch) -> None:
     report = build_report(_checks(monkeypatch, missing={"uv"}), TEXTS)
-    assert " 1 outil sur " in report["summary_text"] and "demande une action" in report[
-        "summary_text"
-    ]
+    assert (
+        " 1 outil sur " in report["summary_text"] and "demande une action" in report["summary_text"]
+    )
 
 
 def test_scenarios_indisponibles_viennent_du_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -238,3 +238,82 @@ def test_echec_du_diagnostic_sans_trace(
     resp, body = _call(instance, "POST", "/api/diagnostic/run", cookie)
     assert resp.status == 500
     assert "secret interne" not in body.decode() and "Relancez-le" in body.decode()
+
+
+# --- revue -------------------------------------------------------------------------------------
+
+
+def test_pastille_au_singulier(monkeypatch: pytest.MonkeyPatch) -> None:
+    report = build_report(_checks(monkeypatch, missing={"uv"}), TEXTS)
+    assert report["badge_text"] == "Diagnostic, 1 outil absent ou trop ancien"
+
+
+def test_proxy_en_regle_chaque_ligne_a_son_que_faire() -> None:
+    env = {
+        "HTTPS_PROXY": "http://p.corp:3128",
+        "NO_PROXY": "localhost,127.0.0.1",
+        "UV_SYSTEM_CERTS": "true",
+    }
+    parts = check_proxy(env, TEXTS).parts
+    assert [p.status for p in parts] == ["ok", "ok", "ok"]
+    assert all(p.what_to_do_text.startswith("Rien à faire") for p in parts)
+
+
+def test_lancement_suivant_ouvre_l_accueil(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "data")
+    first = cli.start_instance(settings)
+    try:
+        jar = {
+            "Cookie": _call(first, "GET", f"/?t={first.token}", {})[0]
+            .getheader("Set-Cookie", "")
+            .split(";")[0]
+        }
+        assert _call(first, "GET", "/diagnostic", jar)[0].status == 200
+    finally:
+        first.stop()
+    second = cli.start_instance(settings)
+    try:
+        jar = {
+            "Cookie": _call(second, "GET", f"/?t={second.token}", {})[0]
+            .getheader("Set-Cookie", "")
+            .split(";")[0]
+        }
+        assert _call(second, "GET", "/", jar)[0].status == 200
+    finally:
+        second.stop()
+
+
+def test_marqueur_non_ecrit_pas_de_boucle(
+    instance: cli.Instance, cookie: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(self: Path, *a: object, **k: object) -> None:
+        raise PermissionError("lecture seule")
+
+    monkeypatch.setattr(Path, "touch", refuse)
+    assert _call(instance, "GET", "/diagnostic", cookie)[0].status == 200
+    assert _call(instance, "GET", "/", cookie)[0].status == 200  # « Continuer » mène à l'accueil
+
+
+def test_console_en_echec_ne_fait_pas_echouer_la_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(diagnostic.toolrun, "resolve", _fake_resolve(set()))
+    monkeypatch.setattr(diagnostic.gitio, "probe_language", lambda *a, **k: _FR)
+
+    def broken(*a: object) -> None:
+        raise UnicodeEncodeError("cp1252", "≥", 0, 1, "console")
+
+    monkeypatch.setattr(cli, "_print_diagnostic", broken)
+    inst = cli.start_instance(Settings(data_dir=tmp_path / "data"))
+    try:
+        jar = {
+            "Cookie": _call(inst, "GET", f"/?t={inst.token}", {})[0]
+            .getheader("Set-Cookie", "")
+            .split(";")[0]
+        }
+        resp, body = _call(inst, "POST", "/api/diagnostic/run", jar)
+        assert resp.status == 200 and json.loads(body)["problem_count"] == 0
+        log = (tmp_path / "data" / "logs" / "app.log").read_text(encoding="utf-8")
+        assert "Console du diagnostic" in log  # l'échec de la console a bien eu lieu
+    finally:
+        inst.stop()

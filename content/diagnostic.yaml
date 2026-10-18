@@ -74,6 +74,10 @@ proxy:
     Si votre entreprise inspecte le trafic HTTPS, posez `UV_SYSTEM_CERTS=true` pour qu'uv
     utilise les certificats du système.
   todo_ok: ""
+  # « Que faire ? » des lignes en règle de la section Proxy (affichés sans dépliant).
+  ok_proxy: "Rien à faire. L'installation et les mises à jour passent par ce proxy."
+  ok_no_proxy: "Rien à faire. L'application reste joignable en local malgré le proxy."
+  ok_certs: "Rien à faire. uv utilise les certificats du système, donc ceux de votre proxy."
 
 part_statuses:
   detected: "Détecté"
@@ -98,7 +102,8 @@ ui:
   summary_tools_many: "{count} outils sur {total} demandent une action"
   summary_tools_none: "aucun des {total} outils ne demande d'action"
   summary_proxy: ", et NO_PROXY demande un réglage"
-  badge: "Diagnostic, {count} outils absents ou trop anciens"
+  badge_one: "Diagnostic, 1 outil absent ou trop ancien"
+  badge_many: "Diagnostic, {count} outils absents ou trop anciens"
   group_required: "Outils requis ({milestone})"
   group_chain: "Outils de la chaîne ({milestone})"
   tools_title: "Outils"

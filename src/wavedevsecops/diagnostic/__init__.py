@@ -136,7 +136,9 @@ def check_proxy(environ: Mapping[str, str] | None, texts: dict[str, Any]) -> Dia
         parts.append(part(block["label_proxy"], block["none"], "info", "not_detected"))
     else:
         lines.append(block["present"].format(proxies=", ".join(proxies)))
-        parts.append(part(block["label_proxy"], ", ".join(proxies), "info", "detected"))
+        parts.append(
+            part(block["label_proxy"], ", ".join(proxies), "ok", "detected", block["ok_proxy"])
+        )
         entries = {e.strip().lower() for e in found.get("NO_PROXY", "").split(",")}
         missing = [name for name in LOOPBACK_NAMES if name not in entries]
         if missing:
@@ -154,7 +156,7 @@ def check_proxy(environ: Mapping[str, str] | None, texts: dict[str, Any]) -> Dia
             )
         else:
             lines.append(block["no_proxy_ok"])
-            parts.append(part("NO_PROXY", found["NO_PROXY"], "ok", "ok"))
+            parts.append(part("NO_PROXY", found["NO_PROXY"], "ok", "ok", block["ok_no_proxy"]))
         certs = found.get("UV_SYSTEM_CERTS")
         if certs is None:
             lines.append(block["system_certs_unset"])
@@ -162,7 +164,7 @@ def check_proxy(environ: Mapping[str, str] | None, texts: dict[str, Any]) -> Dia
             parts.append(part("UV_SYSTEM_CERTS", "", "info", "not_set", block["todo_certs"]))
         else:
             lines.append(block["system_certs_set"].format(value=certs))
-            parts.append(part("UV_SYSTEM_CERTS", certs, "ok", "ok"))
+            parts.append(part("UV_SYSTEM_CERTS", certs, "ok", "ok", block["ok_certs"]))
     return DiagnosticCheck(
         check_id="proxy",
         group="proxy",
@@ -210,9 +212,7 @@ def run_diagnostic(
     return checks
 
 
-def group_by_milestone(
-    items: list[tuple[str, str]], ui: dict[str, Any]
-) -> list[dict[str, Any]]:
+def group_by_milestone(items: list[tuple[str, str]], ui: dict[str, Any]) -> list[dict[str, Any]]:
     """Regroupe `(check_id, jalon)` par jalon, dans l'ordre d'apparition, avec leur titre."""
     groups: list[dict[str, Any]] = []
     for check_id, milestone in items:
@@ -261,7 +261,9 @@ def build_report(checks: list[DiagnosticCheck], texts: dict[str, Any]) -> dict[s
         "groups": groups,
         "summary_text": summary,
         "problem_count": count,
-        "badge_text": ui["badge"].format(count=count) if count else "",
+        "badge_text": (
+            "" if not count else ui["badge_one" if count == 1 else "badge_many"].format(count=count)
+        ),
         "git_notice": git_notice,
     }
 

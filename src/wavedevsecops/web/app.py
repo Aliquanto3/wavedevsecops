@@ -122,19 +122,21 @@ def create_app(
         return FileResponse(STATIC_DIR / "index.html", media_type="text/html; charset=utf-8")
 
     marker = settings.resolved_data_dir() / SEEN_MARKER
+    seen = {"now": False}  # vu pendant cette instance, même si le marqueur n'a pu s'écrire
 
     async def home_page() -> Response:
         # Premier lancement : le diagnostic s'ouvre d'office ; ensuite, l'accueil.
-        if not marker.exists():
+        if not seen["now"] and not marker.exists():
             return RedirectResponse("/diagnostic", status_code=303)
         return await shell_page()
 
     async def diagnostic_page() -> Response:
+        seen["now"] = True
         try:
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.touch()
         except OSError:
-            logging.getLogger("wavedevsecops").warning("Marqueur de premier lancement illisible")
+            logging.getLogger("wavedevsecops").warning("Marqueur de premier lancement non écrit")
         return await shell_page()
 
     special = {"/": home_page, "/diagnostic": diagnostic_page}
@@ -160,7 +162,10 @@ def create_app(
                 report = diagnostic.build_report(checks, texts)
                 last_report["report"] = report
                 if on_diagnostic is not None:
-                    on_diagnostic(checks, texts)
+                    try:
+                        on_diagnostic(checks, texts)
+                    except Exception:  # noqa: BLE001 - la console ne fait pas échouer la page
+                        logging.getLogger("wavedevsecops").exception("Console du diagnostic")
                 return report
 
         try:

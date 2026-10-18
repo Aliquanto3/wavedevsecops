@@ -34,3 +34,20 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.5 ». UX
 - Flux SSE, enveloppe d'événements, affichage ligne par ligne : Story 2.2.
 - Calcul réel des scénarios indisponibles (déclaration des outils par scénario) : story du catalogue ; le paramètre `scenarios` de `run_diagnostic` est prêt.
 - Catalogue grisé quand git manque : story du catalogue (l'encart d'erreur est livré ici).
+
+## Revue
+
+Revue unique (Opus) sur 98efad4, avec la liste du second avis (Haiku). Critères d'acceptation repris un à un : couverts.
+
+- low · second avis 1 · rejeté · `unavailable_scenarios.length` : afficher la taille d'une liste fournie par le serveur n'est pas un calcul métier ; la liste et son contenu viennent de `diagnostic` (AD-16).
+- low · second avis 2 · corrigé · pastille au singulier : `badge_one` / `badge_many` dans `content/diagnostic.yaml` (« Diagnostic, 1 outil absent ou trop ancien »). Test `test_pastille_au_singulier`.
+- low · second avis 3 · rejeté · `create_app()` sans `settings` : `get_settings()` est le défaut voulu ; le seul appelant (`cli.start_instance`) et tous les tests passent leurs réglages, et rien n'est écrit avant un `GET /diagnostic`.
+- low · second avis 4 · corrigé · marqueur non écrivable : « Continuer vers le catalogue » renvoyait sans fin vers `/diagnostic`. L'instance retient en mémoire que la page a été vue. Test `test_marqueur_non_ecrit_pas_de_boucle`.
+- low · second avis 5 · rejeté · POST concurrents sérialisés : le 409 d'AD-17 vise les intentions sur un espace (`/api/ws/<id>/…`) et la file du moteur ; relancer un diagnostic est idempotent et le bouton est inactif pendant la recherche.
+- low · second avis 6 · corrigé · une console en échec (encodage, flux fermé) transformait un rapport calculé en 500 : l'écoute est isolée et journalisée. Test `test_console_en_echec_ne_fait_pas_echouer_la_page`.
+- low · second avis 7 · rejeté · diagnostic lancé à l'ouverture de l'accueil sans rapport connu : voulu, la pastille de l'en-tête en dépend (critère 4) et la spine prévoit le diagnostic dans la console de lancement.
+- low · second avis 8 · rejeté · aucune couverture perdue : `/` avec cookie reste testé (`test_shell_ui` paramétré sur `/`, `test_premier_lancement_…`), le refus d'hôte étranger porte toujours sur `/`.
+- low · second avis 9 · rejeté · même convention que `test_shell_js` (Story 1.3) ; Node est présent sur les runners GitHub de la CI.
+- low · second avis 10 · corrigé · les lignes Proxy en règle n'avaient pas de « Que faire ? » alors que le critère et la maquette en donnent un à chacune : phrases « Rien à faire. … » (`ok_proxy`, `ok_no_proxy`, `ok_certs`), affichées sans dépliant ; « Proxy détecté » passe en ✓ comme sur la maquette. Test `test_proxy_en_regle_chaque_ligne_a_son_que_faire`.
+- low · revue · corrigé · le critère « les lancements suivants ouvrent l'accueil » n'était vérifié que dans une même instance : test `test_lancement_suivant_ouvre_l_accueil` (arrêt puis second lancement sur le même dossier).
+- low · revue · reporté · `<data>/diagnostic_seen` n'est pas dans la disposition d'AD-5. Propriétaire unique (`web`), écrit par le serveur lancé (la règle 1.2 « le second lancement n'écrit rien » vise le lancement qui rejoint une instance vivante, il n'écrit toujours rien). À ajouter à la disposition d'AD-5 à la prochaine mise à jour de la spine, ou à remplacer par un fait de `progress` si le suivi en a besoin.

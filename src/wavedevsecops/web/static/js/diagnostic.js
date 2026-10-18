@@ -147,7 +147,9 @@ function proxySection(plan, report) {
   const body = h("tbody");
   for (const part of proxy.parts) {
     const todo = h("td");
-    if (part.what_to_do_text) {
+    if (part.what_to_do_text && part.status === "ok") {
+      todo.append(rich("p", part.what_to_do_text)); // rien à régler : la phrase seule, sans dépliant
+    } else if (part.what_to_do_text) {
       const details = h("details", {}, h("summary", { text: ui.todo_summary }), rich("p", part.what_to_do_text));
       if (part.status === "warn") details.setAttribute("open", "");
       todo.append(details);
