@@ -228,7 +228,8 @@ def test_progress_illisible_rend_un_motif_et_non_une_erreur_nue(
 def test_scenarios_du_socle_livres_figurent_dans_l_ordre_conseille() -> None:
     """Garde contre la dérive de `SOCLE_ORDER` : un scénario du socle livré dans `content/`
     doit y être nommé (seul le bac à sable libre vient après, hors ordre)."""
-    from wavedevsecops.web.catalogue import SOCLE_ORDER, SOCLE_SECTION, load_catalogue
+    from wavedevsecops.scenarios.order import SOCLE_ORDER, SOCLE_SECTION
+    from wavedevsecops.web.catalogue import load_catalogue
 
     hors_ordre = {"bac-a-sable-libre"}
     content = Path(__file__).resolve().parents[1] / "content"

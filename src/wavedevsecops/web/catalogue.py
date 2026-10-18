@@ -36,28 +36,15 @@ from wavedevsecops.engine import (
 )
 from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
+from wavedevsecops.scenarios.order import SOCLE_SECTION, catalogue_rank
 from wavedevsecops.web.shell import TRACKS, track_options
 
 log = logging.getLogger("wavedevsecops")
 
 DEFAULT_TRACK = "no_ai"
 """Parcours d'ouverture par défaut : le parcours sans IA (le choix de parcours vient en 6.1)."""
-SOCLE_SECTION = "socle-git"
 SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
-SOCLE_ORDER: tuple[str, ...] = (
-    "add-commit",
-    "push-pull",
-    "branche",
-    "pr-merge",
-    "conflit",
-    "stash",
-    "rebase",
-    "recuperation",
-)
-"""Ordre conseillé du socle git (FR-9), par `scenario_id`. Un identifiant qui n'est pas encore
-livré est simplement absent du catalogue ; un scénario déclaré mais absent de cette liste vient
-après, par ordre alphabétique."""
 PICKER_QUESTION = (
     "Choisissez votre parcours. Les deux suivent la même progression ; "
     "seul le code d'exercice change."
@@ -272,11 +259,6 @@ def tool_labels(settings: Settings) -> dict[str, str]:
     return {k: v.get("label", k) for k, v in tool_texts.items() if isinstance(v, dict)}
 
 
-def _socle_rank(scenario_id: str) -> tuple[int, str]:
-    if scenario_id in SOCLE_ORDER:
-        return SOCLE_ORDER.index(scenario_id), scenario_id
-    return len(SOCLE_ORDER), scenario_id
-
 
 def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, Any]:
     """Catalogue du `track` choisi ; sans parcours, seulement le choix du parcours.
@@ -329,7 +311,7 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
                 "diagnostic_path": DIAGNOSTIC_PATH,
             }
         entry["modes"].append(mode)
-    scenarios = sorted(grouped.values(), key=lambda s: _socle_rank(s["scenario_id"]))
+    scenarios = sorted(grouped.values(), key=lambda s: catalogue_rank(s["scenario_id"]))
     for number, entry in enumerate(scenarios, start=1):
         entry["number"] = number
         entry["modes"].sort(key=lambda m: m["mode"])
