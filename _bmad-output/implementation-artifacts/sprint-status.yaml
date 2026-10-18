@@ -47,8 +47,8 @@ development_status:
 
   epic-2: in-progress
   2-1-préparer-un-bac-à-sable-déterministe-à-partir-d-un-yaml: done
-  2-2-faire-passer-chaque-action-par-la-file-d-opérations-de-l-esp: in-progress
-  2-3-afficher-la-disposition-principale-et-gérer-les-volets: backlog
+  2-2-faire-passer-chaque-action-par-la-file-d-opérations-de-l-esp: done
+  2-3-afficher-la-disposition-principale-et-gérer-les-volets: in-progress
   2-4-taper-de-vraies-commandes-git-dans-le-terminal: backlog
   2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: backlog
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: backlog
@@ -98,8 +98,8 @@ development_status:
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
   epic-6-retrospective: optional
 
-  epic-7: backlog
-  7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: backlog
+  epic-7: in-progress
+  7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: in-progress
   7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: backlog
   7-3-être-protégé-par-le-hook-pre-commit-gitleaks: backlog
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: backlog
@@ -107,9 +107,9 @@ development_status:
   7-6-lire-le-même-pipeline-en-github-actions-jenkins-et-gitlab-ci: backlog
   epic-7-retrospective: optional
 
-  epic-8: backlog
+  epic-8: in-progress
   8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: backlog
-  8-2-servir-une-base-de-vulnérabilités-locale-et-figée: backlog
+  8-2-servir-une-base-de-vulnérabilités-locale-et-figée: in-progress
   8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: backlog
   8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: backlog
   8-5-le-scénario-llm-outil-trop-puissant-flow-4: backlog

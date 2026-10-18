@@ -138,3 +138,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.2 · dev · fini, 316 tests, CI verte sur les trois OS · 9ba966f
 - 2026-10-18 · 2.2 · second-avis · 1 high prouvé (close() laisse l'opération tourner → deux écrivains à la réouverture), 2 medium, 5 low · —
 - 2026-10-18 · 1.7 · fusion · rebase sur 221000e par l'orchestrateur, suite complète 289 passed / 33 skipped, CI branche verte (5 jobs dont install.sh réel), ff sur main, story done ; Epic 1 done ; vérification poste réel macOS/Linux (9 points) en attente d'Anaël · 8df335e
+- 2026-10-18 · — · décision Anaël · relais Sprint 2 autorisé pendant la revue de 2.2 (stories éligibles) · —
+- 2026-10-18 · 7.1, 8.2 · dev · lancés (7.1 dev-story Opus ★, 8.2 Sonnet) ; 2.2 en revue · —
+- 2026-10-18 · 2.2 · review · 2 rebases sans conflit, high corrigé (réouverture refusée en 409 tant que l'ancien fil tourne, veille LRU au repos d'abord), 2 medium et 5 low corrigés ; interruption de l'opération à la veille reportée à 2.4 · e5eb028
+- 2026-10-18 · 2.2 · fusion · ff sur main, suite complète verte, CI branche verte sur les trois OS, story done · e5eb028
+- 2026-10-18 · 2.3 · dev · lancé (dev-story Sonnet) ; 2.6 ★ et 3.1 ★ éligibles, en attente d'un créneau (7.1 et 8.2 en dev) · —
