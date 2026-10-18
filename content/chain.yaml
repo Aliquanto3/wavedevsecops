@@ -1,6 +1,7 @@
 # Textes du bandeau et de la carte de la chaîne (Stories 9.1 et 9.2, AD-2).
 # Le serveur les projette tels quels : le front n'invente aucun texte ni lien.
-# Un outil `available: false` s'affiche en tirets ; une station `delivered: false` porte « Bientôt ».
+# Un outil absent du poste (sonde de `tools.toml`) s'affiche en tirets ;
+# une station `delivered: false` porte « Bientôt ».
 schema_version: 1
 
 label: "Chaîne de livraison"
@@ -29,10 +30,10 @@ stations:
     description: "Ce qui se joue sur votre poste, avant même de pousser."
     delivered: true
     tools:
-      - {id: git, label: "git", available: true}
-      - {id: pre-commit, label: "pre-commit", available: true}
-      - {id: gitleaks, label: "gitleaks", available: true}
-      - {id: ruff, label: "ruff", available: true}
+      - {id: git, label: "git"}
+      - {id: pre-commit, label: "pre-commit"}
+      - {id: gitleaks, label: "gitleaks"}
+      - {id: ruff, label: "ruff"}
     barriers:
       - id: secret-scan
         label: "Pas de secret dans le commit"
@@ -50,9 +51,9 @@ stations:
     description: "La pull request et les vérifications automatiques qui la suivent."
     delivered: true
     tools:
-      - {id: pytest, label: "pytest", available: true}
-      - {id: coverage, label: "coverage", available: true}
-      - {id: diff-cover, label: "diff-cover", available: true}
+      - {id: pytest, label: "pytest"}
+      - {id: coverage, label: "coverage"}
+      - {id: diff-cover, label: "diff-cover"}
     barriers:
       - id: tests
         label: "Tests verts"
@@ -69,8 +70,8 @@ stations:
     description: "L'analyse du code et des dépendances."
     delivered: true
     tools:
-      - {id: bandit, label: "bandit", available: true}
-      - {id: pip-audit, label: "pip-audit", available: false}
+      - {id: bandit, label: "bandit"}
+      - {id: pip-audit, label: "pip-audit"}
     barriers:
       - id: static-analysis
         label: "Analyse statique"

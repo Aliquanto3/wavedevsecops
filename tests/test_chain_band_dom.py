@@ -193,12 +193,9 @@ console.log(JSON.stringify(r));
 """,
     )
     assert out["controls"] == out["mapId"] == "chain-map"
-    assert out["closed"] == {
-        "expanded": "false",
-        "hidden": True,
-        "inert": [False, False],
-        "focus": out["closed"]["focus"],
-    }
+    assert out["closed"]["expanded"] == "false" and out["closed"]["hidden"] is True
+    assert out["closed"]["inert"] == [False, False]
+    assert not out["closed"]["focus"].startswith("chain-zone")
     assert out["openByButton"] == {
         "expanded": "true",
         "hidden": False,

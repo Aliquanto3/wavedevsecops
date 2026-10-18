@@ -16,12 +16,14 @@ import json
 import logging
 import threading
 from concurrent.futures import Future
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from wavedevsecops import toolrun
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import (
@@ -42,67 +44,151 @@ SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
 
 
-def load_chain_texts(settings: Settings | None = None) -> dict[str, Any] | None:
-    """Textes de `content/chain.yaml` ; rien si le fichier manque ou est illisible (journalisé)."""
+class _ChainModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+LinkKind = Literal["check", "hook", "term"]
+
+
+class ChainLink(_ChainModel):
+    kind: LinkKind
+    label: str
+
+
+class ChainBarrier(_ChainModel):
+    id: str
+    label: str
+    links: list[ChainLink] = []
+
+
+class ChainTool(_ChainModel):
+    """Outil de `tools.toml` : sa disponibilité vient de `toolrun.resolve`, pas du contenu."""
+
+    id: str
+    label: str
+
+
+class ChainStation(_ChainModel):
+    number: int
+    name: str
+    description: str = ""
+    delivered: bool = True
+    tools: list[ChainTool] = []
+    barriers: list[ChainBarrier] = []
+
+
+class ChainMapTexts(_ChainModel):
+    button_text: str
+    button_label: str
+    title: str
+    soon_text: str
+    unavailable_text: str
+    tools_title: str
+    barriers_title: str
+    links_title: str
+    none_selected: str
+    kinds: dict[LinkKind, str]
+
+
+class ChainTexts(_ChainModel):
+    """Schéma de `content/chain.yaml` (AD-2)."""
+
+    schema_version: Literal[1]
+    label: str
+    here_text: str
+    boundary_text: str
+    boundary_after: int
+    map: ChainMapTexts | None = None
+    stations: list[ChainStation] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _coherent(self) -> ChainTexts:
+        numbers = [s.number for s in self.stations]
+        if numbers != list(range(1, len(numbers) + 1)):
+            raise ValueError(f"stations numérotées {numbers}, attendu 1 à {len(numbers)}")
+        if not 1 <= self.boundary_after < len(numbers):
+            raise ValueError(f"boundary_after={self.boundary_after} hors des stations")
+        if self.map is not None:
+            used = {link.kind for s in self.stations for b in s.barriers for link in b.links}
+            missing = sorted(used - set(self.map.kinds))
+            if missing:
+                raise ValueError(f"map.kinds sans libellé pour {missing}")
+        return self
+
+
+def _validation_text(error: ValidationError) -> str:
+    return "; ".join(
+        f"{'.'.join(str(part) for part in item['loc']) or 'racine'} : {item['msg']}"
+        for item in error.errors()
+    )
+
+
+def load_chain_texts(settings: Settings | None = None) -> ChainTexts | None:
+    """Contenu validé de `content/chain.yaml` ; rien s'il manque ou est invalide (journalisé)."""
     path = (settings or get_settings()).content_path() / "chain.yaml"
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict) or not isinstance(data.get("stations"), list):
-            raise ValueError("clé `stations` absente")
-        return data
-    except (OSError, UnicodeDecodeError, ValueError, yaml.YAMLError) as error:
+        return ChainTexts.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    except ValidationError as error:
+        log.warning(
+            "Chaîne ignorée (%s) : contenu invalide (%s)", path.name, _validation_text(error)
+        )
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
         log.warning("Chaîne ignorée (%s) : %s", path.name, error)
-        return None
+    return None
 
 
-def _map_station(station: dict[str, Any], kinds: dict[str, str]) -> dict[str, Any]:
+def _map_station(
+    station: ChainStation, kinds: dict[str, str], settings: Settings | None
+) -> dict[str, Any]:
     return {
-        "number": station["number"],
-        "name": station["name"],
-        "text": f"Station {station['number']} · {station['name']}",
-        "description": station.get("description", ""),
-        "delivered": bool(station.get("delivered", True)),
+        "number": station.number,
+        "name": station.name,
+        "text": f"Station {station.number} · {station.name}",
+        "description": station.description,
+        "delivered": station.delivered,
         "tools": [
-            {"id": t["id"], "label": t["label"], "available": bool(t.get("available", True))}
-            for t in station.get("tools") or []
+            # Disponibilité réelle sur le poste (registre `tools.toml`, sonde du diagnostic).
+            {"id": t.id, "label": t.label, "available": toolrun.resolve(t.id, settings).ok}
+            for t in station.tools
         ],
         "barriers": [
             {
-                "id": b["id"],
-                "label": b["label"],
+                "id": b.id,
+                "label": b.label,
                 "links": [
-                    {
-                        "kind": link["kind"],
-                        "kind_text": kinds.get(link["kind"], ""),
-                        "label": link["label"],
-                    }
-                    for link in b.get("links") or []
+                    {"kind": link.kind, "kind_text": kinds.get(link.kind, ""), "label": link.label}
+                    for link in b.links
                 ],
             }
-            for b in station.get("barriers") or []
+            for b in station.barriers
         ],
     }
 
 
 def chain_body(station: int | None, settings: Settings | None = None) -> dict[str, Any] | None:
-    """Bandeau et carte de la chaîne (Stories 9.1 et 9.2), depuis `content/chain.yaml` (AD-2)."""
+    """Bandeau et carte de la chaîne (Stories 9.1 et 9.2), depuis `content/chain.yaml` (AD-2).
+
+    Lit le disque et sonde les outils : à appeler hors de la boucle d'événements.
+    """
+    if station is None:
+        return None
     texts = load_chain_texts(settings)
-    if texts is None:
+    if texts is None or not 1 <= station <= len(texts.stations):
         return None
-    stations = texts["stations"]
-    if station is None or not 1 <= station <= len(stations):
-        return None
-    chain_map = texts.get("map") or {}
-    kinds = chain_map.get("kinds") or {}
-    return {
-        "label": texts["label"],
+    chain_map = texts.map
+    kinds: dict[str, str] = dict(chain_map.kinds) if chain_map else {}
+    body: dict[str, Any] = {
+        "label": texts.label,
         "current": station,
-        "here_text": texts["here_text"],
-        "boundary_text": texts["boundary_text"],
-        "boundary_after": texts["boundary_after"],
-        "stations": [_map_station(s, kinds) for s in stations],
-        "map": {k: v for k, v in chain_map.items() if k != "kinds"},
+        "here_text": texts.here_text,
+        "boundary_text": texts.boundary_text,
+        "boundary_after": texts.boundary_after,
+        "stations": [_map_station(s, kinds, settings) for s in texts.stations],
     }
+    if chain_map is not None:
+        body["map"] = chain_map.model_dump(exclude={"kinds"})
+    return body
 
 
 def _refusal(status: int, reason_text: str) -> JSONResponse:
@@ -242,6 +328,7 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
             return _refusal(404, "Ce scénario n'existe pas. Revenez au catalogue.")
         if not await asyncio.to_thread(known, workspace_id):
             return _refusal(404, "Cet espace n'a pas encore été ouvert. Revenez au catalogue.")
+        chain = await asyncio.to_thread(chain_body, loaded.scenario.station, settings)
         return JSONResponse(
             {
                 "workspace_id": workspace_id,
@@ -249,6 +336,6 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 "mode": mode,
                 "track": track,
                 "title": loaded.scenario.title_text,
-                "chain": chain_body(loaded.scenario.station, settings),
+                "chain": chain,
             }
         )

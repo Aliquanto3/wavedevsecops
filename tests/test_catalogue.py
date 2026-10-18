@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from wavedevsecops import cli
+from wavedevsecops import cli, toolrun
 from wavedevsecops.config import Settings
 from wavedevsecops.web.catalogue import chain_body
 
@@ -131,7 +131,7 @@ def test_ouvrir_un_mode_prepare_l_espace_puis_le_rouvre(
         "mode": "A",
         "track": "no_ai",
         "title": "Bac à sable libre",
-        "chain": chain_body(1),
+        "chain": chain_body(1, Settings(data_dir=instance.data_dir)),
     }
 
     status, page = call(instance, "GET", f"/espace/{workspace_id}", cookie)
@@ -186,18 +186,57 @@ def test_bandeau_de_la_chaine_fourni_par_le_serveur() -> None:
     )
 
 
-def test_carte_de_la_chaine_fournie_par_le_serveur(tmp_path) -> None:
+def _resolve_without(missing: str):
+    def fake(tool_id: str, settings: Settings | None = None, **_: object) -> toolrun.ToolStatus:
+        return toolrun.ToolStatus(tool_id, "missing" if tool_id == missing else "ok")
+
+    return fake
+
+
+def test_carte_de_la_chaine_fournie_par_le_serveur(tmp_path, monkeypatch) -> None:
+    # La disponibilité vient de la sonde du poste, pas du contenu.
+    monkeypatch.setattr(toolrun, "resolve", _resolve_without("bandit"))
     chain = chain_body(2)
     assert chain is not None and chain["map"]["button_text"] == "Carte ▾"
     assert chain["map"]["soon_text"] == "Bientôt" and "kinds" not in chain["map"]
     stations = {s["number"]: s for s in chain["stations"]}
     assert [s["delivered"] for s in stations.values()] == [True, True, True, False]
-    # Station 4 en v0.2 : ni outil ni barrière ; un outil indisponible est signalé comme tel.
+    # Station 4 en v0.2 : ni outil ni barrière ; seul l'outil absent du poste est indisponible.
     assert stations[4]["tools"] == [] and stations[4]["barriers"] == []
-    assert any(not t["available"] for s in stations.values() for t in s["tools"])
+    assert [t["id"] for s in stations.values() for t in s["tools"] if not t["available"]] == [
+        "bandit"
+    ]
     barrier = stations[1]["barriers"][0]
-    assert {link["kind"] for link in barrier["links"]} == {"hook", "check", "term"}
-    assert {link["kind_text"] for link in barrier["links"]} == {"Hook", "Check", "Terme"}
+    assert [(link["kind"], link["kind_text"]) for link in barrier["links"]] == [
+        ("hook", "Hook"),
+        ("check", "Check"),
+        ("term", "Terme"),
+    ]
     # Sans `content/chain.yaml`, pas de bandeau (journalisé), sans exception.
     empty = Settings(data_dir=tmp_path / "data", content_dir=tmp_path / "vide")
     assert chain_body(1, empty) is None
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "expected"),
+    [
+        ('    name: "PR et CI"\n', "", "stations.1.name"),
+        ("  - number: 3\n", "  - number: 5\n", "attendu 1 à 4"),
+        ('    term: "Terme"\n', "", "map.kinds sans libellé"),
+        ('{kind: term, label: "Secret"}', '{kind: lien, label: "Secret"}', "kind"),
+        ("boundary_after: 3", "boundary_after: 9", "boundary_after=9"),
+        ("schema_version: 1", "schema_version: 2", "schema_version"),
+    ],
+)
+def test_chaine_invalide_journalisee_sans_bandeau(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, old: str, new: str, expected: str
+) -> None:
+    source = (Path(__file__).parents[1] / "content" / "chain.yaml").read_text(encoding="utf-8")
+    assert old in source
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "chain.yaml").write_text(source.replace(old, new, 1), encoding="utf-8")
+    settings = Settings(data_dir=tmp_path / "data", content_dir=content)
+    with caplog.at_level("WARNING", logger="wavedevsecops"):
+        assert chain_body(1, settings) is None
+    assert "contenu invalide" in caplog.text and expected in caplog.text
