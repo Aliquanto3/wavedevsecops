@@ -61,3 +61,18 @@ C'est l'API dont dépendent 4.4 (Recommencer), 4.5 (quiz), 5.x et 6.6 (exécutio
 - Arrêt des runs du pipeline de l'espace : à brancher avec `ci` (AD-10). `ci/` est déjà vidé.
 - Surveillant pendant `setup` avec `replace=True` (Recommencer par reconstruction, 4.4) : il n'est que suspendu, et le même verrou Windows peut gêner `remove_tree`. 4.4 pourra ajouter `setup` à `STOP_WATCH_STATES`.
 - Instantané avant chaque choix de quiz : appel de `take_snapshot(..., reason="quiz")` par 4.5.
+
+## Revue
+
+Rebase sur `origin/main` (2.4) : conflit trivial dans `config.py` (réglages `terminal_timeout_s` et `max_snapshots` / `restore_retry_ms` gardés tous deux).
+
+- high, second avis H1 : corrigé. Une exception autre que `RestoreFailed` (git en échec à la vérification, `run.json` impossible à écrire) ne donnait ni `restore_ended{restore_failed}` ni `restore_failed` dans `run.json`. `_run_restore` la convertit désormais en `RestoreFailed`, avec un test.
+- medium, second avis H2 : reporté à 4.4, déjà noté dans les Reports. Après `restore_failed`, l'espace revient au repos et accepte les écritures. Aucune intention ne déclenche encore de restauration (bouton à venir en 4.5/4.6) ; le refus des autres intentions revient à Recommencer (4.4). Vérification à faire : en 4.4, une intention d'écriture est refusée tant que `run.json.restore_failed` est posé.
+- medium, second avis M3 : corrigé. Le retour arrière n'avait qu'un essai, et `restoring` était effacé même s'il échouait. Il a maintenant trois essais espacés. S'il reste incomplet, `restoring` est gardé et le démarrage suivant reprend la copie (test).
+- medium, second avis M4 : corrigé autrement. Si la reprise échoue, `restoring` est gardé (état inconnu) et le démarrage suivant retente. Le même maintien vaut pour une exception imprévue après la phase `copy`. Les suppressions sans réessai restent, le surveillant étant arrêté pendant `restoring`.
+- low, second avis L5 : rejeté en partie. Le test `quiz_altered` tourne sur tous les OS : le `skipif` porte sur le test du fichier verrouillé. L'assertion d'état du moteur a été ajoutée à `test_restore_failed_dans_la_file`.
+- low, second avis L6 : rejeté. `.staging-N` est supprimé en cas d'échec et de nouveau avant la prise suivante, et `.restore/` est vidé en fin de restauration réussie. La corbeille d'un échec reste, puis est supprimée à la prochaine restauration.
+- low, second avis L7 : reporté. Seuls `index.lock` et `HEAD.lock` sont exclus de la copie (AD-12). Les autres verrous de refs (`*.lock`) sont rares hors d'une commande en cours, et la file sérialise les commandes.
+- low, second avis L8 : rejeté. Le libellé suit `restore_ended{status: ok}`, et l'UI de la restauration (4.5/4.6) choisira son texte.
+- Complexité : 0 constat. La rétention et la liste des instantanés sont en O(n), avec n ≤ `max_snapshots`, et ne tournent qu'à la prise ou à la restauration.
+- API publique inchangée (`take_snapshot`, `restore_snapshot`, `WorkspaceManager.restore`, `resume_restore`) ; `_fail` reçoit `keep_pending` (interne).

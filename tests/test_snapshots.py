@@ -195,6 +195,31 @@ def test_renommage_refuse_trois_essais_puis_retour_arriere(
     # Retour arrière : l'espace est resté dans l'état d'avant la tentative.
     assert fingerprint(layout, git) == altered
     assert load_run(layout)["restore_failed"]["snapshot_id"] == 0
+    assert load_run(layout)["restoring"] is None  # retour arrière complet : rien à reprendre
+
+
+def test_retour_arriere_incomplet_garde_restoring(
+    prepared, git: Git, settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revue : si le retour arrière échoue aussi, `restoring` reste pour la reprise."""
+    layout = prepared.layout
+    _alter(git, layout)
+    real_rename = os.rename
+
+    def rename(source, target) -> None:
+        if Path(source).name == "origin.git" and "trash" in str(target):
+            raise PermissionError(13, "verrouillé", str(source))
+        if "staging" in str(target):  # le retour arrière est refusé lui aussi
+            raise PermissionError(13, "verrouillé", str(source))
+        real_rename(source, target)
+
+    monkeypatch.setattr(wsfs.os, "rename", rename)
+    with pytest.raises(RestoreFailed):
+        restore_snapshot(layout, git, settings, 0, sleep=lambda _s: None)
+    monkeypatch.undo()
+    run = load_run(layout)
+    assert run["restore_failed"]["snapshot_id"] == 0
+    assert run["restoring"]["snapshot_id"] == 0
 
 
 @pytest.mark.skipif(os.name != "nt", reason="verrou de fichier propre à Windows")
@@ -323,6 +348,27 @@ def test_restore_failed_dans_la_file(prepared, manager: WorkspaceManager) -> Non
     assert ended.payload["status"] == "restore_failed"
     error = next(e for e in ops if e.kind == Kind.APP_ERROR)
     assert "Recommencez" in error.payload["action_text"]
+    assert manager.get(WS).state == "idle"  # refus des autres intentions : story 4.4
+
+
+def test_exception_inattendue_donne_restore_failed(
+    prepared, manager: WorkspaceManager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revue : une exception hors `RestoreFailed` (ici à la vérification) donne aussi
+    `restore_failed`, et `restoring` reste pour que le démarrage suivant reprenne la copie."""
+    from wavedevsecops.engine import snapshots
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("git introuvable")
+
+    monkeypatch.setattr(snapshots, "fingerprint", broken)
+    events = _events(manager)
+    result = manager.restore(WS, 0).result(WAIT)
+    ended = next(e for e in events if e.op_id == result.op_id and e.kind == Kind.RESTORE_ENDED)
+    assert ended.payload["status"] == "restore_failed"
+    run = load_run(prepared.layout)
+    assert run["restore_failed"]["snapshot_id"] == 0
+    assert run["restoring"]["phase"] == "verify"
 
 
 def test_reprise_au_demarrage(prepared, git: Git, manager: WorkspaceManager) -> None:

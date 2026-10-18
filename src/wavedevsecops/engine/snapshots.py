@@ -194,14 +194,19 @@ def _discard(path: Path) -> None:
         log.warning("Corbeille de restauration non supprimée : %s", path, exc_info=True)
 
 
-def _fail(layout: Layout, snapshot_id: int | None, why: str) -> RestoreFailed:
+def _fail(
+    layout: Layout, snapshot_id: int | None, why: str, *, keep_pending: bool = False
+) -> RestoreFailed:
+    """Consigne `restore_failed` ; `keep_pending` garde `restoring` quand les entrées sont
+    dans un état mélangé : le prochain démarrage reprendra alors la copie (AD-6)."""
     failed = RestoreFailed(snapshot_id, why)
+    changes: dict[str, Any] = {
+        "restore_failed": {"snapshot_id": snapshot_id, "reason_text": failed.cause_text}
+    }
+    if not keep_pending:
+        changes["restoring"] = None
     try:
-        _update_run(
-            layout,
-            restoring=None,
-            restore_failed={"snapshot_id": snapshot_id, "reason_text": failed.cause_text},
-        )
+        _update_run(layout, **changes)
     except Exception:  # noqa: BLE001 - l'échec reste signalé même si run.json est illisible
         log.exception("restore_failed non consigné dans run.json (%s)", layout.root)
     return failed
@@ -216,19 +221,30 @@ def _verify(layout: Layout, git: Git, snapshot: Snapshot) -> None:
 
 
 def _rollback(
-    layout: Layout, staging: Path, trash: Path, moved: list[str], placed: list[str]
-) -> None:
-    """Remet les entrées d'avant la restauration (au mieux) après un renommage refusé."""
+    layout: Layout,
+    staging: Path,
+    trash: Path,
+    moved: list[str],
+    placed: list[str],
+    *,
+    pause_s: float,
+    sleep: Sleep,
+) -> bool:
+    """Remet les entrées d'avant la restauration (au mieux) ; `False` si l'une n'a pas pu."""
+    complete = True
     for name in reversed(placed):
         try:
-            wsfs.move(layout.root / name, staging / name, attempts=1)
+            wsfs.move(layout.root / name, staging / name, pause_s=pause_s, sleep=sleep)
         except OSError:
+            complete = False
             log.warning("Retour arrière impossible pour %s", name, exc_info=True)
     for name in reversed(moved):
         try:
-            wsfs.move(trash / name, layout.root / name, attempts=1)
+            wsfs.move(trash / name, layout.root / name, pause_s=pause_s, sleep=sleep)
         except OSError:
+            complete = False
             log.warning("Retour arrière impossible pour %s", name, exc_info=True)
+    return complete
 
 
 def restore_snapshot(
@@ -276,9 +292,12 @@ def restore_snapshot(
                 placed.append(name)
     except OSError as error:
         log.warning("Renommage refusé pendant la restauration", exc_info=True)
-        _rollback(layout, staging, trash, moved, placed)
+        restored = _rollback(layout, staging, trash, moved, placed, pause_s=pause_s, sleep=sleep)
         raise _fail(
-            layout, snapshot_id, "un fichier de l'espace est verrouillé par un autre programme"
+            layout,
+            snapshot_id,
+            "un fichier de l'espace est verrouillé par un autre programme",
+            keep_pending=not restored,
         ) from error
     _update_run(layout, restoring={**pending, "phase": "verify"})
     _verify(layout, git, snapshot)
@@ -318,7 +337,10 @@ def resume_restore(layout: Layout, git: Git, settings: Settings) -> Snapshot | N
         wsfs.copy_entries(snapshot.path, SNAPSHOT_ENTRIES, layout.root)
     except OSError as error:
         log.warning("Reprise de la restauration %s", snapshot_id, exc_info=True)
-        raise _fail(layout, snapshot_id, "la reprise de la copie a échoué") from error
+        # Entrées dans un état inconnu : le prochain démarrage retentera la copie.
+        raise _fail(
+            layout, snapshot_id, "la reprise de la copie a échoué", keep_pending=True
+        ) from error
     _update_run(layout, restoring={**pending, "phase": "verify"})
     _verify(layout, git, snapshot)
     return snapshot
@@ -333,7 +355,19 @@ def _run_restore(ctx: OpContext, snapshot_id: int | None, call: Callable[[], Sna
     if snapshot_id is not None:
         ctx.emit(Kind.RESTORE_STARTED, RestoreStarted(snapshot_id=snapshot_id))
     try:
-        snapshot = call()
+        try:
+            snapshot = call()
+        except RestoreFailed:
+            raise
+        except Exception as error:
+            # « Tout écart ou toute exception donne `restore_failed` » (AD-6) : git en échec
+            # pendant la vérification, `run.json` impossible à écrire…
+            log.exception("Restauration de %s", ctx.layout.root)
+            pending = pending_restore(ctx.layout)
+            mixed = pending is not None and pending.get("phase") not in (None, "copy")
+            raise _fail(
+                ctx.layout, snapshot_id, "une erreur inattendue l'a interrompu", keep_pending=mixed
+            ) from error
     except RestoreFailed as failed:
         ctx.emit(
             Kind.RESTORE_ENDED,
