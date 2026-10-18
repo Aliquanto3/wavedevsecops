@@ -124,3 +124,6 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.5 · review · 5 low corrigés, aucun medium ; diagnostic_seen à ajouter à AD-5 · c72d1c4
 - 2026-10-18 · 1.7 · dev · lancé (dev-story Sonnet, worktree) · —
 - 2026-10-18 · 1.5 · fusion · rebase sur 5a51a2a par l'orchestrateur, suite complète 219 passed, CI branche verte sur les trois OS, ff sur main, story done · 0ec4010
+- 2026-10-18 · 2.1 · review · 2 rebases (conflit trivial contracts), 3 medium corrigés (ignore/attributs globaux isolés, confinement .git normalisé, étape CI autocrlf qui prouvait à vide), 4 low corrigés ; liens de l'apprenant hors espace reportés à 2.2 · 836eb0d
+- 2026-10-18 · 2.1 · fusion · ff sur main, suite complète 272 passed / 2 skipped, CI branche verte sur les trois OS, story done · 836eb0d
+- 2026-10-18 · 2.2, 2.11 · dev · lancés (2.2 dev-story Opus ★, 2.11 Sonnet) ; 1.7 en dev · —
