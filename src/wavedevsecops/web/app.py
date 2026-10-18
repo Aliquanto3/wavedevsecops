@@ -27,6 +27,7 @@ from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.engine import WorkspaceManager, pr_intents
 from wavedevsecops.web.catalogue import install_catalogue_routes
+from wavedevsecops.web.exercise import register_exercise_intent
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
 from wavedevsecops.web.workspaces import install_workspace_routes
 
@@ -207,6 +208,7 @@ def create_app(
     pr_intents.register_intents()
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
+    register_exercise_intent()
     workspaces = workspaces or WorkspaceManager(settings)
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)

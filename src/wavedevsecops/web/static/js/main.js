@@ -52,7 +52,7 @@ async function showWorkspace(container, workspaceId) {
     `${TRACKS[info.track] || info.track} · Mode ${info.mode}`;
   document.title = `${info.title} · WaveDevSecOps`;
   const store = createStore();
-  mountWorkspace(container, { title: info.title, store, chain: info.chain });
+  mountWorkspace(container, { title: info.title, store, chain: info.chain, track: info.track });
   connectWorkspace(store, workspaceId);
 }
 

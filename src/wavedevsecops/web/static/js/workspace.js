@@ -5,6 +5,7 @@ import { bindAction } from "./actions.js";
 import { buildChainBand, mountChain } from "./chain.js";
 import { el, richText } from "./dom.js";
 import * as L from "./layout.js";
+import { mountNetworkRun } from "./network-run.js";
 import { listPanes } from "./panes.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
@@ -18,7 +19,10 @@ const TOOL_HIDE = "—";
 const TOOL_MAXIMIZE = "⛶";
 
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
-export function mountWorkspace(container, { title, store, storage, chain = null, onSelect }) {
+export function mountWorkspace(
+  container,
+  { title, store, storage, chain = null, onSelect, track, fetchImpl },
+) {
   const panes = listPanes();
   const byId = new Map(panes.map((pane) => [pane.id, pane]));
   let config = L.loadConfig(panes, storage);
@@ -40,6 +44,8 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   const panelError = el("p", "scenario-error", { role: "alert" });
   const scenarioView = createScenarioView({ onSelect });
   panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
+  // Seul le parcours LLM a du code d'exercice à lancer ; le serveur revérifie le parcours.
+  const networkRun = track === "llm" ? mountNetworkRun(panel, { store, fetchImpl }) : null;
 
   const zone = el("div", "views");
   const chipBar = el("div", "chips", {
@@ -585,6 +591,7 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
     destroy() {
       unsubscribe();
       chainView?.close(false);
+      if (networkRun) networkRun.destroy();
       document.removeEventListener("keydown", onKeydown);
       if (observer) observer.disconnect();
     },

@@ -93,6 +93,9 @@ class Settings(BaseModel):
     restore_retry_ms: int = Field(default=250, ge=0)
     """Pause avant le 2e essai d'un renommage de restauration (doublée avant le 3e, AD-6)."""
 
+    llm_run_timeout_s: float = Field(default=180.0, gt=0)
+    """Délai maximal du code d'exercice du parcours LLM lancé par l'apprenant (AD-13)."""
+
     def gitconfig_path(self) -> Path:
         """`<data>/gitconfig`, désigné par `GIT_CONFIG_GLOBAL` (AD-3, AD-5)."""
         return self.resolved_data_dir() / "gitconfig"
