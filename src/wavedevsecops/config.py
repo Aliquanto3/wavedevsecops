@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
 
+from platformdirs import user_data_dir
 from pydantic import BaseModel, ConfigDict
 
 ENV_PREFIX = "WDS_"
@@ -27,6 +28,18 @@ class Settings(BaseModel):
 
     data_dir: Path | None = None
     """Dossier des données utilisateur ; `None` : dossier par défaut de platformdirs."""
+
+    log_max_bytes: int = 1_000_000
+    """Taille d'un fichier de `<data>/logs/app.log` avant rotation."""
+
+    log_backup_count: int = 3
+    """Nombre de fichiers de journal conservés après rotation."""
+
+    def resolved_data_dir(self) -> Path:
+        """Dossier des données : `data_dir`, sinon celui de platformdirs (AD-5)."""
+        if self.data_dir is not None:
+            return self.data_dir
+        return Path(user_data_dir("WaveDevSecOps", appauthor=False, roaming=False))
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:

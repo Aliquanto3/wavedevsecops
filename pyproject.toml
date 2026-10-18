@@ -17,6 +17,9 @@ dependencies = [
     "platformdirs==4.13.4",
 ]
 
+[project.scripts]
+wavedevsecops = "wavedevsecops.cli:main"
+
 [project.optional-dependencies]
 window = ["pywebview==6.2.1"]
 
