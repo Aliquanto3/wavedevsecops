@@ -16,7 +16,7 @@ from functools import cache
 from pathlib import Path
 
 from platformdirs import user_data_dir
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ENV_PREFIX = "WDS_"
 APP_NAME = "WaveDevSecOps"
@@ -65,6 +65,24 @@ class Settings(BaseModel):
 
     git_timeout_s: float = 30.0
     """Délai maximal d'une commande git interne (setup, lectures de l'empreinte), en secondes."""
+
+    event_buffer: int = Field(default=1000, ge=1)
+    """Événements gardés par espace pour la reprise du flux SSE (`Last-Event-ID`, AD-17)."""
+
+    max_active_workspaces: int = Field(default=3, ge=1)
+    """Espaces actifs (file, surveillant, runs) au plus ; les autres dorment (AD-1)."""
+
+    max_pending_ops: int = Field(default=32, ge=1)
+    """Opérations en attente dans la file d'un espace avant de refuser une intention (409)."""
+
+    watch_quiet_ms: int = Field(default=500, ge=0)
+    """Silence après une commande avant que le surveillant de l'arbre reprenne (AD-1)."""
+
+    sse_heartbeat_s: float = Field(default=15.0, gt=0)
+    """Intervalle des lignes de maintien du flux SSE, en secondes."""
+
+    engine_stop_timeout_s: float = Field(default=30.0, gt=0)
+    """Attente maximale de la fin de l'opération en cours quand un espace s'endort."""
 
     def gitconfig_path(self) -> Path:
         """`<data>/gitconfig`, désigné par `GIT_CONFIG_GLOBAL` (AD-3, AD-5)."""

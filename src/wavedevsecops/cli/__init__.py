@@ -25,7 +25,7 @@ from wavedevsecops import diagnostic
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError, DiagnosticCheck
 from wavedevsecops.progress import ensure_progress
-from wavedevsecops.web import create_app
+from wavedevsecops.web import create_app, shutdown_app
 
 HOST = "127.0.0.1"
 LOCK_NAME = "app.lock"
@@ -142,6 +142,7 @@ class Instance:
         return url_for(self.port, self.token)
 
     def stop(self) -> None:
+        shutdown_app(self.server.config.app)  # ferme les flux SSE, sinon uvicorn les attend
         self.server.should_exit = True
         self.thread.join(timeout=10)
         self.sock.close()

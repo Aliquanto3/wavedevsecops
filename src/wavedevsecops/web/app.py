@@ -25,7 +25,9 @@ from fastapi.staticfiles import StaticFiles
 from wavedevsecops import diagnostic
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
+from wavedevsecops.engine import WorkspaceManager
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
+from wavedevsecops.web.workspaces import install_workspace_routes
 
 SESSION_COOKIE = "wds_session"
 PUBLIC_PREFIX = "/osv/"
@@ -64,10 +66,13 @@ def create_app(
     milestone: str = CURRENT_MILESTONE,
     settings: Settings | None = None,
     on_diagnostic: DiagnosticListener | None = None,
+    workspaces: WorkspaceManager | None = None,
 ) -> FastAPI:
     """Construit l'application pour une instance : `port` et `token` fixés au lancement.
 
     `on_diagnostic(checks, texts)` est appelé après chaque diagnostic (la console de lancement).
+    `workspaces` : registre des espaces (par défaut, un `WorkspaceManager` neuf : un `boot_id`
+    par lancement) ; `shutdown_app` l'arrête.
     """
     settings = settings or get_settings()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -193,6 +198,18 @@ def create_app(
             }
         )
 
+    workspaces = workspaces or WorkspaceManager(settings)
+    app.state.workspaces = workspaces
+    install_workspace_routes(app, workspaces)
+
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     return app
+
+
+def shutdown_app(app: object) -> None:
+    """Endort les espaces de l'application : files et surveillants arrêtés, flux SSE fermés."""
+    state = getattr(app, "state", None)
+    workspaces = getattr(state, "workspaces", None)
+    if isinstance(workspaces, WorkspaceManager):
+        workspaces.close()

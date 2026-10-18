@@ -14,11 +14,10 @@ from wavedevsecops import toolrun, wsfs
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine.fingerprint import fingerprint
+from wavedevsecops.engine.runfile import RUN_SCHEMA_VERSION
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios import LoadedScenario, run_setup
 from wavedevsecops.wsfs import Layout
-
-RUN_SCHEMA_VERSION = 1
 
 
 class WorkspaceError(AppError):

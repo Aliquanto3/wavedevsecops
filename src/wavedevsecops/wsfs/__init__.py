@@ -166,6 +166,34 @@ def read_bytes(root: Path, path: str) -> bytes | None:
         return None
 
 
+SYMLINK_PREFIX = b"symlink:"
+
+
+def read_entry(root: Path, path: str) -> bytes | None:
+    """Contenu d'une entrée de l'arbre pour l'empreinte (AD-6), sans jamais suivre un lien.
+
+    Un lien symbolique vaut sa cible écrite (comme git la stocke), même s'il sort de
+    l'espace ou vise `.git/` ; une entrée illisible ou hors de l'espace vaut `None`.
+    """
+    pure = check_relative(path, portable=False)
+    try:
+        parent = root.resolve() if len(pure.parts) == 1 else confine(
+            root, pure.parent.as_posix(), portable=False
+        )
+    except SandboxPathError:
+        return None
+    entry = parent / pure.name
+    try:
+        if entry.is_symlink():
+            return SYMLINK_PREFIX + os.fsencode(os.readlink(entry))
+    except OSError:
+        return None
+    try:
+        return read_bytes(root, path)
+    except SandboxPathError:
+        return None
+
+
 def make_dirs(path: Path) -> None:
     """Crée un dossier de l'espace (et ses parents)."""
     path.mkdir(parents=True, exist_ok=True)

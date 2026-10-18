@@ -8,9 +8,32 @@ import pytest
 from static_rules import (
     dependency_violations,
     env_read_violations,
+    explanation_publish_violations,
     iter_modules,
     sandbox_write_violations,
 )
+
+
+def test_seule_la_file_publie_une_explication() -> None:
+    assert explanation_publish_violations() == []
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "from wavedevsecops.events import StepExplanation\n",
+        "from wavedevsecops import events\nevents.Kind.STEP_EXPLANATION\n",
+        "emit('step_explanation', {})\n",
+    ],
+)
+def test_explication_hors_file_detectee(tmp_path: Path, code: str) -> None:
+    src = _write(
+        tmp_path,
+        {"web/x.py": code, "events/__init__.py": code, "engine/operations.py": code},
+    )
+    violations = explanation_publish_violations(src, "pkg")
+    assert len(violations) == 1, violations
+    assert violations[0].startswith("pkg.web.x")
 
 
 def _write(root: Path, files: dict[str, str]) -> Path:

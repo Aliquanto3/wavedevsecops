@@ -316,3 +316,32 @@ def sandbox_write_violations(src: Path = SRC, package: str = PACKAGE) -> list[st
             if _matches(name, WRITE_MODULES):
                 violations.append(f"{module} importe {name} : passez par wsfs")
     return violations
+
+
+# Seule la file d'opérations publie une explication, après projections et verdict (AD-1).
+EXPLANATION_NAMES = frozenset({"STEP_EXPLANATION", "StepExplanation"})
+EXPLANATION_KIND = "step_explanation"
+EXPLANATION_PUBLISHER = "engine.operations"
+
+
+def explanation_publish_violations(src: Path = SRC, package: str = PACKAGE) -> list[str]:
+    """Aucun module, hors du catalogue (`events`) et de la file, ne nomme l'explication d'étape."""
+    violations = []
+    for module, path in iter_modules(src, package):
+        if component(module) == "events" or module == f"{package}.{EXPLANATION_PUBLISHER}":
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            name = None
+            if isinstance(node, ast.Name) and node.id in EXPLANATION_NAMES:
+                name = node.id
+            elif isinstance(node, ast.Attribute) and node.attr in EXPLANATION_NAMES:
+                name = node.attr
+            elif isinstance(node, ast.alias) and node.name in EXPLANATION_NAMES:
+                name = node.name
+            elif isinstance(node, ast.Constant) and node.value == EXPLANATION_KIND:
+                name = repr(EXPLANATION_KIND)
+            if name is not None:
+                line = getattr(node, "lineno", 0)
+                violations.append(f"{module}:{line} publie {name} hors de la file d'opérations")
+    return violations

@@ -5,7 +5,8 @@ Empreinte : sha256 d'une sérialisation triée de l'état de l'espace :
 - refs et cibles de `repo/` et `origin.git/`, HEAD compris (symbolique ou détaché) ;
 - objets accessibles depuis les refs et le reflog ;
 - entrées de l'index (mode, oid, étage, chemin) ;
-- chemin et contenu (sha256) de chaque fichier suivi ou non ignoré de l'arbre de travail ;
+- chemin et contenu (sha256) de chaque fichier suivi ou non ignoré de l'arbre de travail
+  (un lien symbolique vaut sa cible écrite : il n'est jamais suivi) ;
 - liste ordonnée du stash ;
 - chemin et contenu de chaque fichier de `hooks/`.
 
@@ -42,7 +43,7 @@ def canonical_records(layout: Layout, git: Git) -> list[str]:
         records += [f"{label} object {oid}" for oid in gitio.reachable_objects(git, path)]
     records += [f"repo index {entry}" for entry in gitio.index_entries(git, layout.repo)]
     for rel in gitio.worktree_paths(git, layout.repo):
-        records.append(f"repo worktree {rel} {_digest(wsfs.read_bytes(layout.repo, rel))}")
+        records.append(f"repo worktree {rel} {_digest(wsfs.read_entry(layout.repo, rel))}")
     for position, sha in enumerate(gitio.stash_list(git, layout.repo)):
         records.append(f"repo stash {position} {sha}")
     for rel in wsfs.iter_files(layout.hooks):

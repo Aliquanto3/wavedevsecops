@@ -185,6 +185,29 @@ def test_empreinte_suit_l_etat_et_ignore_le_reste(
     assert fingerprint(layout, git) != reference
 
 
+def test_lien_de_l_apprenant_qui_sort_ou_vise_git(
+    settings: Settings, free: LoadedScenario, git_path: Path, tmp_path: Path
+) -> None:
+    """Un lien symbolique vaut sa cible écrite : il n'est jamais suivi (report de 2.1)."""
+    prepared = prepare_workspace(free, "llm", settings=settings, git_path=git_path)
+    layout = prepared.layout
+    git = _git(prepared, settings, git_path)
+    outside = tmp_path / "dehors.txt"
+    outside.write_text("secret", encoding="utf-8")
+    try:
+        (layout.repo / "sortie").symlink_to(outside)
+        (layout.repo / "interne").symlink_to(layout.repo / ".git" / "config")
+    except OSError:
+        pytest.skip("liens symboliques indisponibles sur ce poste")
+    with_links = fingerprint(layout, git)
+    assert with_links != prepared.fingerprint
+    outside.write_text("autre secret", encoding="utf-8")
+    assert fingerprint(layout, git) == with_links  # la cible n'est pas lue
+    (layout.repo / "sortie").unlink()
+    (layout.repo / "sortie").symlink_to(tmp_path / "ailleurs.txt")
+    assert fingerprint(layout, git) != with_links  # la cible écrite compte
+
+
 def test_ops_branch_switch_et_alias(settings: Settings, git_path: Path) -> None:
     text = """\
 schema_version: 1
