@@ -1,7 +1,7 @@
 // Magasin de projection (AD-17) : l'état d'un espace tel que le serveur le publie. Le front n'en
 // calcule rien (AD-2) : il garde le dernier état connu, applique les événements du flux dans
 // l'ordre de `seq`, et se resynchronise sur `resync_required`.
-import { assertElementType } from "./panes.js";
+import { assertElementType, listPanes } from "./panes.js";
 
 export const LOADING = "loading";
 export const STREAM_LOST_TEXT =
@@ -23,6 +23,7 @@ function initial() {
     terminal: { entries: [], cleared: 0, version: 0 }, // sorties du terminal, dans l'ordre d'arrivée
     stepPanel: null, // panneau Scénario écrit par le serveur (étapes, étape courante)
     verdict: null, // dernier step_verdict de l'espace ; null après un rechargement
+    announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
   };
 }
 
@@ -32,15 +33,26 @@ function withEntry(terminal, entry) {
   return { ...terminal, version: terminal.version + 1 };
 }
 
-/** Garde les projections dont chaque `element` a un type déclaré par son volet. */
+/**
+ * Garde les vues de `state_projected.views` (une clé par vue : `graph`, `staging`, `prompt`…).
+ * Chaque volet déclare à son enregistrement les vues qu'il affiche et leurs `element_id` : une
+ * vue dont un `element_id` a un type que son volet n'a pas déclaré est refusée. Les clés que
+ * aucun volet ne déclare passent telles quelles.
+ */
 export function acceptViews(views, problems = []) {
-  const accepted = {};
-  for (const [paneId, view] of Object.entries(views || {})) {
-    try {
-      for (const element of (view && view.elements) || []) assertElementType(paneId, element.type);
-      accepted[paneId] = view;
-    } catch (err) {
-      problems.push(err.message);
+  const accepted = { ...(views || {}) };
+  for (const pane of listPanes()) {
+    for (const [key, elementIds] of Object.entries(pane.projection)) {
+      if (!(key in accepted)) continue;
+      try {
+        for (const id of elementIds(accepted[key])) {
+          assertElementType(pane.id, String(id).split(":", 1)[0]);
+        }
+      } catch (err) {
+        problems.push(err.message);
+        console.warn(`Vue « ${key} » écartée : ${err.message}`); // diagnostic pour le développeur
+        delete accepted[key];
+      }
     }
   }
   return accepted;
@@ -70,6 +82,7 @@ function explainStep(panel, payload) {
 
 export function createStore() {
   let state = initial();
+  const externalOps = new Set();
   const listeners = new Set();
 
   function set(patch) {
@@ -106,6 +119,7 @@ export function createStore() {
         problems,
         stepPanel: snapshot.step_panel || null,
         verdict: null,
+        announce: null, // l'ouverture n'est pas une commande
       });
     },
     fail(errorText) {
@@ -135,6 +149,13 @@ export function createStore() {
         patch.views = acceptViews(payload.views, problems);
         patch.fingerprint = payload.fingerprint || "";
         patch.problems = problems;
+        const text = (payload.views && payload.views.announce_text) || "";
+        // Une commande est une opération de l'apprenant : ni l'ouverture (sans op_id) ni un
+        // changement venu de l'extérieur (annoncé juste avant par `external_change`).
+        const command = Boolean(envelope.op_id) && !externalOps.delete(envelope.op_id);
+        patch.announce = text ? { text, command } : null;
+      } else if (envelope.kind === "external_change") {
+        if (envelope.op_id) externalOps.add(envelope.op_id);
       } else if (envelope.kind === "terminal_output") {
         // Verbatim : le front n'analyse jamais la sortie (AD-2).
         patch.terminal = withEntry(state.terminal, {

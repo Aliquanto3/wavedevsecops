@@ -266,6 +266,17 @@ def test_vues_annotees(sandbox: Sandbox) -> None:
     ]
     assert [(i.path, i.letter) for i in staging.unstaged] == [("README.md", "M")]
     assert [(i.path, i.letter) for i in staging.untracked] == [("b.txt", "?")]
+    # Noms accessibles écrits par le serveur (AD-2), pas par le front.
+    names = [i.a11y_name_text for i in [*staging.staged, *staging.unstaged, *staging.untracked]]
+    assert names == [
+        "Indexé : a.txt, ajouté",
+        "Modifié, non indexé : README.md, modifié",
+        "Non suivi : b.txt, non suivi",
+    ]
+    box.run("commit", "-qm", "a")
+    box.run("mv", "a.txt", "c.txt")
+    renamed = build_views(box.state()).staging.staged
+    assert [i.a11y_name_text for i in renamed] == ["Indexé : a.txt → c.txt, renommé"]
 
 
 def test_passages_liables(sandbox: Sandbox) -> None:

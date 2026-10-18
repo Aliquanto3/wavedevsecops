@@ -26,6 +26,21 @@ Mode = Literal["A", "B"]
 SetupOp = op_union()
 
 
+FORBIDDEN_STEP_INTENT = "run_exercise_code"
+"""Intention réservée à l'apprenant (AD-13) : aucune étape ne peut la déclarer."""
+
+
+def _mentions(value: object, needle: str) -> bool:
+    """Vrai si `needle` figure, comme clé ou comme texte, n'importe où dans `value`."""
+    if isinstance(value, str):
+        return needle in value
+    if isinstance(value, dict):
+        return any(_mentions(k, needle) or _mentions(v, needle) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_mentions(item, needle) for item in value)
+    return False
+
+
 StepSpec = step_union()
 """Une étape : un type du registre `scenarios/steps/`, discriminé par `type` (AD-7)."""
 
@@ -89,6 +104,14 @@ class Scenario(BaseModel):
                 defined.add(op.as_)
         step_ids: set[str] = set()
         for index, step in enumerate(self.steps):
+            if _mentions(step.model_dump(), FORBIDDEN_STEP_INTENT):
+                errors.append(
+                    (
+                        ("steps", index),
+                        f"une étape ne peut pas déclarer « {FORBIDDEN_STEP_INTENT} » : seul "
+                        "l'apprenant lance le code d'exercice, après confirmation (AD-13)",
+                    )
+                )
             if step.step_id in step_ids:
                 errors.append(
                     (("steps", index, "step_id"), f"step_id « {step.step_id} » en double")

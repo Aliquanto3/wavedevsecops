@@ -5,6 +5,7 @@ import { bindAction } from "./actions.js";
 import { buildChainBand, mountChain } from "./chain.js";
 import { el, richText } from "./dom.js";
 import * as L from "./layout.js";
+import { mountNetworkRun } from "./network-run.js";
 import { listPanes } from "./panes.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
@@ -12,13 +13,17 @@ import { LOADING } from "./store.js";
 export { buildChainBand };
 export const PREPARING_TEXT = "Préparation du bac à sable…";
 export const READY_TEXT = "Le bac à sable est prêt. Les consignes du scénario s'afficheront ici.";
+export const COMMAND_DONE_TEXT = "Commande terminée.";
 export const LAST_VIEW_TEXT = "Au moins une vue reste visible.";
 
 const TOOL_HIDE = "—";
 const TOOL_MAXIMIZE = "⛶";
 
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
-export function mountWorkspace(container, { title, store, storage, chain = null, onSelect }) {
+export function mountWorkspace(
+  container,
+  { title, store, storage, chain = null, onSelect, track, fetchImpl },
+) {
   const panes = listPanes();
   const byId = new Map(panes.map((pane) => [pane.id, pane]));
   let config = L.loadConfig(panes, storage);
@@ -40,6 +45,8 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   const panelError = el("p", "scenario-error", { role: "alert" });
   const scenarioView = createScenarioView({ onSelect });
   panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
+  // Seul le parcours LLM a du code d'exercice à lancer ; le serveur revérifie le parcours.
+  const networkRun = track === "llm" ? mountNetworkRun(panel, { store, fetchImpl }) : null;
 
   const zone = el("div", "views");
   const chipBar = el("div", "chips", {
@@ -61,14 +68,28 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   container.replaceChildren(workspace);
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
+  // Région role="status" unique du panneau : « Commande terminée. Vues mises à jour : … » (FR-4).
+  let announced = null;
   const unsubscribe = store.subscribe((state) => {
     const preparing = state.engineState === LOADING || state.engineState === "setup";
     const stepStatus = scenarioView.update(state);
-    panelStatus.textContent = state.errorText
-      ? ""
-      : preparing
-        ? PREPARING_TEXT
-        : stepStatus || READY_TEXT;
+    // Annonce de la commande d'abord, puis le statut d'étape : l'un n'écrase pas l'autre.
+    let line = PREPARING_TEXT;
+    if (!preparing) {
+      const parts = [];
+      if (state.announce) {
+        parts.push(
+          state.announce.command
+            ? `${COMMAND_DONE_TEXT} ${state.announce.text}`
+            : state.announce.text,
+        );
+      }
+      if (stepStatus) parts.push(stepStatus);
+      line = parts.length ? parts.join(" ") : READY_TEXT;
+    }
+    if (state.announce !== announced) panelStatus.textContent = ""; // relit une annonce identique
+    announced = state.announce;
+    panelStatus.textContent = state.errorText ? "" : line;
     panelError.textContent = state.errorText;
   });
 
@@ -585,6 +606,7 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
     destroy() {
       unsubscribe();
       chainView?.close(false);
+      if (networkRun) networkRun.destroy();
       document.removeEventListener("keydown", onKeydown);
       if (observer) observer.disconnect();
     },

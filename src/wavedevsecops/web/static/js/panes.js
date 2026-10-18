@@ -11,7 +11,9 @@
 //     row: 1, rowShare: 40,        // rangée (1 = haute) et sa part de hauteur (premier volet de la rangée)
 //     share: 55,                   // part de largeur dans la rangée
 //     foldRank: 2,                 // ordre de repli sous la taille nominale (absent : jamais replié)
-//     scroll: "both",             // défilement dans les deux sens (graphe, diff, terminal) ; sinon vertical
+//     projection: { graph: (view) => [element_id, …] },  // vues de `state_projected` que ce volet
+//                                  // affiche, avec leurs `element_id` (types contrôlés par le magasin)
+//     scroll: "both",           // défilement dans les deux sens (graphe, diff, terminal) ; sinon vertical
 //     terminal: false,           // vrai : Échap y rend le focus au titre
 //     empty: { title, text },      // état vide titré (jamais un spinner muet)
 //     render(body, ctx) { ... },   // remplit le corps ; ctx.store donne la projection (store.js)
@@ -36,6 +38,7 @@ export function registerPane(pane) {
     terminal: false,
     ...pane,
     elementTypes: [...types],
+    projection: { ...(pane.projection || {}) },
   });
 }
 

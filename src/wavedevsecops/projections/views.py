@@ -270,6 +270,33 @@ def _head_text(state: RepoState) -> str:
     return f"HEAD sur {_branch(state)}"
 
 
+STAGED_TEXT = "Indexé"
+UNSTAGED_TEXT = "Modifié, non indexé"
+UNTRACKED_TEXT = "Non suivi"
+# Lettres d'état de `git status --short`, dites en toutes lettres dans le nom accessible.
+_LETTER_TEXT = {
+    "M": "modifié",
+    "A": "ajouté",
+    "D": "supprimé",
+    "R": "renommé",
+    "C": "copié",
+    "T": "type changé",
+    "U": "en conflit",
+    "?": "non suivi",
+}
+
+
+def _staging_item(group: str, where: str, path: str, letter: str, orig: str = "") -> StagingItem:
+    shown = f"{orig} → {path}" if orig else path
+    return StagingItem(
+        element_id=element_id("path", where, path),
+        path=path,
+        letter=letter,
+        orig_path=orig,
+        a11y_name_text=f"{group} : {shown}, {_LETTER_TEXT.get(letter, letter)}",
+    )
+
+
 def build_staging(state: RepoState) -> StagingView:
     """Les trois groupes de `staging-index`, avec la lettre d'état git (UX-DR16)."""
     staged: list[StagingItem] = []
@@ -277,39 +304,18 @@ def build_staging(state: RepoState) -> StagingView:
     untracked: list[StagingItem] = []
     for entry in state.status:
         if entry.kind == "untracked":
-            untracked.append(
-                StagingItem(
-                    element_id=element_id("path", "worktree", entry.path),
-                    path=entry.path,
-                    letter="?",
-                )
-            )
+            untracked.append(_staging_item(UNTRACKED_TEXT, "worktree", entry.path, "?"))
             continue
         if entry.kind == "unmerged":
-            unstaged.append(
-                StagingItem(
-                    element_id=element_id("path", "worktree", entry.path),
-                    path=entry.path,
-                    letter="U",
-                )
-            )
+            unstaged.append(_staging_item(UNSTAGED_TEXT, "worktree", entry.path, "U"))
             continue
         if entry.index_status != ".":
             staged.append(
-                StagingItem(
-                    element_id=element_id("path", "index", entry.path),
-                    path=entry.path,
-                    letter=entry.index_status,
-                    orig_path=entry.orig_path,
-                )
+                _staging_item(STAGED_TEXT, "index", entry.path, entry.index_status, entry.orig_path)
             )
         if entry.worktree_status != ".":
             unstaged.append(
-                StagingItem(
-                    element_id=element_id("path", "worktree", entry.path),
-                    path=entry.path,
-                    letter=entry.worktree_status,
-                )
+                _staging_item(UNSTAGED_TEXT, "worktree", entry.path, entry.worktree_status)
             )
     return StagingView(staged=staged, unstaged=unstaged, untracked=untracked)
 

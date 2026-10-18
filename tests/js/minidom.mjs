@@ -248,6 +248,9 @@ class Document extends Node {
   createTextNode(text) {
     return new Text(text);
   }
+  createElementNS(_namespace, tag) {
+    return new Element(tag);
+  }
   getElementById(id) {
     return [...this._descendants()].find((node) => node.id === id) || null;
   }

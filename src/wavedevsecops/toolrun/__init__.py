@@ -29,6 +29,8 @@ from wavedevsecops.registry import (
 State = Literal["ok", "missing", "too_old", "mismatch"]
 Source = Literal["host", "provisioned", "environment"]
 
+ProcResult = procs.ProcResult
+Handle = procs.Handle
 PROXY_NAMES = ("http_proxy", "https_proxy", "all_proxy")
 LOOPBACK_NO_PROXY = "127.0.0.1,localhost"
 NETGUARD_VARIABLE = "WDS_NETGUARD"
@@ -131,12 +133,18 @@ def probe_environment() -> dict[str, str]:
     return env
 
 
-def offline_environment(settings: Settings | None = None) -> dict[str, str]:
-    """Environnement hors ligne des outils lancés par l'application (AD-12)."""
+def offline_environment(
+    settings: Settings | None = None, base: Mapping[str, str] | None = None
+) -> dict[str, str]:
+    """Environnement hors ligne des outils lancés par l'application (AD-12).
+
+    `base` : variables héritées de départ (par défaut tout l'environnement du processus).
+    """
     settings = settings or get_settings()
     data = settings.resolved_data_dir()
     cache = data / "cache"
-    env = {k: v for k, v in inherited_environment().items() if k.lower() not in PROXY_NAMES}
+    inherited = inherited_environment() if base is None else dict(base)
+    env = {k: v for k, v in inherited.items() if k.lower() not in PROXY_NAMES}
     env.update(
         UV_OFFLINE="1",
         UV_CACHE_DIR=str(data / "uv-cache"),
@@ -436,3 +444,35 @@ def sync_environment(
             error=f"environnement incomplet : site-packages introuvable dans {venv}",
         )
     return result
+
+
+def venv_python(venv: Path, platform: str = sys.platform) -> Path | None:
+    """Interpréteur de l'environnement d'exercice, ou None s'il n'existe pas."""
+    if family(platform) == "windows":
+        candidate = venv / "Scripts" / "python.exe"
+    else:
+        candidate = venv / "bin" / "python"
+    return candidate if candidate.is_file() else None
+
+
+def spawn_module(
+    venv: Path,
+    module: str,
+    args: Sequence[str] = (),
+    *,
+    env: Mapping[str, str],
+    cwd: Path | None = None,
+    timeout: float = 60.0,
+    platform: str = sys.platform,
+) -> procs.Handle:
+    """Lance `python -m <module> <args>` avec l'interpréteur de `venv`, sans attendre (AD-12).
+
+    Rend le `Handle` de `procs.spawn` : sortie au fil de l'eau, délai, arrêt d'arbre (Job
+    Object sous Windows). `env` est explicite : l'environnement hors ligne n'est pas imposé,
+    pour que `llmrun` seul puisse lancer sans la garde réseau (AD-13). Lève `OSError` si
+    l'environnement manque ou si le processus ne démarre pas.
+    """
+    python = venv_python(venv, platform)
+    if python is None:
+        raise FileNotFoundError(f"l'environnement d'exercice est absent ({venv})")
+    return procs.spawn([python, "-m", module, *args], env=env, cwd=cwd, timeout=timeout)

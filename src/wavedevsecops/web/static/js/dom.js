@@ -17,6 +17,17 @@ export function richText(parent, text) {
   return parent;
 }
 
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+/** Élément SVG ; `class` et les autres attributs passent par `setAttribute`. */
+export function svg(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NAMESPACE, tag);
+  for (const [name, value] of Object.entries(attrs)) {
+    if (value !== false && value != null) node.setAttribute(name, String(value));
+  }
+  return node;
+}
+
 export function el(tag, className = "", attrs = {}) {
   const node = document.createElement(tag);
   if (className) node.className = className;

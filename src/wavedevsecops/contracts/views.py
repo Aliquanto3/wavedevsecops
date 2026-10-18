@@ -102,6 +102,8 @@ class StagingItem(_Model):
     """Lettre d'état git (`M`, `A`, `D`, `R`, `C`, `T`, `U`, `?`)."""
     orig_path: str = ""
     designable: bool = True
+    a11y_name_text: str = ""
+    """Groupe, chemin et état en toutes lettres (« Indexé : a.txt, ajouté »)."""
 
 
 class StagingView(_Model):
