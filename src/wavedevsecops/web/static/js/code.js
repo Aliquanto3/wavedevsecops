@@ -53,6 +53,8 @@ export function buildDiff(diff) {
   for (const file of diff.files) {
     const group = el("div", "diff-file");
     const head = el("div", "diff-file-header", {
+      role: "heading",
+      "aria-level": "3",
       tabindex: "-1",
       "data-roving": true,
       "data-element-id": file.element_id,
@@ -64,6 +66,7 @@ export function buildDiff(diff) {
       group.append(text("div", "diff-hunk", hunk.header_text));
       for (const line of hunk.lines) {
         const row = el("div", `diff-line ${KIND_CLASS[line.kind]}${line.conflict ? " is-conflict" : ""}`, {
+          role: "group",
           tabindex: "-1",
           "data-roving": true,
           "data-element-id": line.element_id,

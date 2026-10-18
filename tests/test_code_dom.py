@@ -241,6 +241,7 @@ const snapshot = {
   worktreeButton: $$(".diff-worktree").length,
   panelHidden: [$(".code-file-panel").hidden, $(".code-diff-panel").hidden],
   group: $(".diff-view").getAttribute("aria-label"),
+  roles: [files[0].getAttribute("role"), files[0].getAttribute("aria-level"), lines[0].getAttribute("role")],
 };
 $(".diff-worktree").click();
 await flush();
@@ -251,6 +252,8 @@ console.log(JSON.stringify(snapshot));
     assert out["diffCall"] == [f"?target={'a' * 40}"]
     assert out["target"] == f"Commit {SHA[:7]}" and out["group"] == out["target"]
     assert out["panelHidden"] == [True, False] and out["worktreeButton"] == 1
+    # Un nom accessible ne vaut que sur un rôle qui l'admet (pas sur un div générique).
+    assert out["roles"] == ["heading", "3", "group"]
     [first, second] = out["headers"]
     assert first[0] == "path:head:f.txt" and "modifié" in first[1] and "modifié · +3 −1" in first[2]
     assert second[0] == "path:head:new.txt" and "nouveau fichier" in second[2]

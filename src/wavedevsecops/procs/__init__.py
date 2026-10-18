@@ -398,18 +398,34 @@ def spawn(
     return Handle(process, timeout=timeout, job=_make_job(process.pid))
 
 
-def open_path(path: Path) -> None:
-    """Ouvre `path` dans l'application par défaut du système, sans attendre (story 2.8).
+LAUNCHER_SUFFIXES = frozenset({".desktop"})
+"""Fichiers que `xdg-open` lancerait au lieu de les ouvrir comme texte : refusés."""
 
-    Windows : `os.startfile` ; macOS : `open` ; ailleurs : `xdg-open`. Sans shell, entrée et
-    sorties fermées, détaché de la session. Lève `OSError` si le système ne sait pas l'ouvrir.
+
+def open_path(path: Path) -> None:
+    """Ouvre `path` comme texte dans l'éditeur du système, sans attendre (story 2.8).
+
+    Jamais l'action « ouvrir » d'un fichier exécutable : un `.bat`, un `.ps1`, un `.py` (lanceur
+    `py`) ou un `.lnk` s'exécuterait au clic. Windows : verbe `edit` de `os.startfile`, sinon
+    le Bloc-notes ; macOS : `open -t` (éditeur de texte par défaut) ; ailleurs : `xdg-open`,
+    sauf lanceur `.desktop`. Sans shell, entrée et sorties fermées, détaché de la session.
+    Lève `OSError` si le système ne sait pas l'ouvrir.
     """
+    target = os.fspath(path)
     if IS_WINDOWS:
-        os.startfile(path)  # type: ignore[attr-defined]  # noqa: S606 - ouverture voulue
-        return
-    opener = "open" if sys.platform == "darwin" else "xdg-open"
+        try:
+            os.startfile(target, "edit")  # type: ignore[attr-defined]  # noqa: S606
+            return
+        except OSError:
+            argv = ["notepad.exe", target]  # aucun verbe `edit` pour ce type de fichier
+    elif sys.platform == "darwin":
+        argv = ["open", "-t", target]
+    else:
+        if path.suffix.lower() in LAUNCHER_SUFFIXES:
+            raise OSError(f"lanceur refusé : {path.name}")
+        argv = ["xdg-open", target]
     subprocess.Popen(  # noqa: S603 - argv sans shell, chemin confiné par wsfs
-        [opener, os.fspath(path)],
+        argv,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

@@ -167,12 +167,23 @@ def _replace(tmp: str, target: Path) -> None:
             time.sleep(REPLACE_PAUSE_S * attempt)
 
 
+NEW_FILE_MODE = 0o644
+"""Droits POSIX d'un fichier créé (`mkstemp` crée en 0600, que git n'attend pas)."""
+
+
 def _atomic_write(target: Path, data: bytes) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(target.stat().st_mode)
+    except OSError:
+        mode = NEW_FILE_MODE
     fd, tmp = tempfile.mkstemp(prefix=".wds-", suffix=".tmp", dir=target.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
+        if os.name != "nt":
+            # Le remplacement garde les droits du fichier d'origine (bit x d'un script).
+            os.chmod(tmp, mode)
         _replace(tmp, target)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)

@@ -71,6 +71,11 @@ def _check_save(repo: Path, body: SaveFile) -> None:
 
 def build_save_file(engine: WorkspaceEngine, body: SaveFile) -> Operation:
     repo = engine.layout.repo
+    if len(body.content.encode("utf-8")) > MAX_CONTENT:
+        # La limite compte les octets, comme la lecture : un fichier enregistré reste éditable.
+        raise wsfs.SandboxFileError(
+            "Ce contenu est trop gros pour la vue Code.", "Modifiez-le dans votre éditeur."
+        )
     _check_save(repo, body)
 
     def run(ctx: OpContext) -> int:

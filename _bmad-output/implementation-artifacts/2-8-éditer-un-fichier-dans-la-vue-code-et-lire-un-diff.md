@@ -34,7 +34,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.8 ». UX
 - Les lectures de la vue Code sont des `GET` hors file, comme `resolve_sha` (AD-17) : elles ne changent rien. Le diff n'est pas dans `state_projected.views` (il dépend d'une cible choisie par l'apprenant et pèserait sur chaque événement) ; il est projeté à la demande, avec le même schéma d'`element_id`.
 - `base_hash` porte sur les octets du disque (CRLF compris), pas sur le texte normalisé : un fichier modifié par un éditeur externe en CRLF est bien vu comme changé.
 - Après le 202 de `save_file`, le front attend que le disque porte le contenu envoyé (relecture, 20 essais) avant d'effacer le point plein : la file écrit après la réponse.
-- Les fichiers non suivis ne figurent pas dans le diff de l'arbre de travail (git ne les compare à rien) ; l'index de « Dépôt local » les montre.
+- Les fichiers non suivis figurent dans le diff de l'arbre de travail comme nouveaux fichiers (décision révisée en revue, voir M5).
 
 ## Reports
 
@@ -46,4 +46,17 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.8 ». UX
 
 ## Revue
 
-(à remplir par l'orchestrateur)
+Revue Opus après rebase sur main (4.5), constats du second avis (Haiku) repris un par un.
+
+- M2 · high · second avis · corrigé : « Ouvrir dans mon éditeur » appelait `os.startfile(path)` (verbe « ouvrir ») : un `.bat`, `.ps1`, `.lnk` ou un `.py` (lanceur `py`) s'exécutait au clic. `procs.open_path` ouvre désormais comme texte : verbe `edit`, sinon Bloc-notes (Windows), `open -t` (macOS), `xdg-open` sans lanceur `.desktop` (Linux). Tests avec doublures.
+- M3 · medium · second avis · corrigé : `mkstemp` crée en 0600, donc un script 100755 perdait son bit x (changement de mode vu par git). `wsfs._atomic_write` garde les droits du fichier remplacé, 0644 pour un nouveau. Test POSIX (CI Linux et macOS).
+- M5 · medium · second avis · corrigé : un fichier créé par `save_file` n'apparaissait pas dans le diff de l'arbre de travail, contre le récit d'epics. Les non suivis (hors `.gitignore`, 200 au plus) y figurent en « nouveau fichier », par `git diff --no-index` (l'index n'est pas touché). La décision contraire ci-dessus est remplacée.
+- M6 · medium · second avis · corrigé : `aria-label` sur des `div` sans rôle (ignoré). En-tête de fichier `role="heading"` niveau 3, ligne `role="group"`. Test DOM.
+- M4 · medium · second avis · écarté (vérifié) : après le rebase, `save_file` (`writes=True`) passe par `_write_refusal` à la soumission et dans la file ; refusé après `restore_failed`. Test ajouté.
+- M1 · medium · second avis · écarté : l'écriture en LF est la règle du spine (`wsfs` normalise `\r\n`), le setup écrit en LF et `core.autocrlf=false` : un CRLF ne vient que d'un éditeur externe, et l'enregistrement ramène le fichier à la convention du dépôt.
+- L8 · low · second avis · corrigé : la taille maximale de `save_file` compte les octets UTF-8, comme la lecture (un fichier enregistré reste éditable). Test.
+- L7 · low · second avis · écarté : lecture entière avant le contrôle de 512 Kio ; application locale, fichiers d'exercice petits, l'empreinte du fichier est de toute façon calculée.
+- L9 · low · second avis · corrigé en partie : tests ajoutés (droits POSIX, non suivis, ouverture sûre, garde, octets) ; CRLF couvert par le test d'enregistrement existant.
+- L10 · low · second avis · écarté : la fenêtre entre la revérification de `base_hash` dans la file et l'écriture atomique est de quelques microsecondes ; seul un éditeur externe peut s'y glisser, sans verrou de fichier portable.
+- Complexité : 0 constat (le diff est projeté à la demande, borné à 3000 lignes et 200 non suivis ; aucune structure qui grossit par événement).
+- Reporté, à vérifier par Anaël sur sa machine : « Ouvrir dans mon éditeur » sur un `.py` et un `.md` sous Windows ouvre désormais le Bloc-notes quand le type n'a pas de verbe `edit` (pas l'éditeur associé à « ouvrir »).

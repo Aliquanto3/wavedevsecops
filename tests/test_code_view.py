@@ -3,6 +3,8 @@ diff projeté et les lectures de la vue Code, sur un vrai git et par la file d'o
 
 from __future__ import annotations
 
+import os
+import stat
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -10,10 +12,16 @@ import pytest
 from test_terminal import WAIT, Space
 from test_workspace_api import WS, _call, cookie, instance  # noqa: F401 - fixtures pytest
 
-from wavedevsecops import terminal, wsfs
+from wavedevsecops import procs, terminal, wsfs
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError, parse_element_id
-from wavedevsecops.engine import OperationRefused, build_operation, code_intents
+from wavedevsecops.engine import (
+    OperationRefused,
+    build_operation,
+    code_intents,
+    load_run,
+    save_run,
+)
 from wavedevsecops.gitio import Git
 from wavedevsecops.projections.diff import DiffTargetError, parse_diff, read_diff
 
@@ -334,3 +342,87 @@ def test_enregistrer_par_http_puis_conflit(tmp_path, instance, cookie) -> None: 
     assert status == 409 and "a changé sur le disque" in refused["reason_text"]
     status, _ = _call(instance, "POST", f"{base}/save_file", cookie, {"path": "n.txt"})
     assert status == 422
+
+
+# --- revue : non suivis, droits, ouverture sûre, garde d'écriture, taille ----------------------
+
+
+def test_un_fichier_cree_figure_dans_le_diff_de_l_arbre_de_travail(
+    space: Space, git_path: Path
+) -> None:
+    _commit(space, "a.txt", "un\n")
+    space.write("a.txt", "deux\n")
+    _, outcome = _save(space, "nouveau.txt", "bonjour\nmonde\n", base="")
+    assert outcome.code == 0
+    view = read_diff(_git(space, git_path), space.layout.repo, "worktree")
+    assert [(f.path, f.status) for f in view.files] == [
+        ("a.txt", "modified"),
+        ("nouveau.txt", "new"),
+    ]
+    new = view.files[1]
+    assert (new.added, new.removed, new.element_id) == (2, 0, "path:worktree:nouveau.txt")
+    assert [line.text for hunk in new.hunks for line in hunk.lines] == ["bonjour", "monde"]
+    assert "?? nouveau.txt" in _status(space, git_path)  # la lecture n'a rien ajouté à l'index
+
+
+@pytest.mark.skipif(os.name == "nt", reason="droits POSIX")
+def test_l_enregistrement_garde_le_bit_executable(space: Space, git_path: Path) -> None:
+    _commit(space, "run.sh", "#!/bin/sh\necho un\n")
+    script = space.layout.repo / "run.sh"
+    script.chmod(0o755)
+    assert space.run("git add run.sh").code == 0
+    assert space.run("git commit -m 'exécutable'").code == 0
+    _, outcome = _save(space, "run.sh", "#!/bin/sh\necho deux\n")
+    assert outcome.code == 0
+    assert stat.S_IMODE(script.stat().st_mode) == 0o755
+    assert "old mode" not in _git(space, git_path).internal("diff", cwd=space.layout.repo)
+    _, created = _save(space, "neuf.txt", "x\n", base="")
+    assert created.code == 0
+    assert stat.S_IMODE((space.layout.repo / "neuf.txt").stat().st_mode) == wsfs.NEW_FILE_MODE
+
+
+def test_save_file_est_refuse_apres_un_retablissement_echoue(space: Space) -> None:
+    _commit(space, "a.txt", "un\n")
+    run = load_run(space.layout)
+    save_run(space.layout, {**run, "restore_failed": {"snapshot_id": 1, "reason_text": "x"}})
+    with pytest.raises(OperationRefused):
+        _save(space, "a.txt", "deux\n")
+    assert (space.layout.repo / "a.txt").read_text(encoding="utf-8") == "un\n"
+
+
+def test_la_taille_maximale_compte_les_octets(space: Space) -> None:
+    wide = "é" * (code_intents.MAX_CONTENT // 2 + 1)  # sous la limite en caractères
+    with pytest.raises(AppError):
+        _save(space, "gros.txt", wide, base="")
+    assert not (space.layout.repo / "gros.txt").exists()
+
+
+@pytest.mark.parametrize("name", ["lance.bat", "script.ps1", "app.py", "raccourci.lnk"])
+def test_ouvrir_dans_mon_editeur_n_execute_jamais_le_fichier_sous_windows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str
+) -> None:
+    calls: list[tuple] = []
+
+    def startfile(path: str, verb: str = "open") -> None:
+        calls.append(("startfile", verb))
+        raise OSError("aucun verbe")
+
+    monkeypatch.setattr(procs, "IS_WINDOWS", True)
+    monkeypatch.setattr(procs.os, "startfile", startfile, raising=False)
+    monkeypatch.setattr(procs.subprocess, "Popen", lambda argv, **_: calls.append(tuple(argv)))
+    procs.open_path(tmp_path / name)
+    assert calls == [("startfile", "edit"), ("notepad.exe", str(tmp_path / name))]
+
+
+def test_ouvrir_dans_mon_editeur_ouvre_comme_texte_sous_macos_et_refuse_un_lanceur(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple] = []
+    monkeypatch.setattr(procs, "IS_WINDOWS", False)
+    monkeypatch.setattr(procs.subprocess, "Popen", lambda argv, **_: calls.append(tuple(argv)))
+    monkeypatch.setattr(procs.sys, "platform", "darwin")
+    procs.open_path(tmp_path / "a.sh")
+    assert calls == [("open", "-t", str(tmp_path / "a.sh"))]
+    monkeypatch.setattr(procs.sys, "platform", "linux")
+    with pytest.raises(OSError):
+        procs.open_path(tmp_path / "app.desktop")

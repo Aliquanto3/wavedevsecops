@@ -20,6 +20,8 @@ EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 MAX_LINES = 3000
 """Lignes de diff au plus projetées : au-delà, la projection est coupée et le dit."""
 MAX_TEXT = 2000
+MAX_UNTRACKED = 200
+"""Fichiers non suivis au plus ajoutés au diff de l'arbre de travail (un appel git chacun)."""
 _TARGET = re.compile(r"^[0-9a-f]{7,40}$")
 _HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _CONFLICT = re.compile(r"^(<<<<<<<|>>>>>>>)( |$)|^=======$")
@@ -195,17 +197,51 @@ def _has_head(git: Git, repo: Path) -> bool:
     return git.run("rev-parse", "--verify", "-q", "HEAD", cwd=repo, extra_env=_QUIET).ok
 
 
+def _untracked_diff(git: Git, repo: Path) -> str:
+    """Diff des fichiers non suivis (hors `.gitignore`), présentés comme de nouveaux fichiers.
+
+    `git diff --no-index` contre `/dev/null` : rien n'entre dans l'index (une lecture ne l'écrit
+    pas). Au plus `MAX_UNTRACKED` fichiers, et arrêt dès que le diff dépasse `MAX_LINES`.
+    """
+    listed = git.internal(
+        "ls-files", "--others", "--exclude-standard", "-z", cwd=repo, extra_env=_QUIET
+    )
+    parts: list[str] = []
+    size = 0
+    for path in [p for p in listed.split("\0") if p][:MAX_UNTRACKED]:
+        found = git.run(
+            "diff",
+            "--no-index",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            "--",
+            "/dev/null",
+            path,
+            cwd=repo,
+            extra_env=_QUIET,
+        )
+        # `--no-index` sort en 1 quand les deux côtés diffèrent : c'est le cas attendu.
+        if found.returncode not in (0, 1) or found.timed_out or found.error:
+            continue
+        parts.append(found.stdout)
+        size += found.stdout.count("\n")
+        if size > MAX_LINES:
+            break
+    return "\n".join(parts)
+
+
 def read_diff(git: Git, repo: Path, target: str) -> DiffView:
     """Diff de l'arbre de travail depuis HEAD (`worktree`) ou d'un commit contre son premier parent.
 
-    Les fichiers non suivis n'y figurent pas (git ne les compare à rien) : l'index de la vue
-    « Dépôt local » les montre.
+    L'arbre de travail montre aussi les fichiers non suivis (hors `.gitignore`), comme de
+    nouveaux fichiers : un fichier créé dans la vue Code y figure dès son enregistrement.
     """
     flags = ("--no-ext-diff", "--no-textconv", "--no-color", "-M")
     if target == WORKTREE:
         base = "HEAD" if _has_head(git, repo) else EMPTY_TREE
         out = git.internal("diff", *flags, base, cwd=repo, extra_env=_QUIET)
-        view = parse_diff(out, WORKTREE)
+        view = parse_diff(f"{out}\n{_untracked_diff(git, repo)}", WORKTREE)
         text = "Arbre de travail (depuis HEAD)"
         empty = "Aucun changement : l'arbre de travail est identique à HEAD."
         return view.model_copy(
