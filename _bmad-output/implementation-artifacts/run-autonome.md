@@ -127,3 +127,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.1 · review · 2 rebases (conflit trivial contracts), 3 medium corrigés (ignore/attributs globaux isolés, confinement .git normalisé, étape CI autocrlf qui prouvait à vide), 4 low corrigés ; liens de l'apprenant hors espace reportés à 2.2 · 836eb0d
 - 2026-10-18 · 2.1 · fusion · ff sur main, suite complète 272 passed / 2 skipped, CI branche verte sur les trois OS, story done · 836eb0d
 - 2026-10-18 · 2.2, 2.11 · dev · lancés (2.2 dev-story Opus ★, 2.11 Sonnet) ; 1.7 en dev · —
+- 2026-10-18 · 1.7 · dev · fini, CI verte (installation réelle sur runners ubuntu et macos, shellcheck) · 7f4c23f
+- 2026-10-18 · 2.11 · dev · fini, 289 tests, CI verte sur les trois OS, sans réseau ni modèle ; httpx 0.28.1 à ajouter à la table Stack · 23ea199
+- 2026-10-18 · 1.7 · second-avis · aucun high, 1 medium/low (voie zip sans provisionnement git, idem install.ps1), 5 low · —
+- 2026-10-18 · 2.11 · second-avis · 4 medium (allowed_endpoints contrôlé contre lui-même, AD-13 non imposé au gabarit, chemin httpx jamais testé, tests hors venv verrouillé), 4 low · —
+- 2026-10-18 · 2.11 · review · 3 medium corrigés (test loopback par nom d'hôte, tests du gabarit en uv --offline --frozen sur cache préchargé en CI, chemin httpx exécuté), AD-13 des tests du gabarit via toolrun reporté à la station 1 · c2d4573
+- 2026-10-18 · 2.11 · fusion · ff sur main, suite complète verte, CI branche verte sur les trois OS, story done · c2d4573
+- 2026-10-18 · — · décision pour Anaël · ajouter httpx==0.28.1 à la table Stack du spine et au test de cohérence AD-16 ; diagnostic_seen à ajouter à AD-5 · —
