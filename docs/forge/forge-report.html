@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forge git-commands-training</title>
+<style>
+:root{--bg:#f7f3ea;--card:#fffdf8;--ink:#2b2622;--muted:#6f655b;--line:#e2d9c8;--seal:#9b2226;--ok:#2d6a4f;--ko:#9b2226;--warn:#b5651d}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1a17;--card:#25221e;--ink:#eee6d8;--muted:#a89c8c;--line:#3a352e;--seal:#c4453f;--ok:#74c69d;--ko:#e5737a;--warn:#e0a060}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,"Times New Roman",serif}
+main{max-width:880px;margin:0 auto;padding:32px 16px 64px}
+header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:20px}
+header svg{flex:0 0 auto;width:150px;height:150px}
+h1{font-size:1.7rem;margin:0 0 6px}
+h2{font-size:1.15rem;margin:28px 0 10px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.sub{color:var(--muted);margin:0 0 4px}
+section.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 20px 12px;margin-top:20px}
+ul{padding-left:20px;margin:8px 0}
+li{margin:6px 0}
+.lock::marker{content:"🔒 "}
+.kill::marker{content:"✖ ";color:var(--ko)}
+.warn::marker{content:"⚠ ";color:var(--warn)}
+.later::marker{content:"→ "}
+code{font-family:Consolas,monospace;font-size:.9em;background:var(--line);padding:0 4px;border-radius:3px}
+.chain{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.st{flex:1 1 150px;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:.9rem}
+.st b{display:block}
+.st.core{border:2px solid var(--seal)}
+.tag{font-size:.75rem;color:var(--muted)}
+.personas{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:8px}
+.p{border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:.92rem}
+.p b{display:block}
+.p i{color:var(--muted)}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+<header>
+<svg viewBox="0 0 200 200" role="img" aria-label="Sceau HARDENED">
+  <g fill="var(--seal)">
+    <path d="M100 8c10 0 14 9 23 11s17-5 25 1 5 16 11 23 16 6 19 16-5 15-4 24 9 15 5 24-14 8-19 15-3 17-11 22-17-2-25 1-12 13-23 13-14-9-23-12-17 3-24-3-4-16-11-22-16-6-19-15 6-15 4-24-9-16-5-25 15-8 20-15 2-17 10-22 17 3 25 0 13-11 23-11z" opacity=".92"/>
+  </g>
+  <circle cx="100" cy="100" r="62" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>
+  <circle cx="100" cy="100" r="54" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1" stroke-dasharray="3 4"/>
+  <text x="100" y="92" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="13" letter-spacing="2">BMAD FORGE</text>
+  <text x="100" y="115" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-weight="bold" font-size="22" letter-spacing="1">HARDENED</text>
+  <text x="100" y="134" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="11">18 · X · 2026</text>
+</svg>
+<div>
+  <h1>git-commands-training</h1>
+  <p class="sub">Appli locale pour apprendre git et GitHub, puis la chaîne CI/CD et DevSecOps, sur le modèle pédagogique de WaveStack. Public : Anaël, puis des collègues en vibe coding (en autonomie, puis en atelier), puis des clients.</p>
+  <p class="sub"><b>Issue :</b> idée durcie. C'est un seul produit, présenté à la <code>v1.0.0</code>, avec des releases 0.x à chaque lot.</p>
+</div>
+</header>
+
+<section class="card">
+<h2>Jalons</h2>
+<div class="chain">
+<div class="st"><b>v0.1 · socle git</b><span class="tag">hors ligne, scénarios A et B, quiz</span></div>
+<div class="st core"><b>v0.2 · stations 1 à 3</b><span class="tag">poste local, PR et CI, sécurité et qualité</span></div>
+<div class="st"><b>v0.3 · station 4</b><span class="tag">livraison et rollback</span></div>
+<div class="st"><b>v1.0 · présentation</b><span class="tag">collègues, puis ateliers</span></div>
+</div>
+<p class="sub">Après la v0.1 : un test avec deux collègues pendant une heure s'ils sont disponibles, sinon les propres tests d'Anaël.</p>
+</section>
+
+<section class="card">
+<h2>Décisions verrouillées · socle git</h2>
+<ul>
+<li class="lock"><b>Mécanique :</b> l'apprenant tape les commandes (A). Dans les scénarios B, un agent a agi sur le dépôt, et l'apprenant comprend ce qui s'est passé puis décide.</li>
+<li class="lock"><b>Moteur :</b> vrai git sur un dépôt bac à sable, un dépôt bare local qui joue <code>origin</code>, et une couche « GitHub simulé » pour les PR, la revue, le merge et les commits d'un collègue. Tout fonctionne hors ligne.</li>
+<li class="lock"><b>Agent B :</b> scénarisé et déterministe, avec des erreurs réalistes prévues.</li>
+<li class="lock"><b>Deux parcours :</b> l'un avec du code LLM en décor (exécution facultative, pas de leçon sur le fonctionnement des agents), l'autre avec du code minimal sans IA.</li>
+<li class="lock"><b>Points d'ancrage pour la suite :</b> scénarios en YAML déclaratif, modèle de PR avec des checks, dépôts d'exercice avec <code>tests/</code>, mise en page qui accepte un volet supplémentaire.</li>
+</ul>
+<h2>Décisions verrouillées · chaîne DevSecOps</h2>
+<ul>
+<li class="lock"><b>Concepts et barrières</b>, montrés avec de vrais outils légers : <code>ruff</code>, <code>pytest</code>, <code>pre-commit</code>, <code>gitleaks</code>, <code>bandit</code>, <code>pip-audit</code>. Jenkins, GitHub Actions et GitLab CI sont montrés comme trois écritures du même pipeline. Sonar est présenté comme une quality gate simulée.</li>
+<li class="lock"><b>La station 3 (sécurité et qualité) est le cœur</b>, parce que c'est ce que regardent RSSI, DSSI et conformité. Elle inclut des barrières propres au code LLM : clé en dur, outil trop puissant, données envoyées au cloud. L'injection de prompt est seulement nommée.</li>
+<li class="lock"><b>Savoir en parler :</b> un scénario « entretien RSSI » où chaque réponse s'appuie sur une preuve dans les vues, une fiche exportable barrière → risque → preuve, et la conformité en simple correspondance.</li>
+<li class="lock"><b>CI et CD :</b> une vue « carte de la chaîne » suit l'apprenant et fait apparaître la frontière entre les deux.</li>
+<li class="lock"><b>Réussite v1.0 :</b> installation complète en moins de 10 min, sans droits administrateur et hors ligne ; séances d'une heure au plus ; entretien RSSI réussi à 80 % ou plus du premier coup ; tous les scénarios terminés sans indice.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2>Rejeté, et pourquoi</h2>
+<ul>
+<li class="kill"><b>Git simulé en JavaScript :</b> le terrain est déjà occupé et les messages affichés ne sont pas fidèles.</li>
+<li class="kill"><b>Chatbot tuteur avant la v1.0 :</b> il risque de casser en démonstration, et le routage vers plusieurs endpoints coûte cher.</li>
+<li class="kill"><b>Un vrai LLM qui pilote git :</b> son comportement n'est pas déterministe, ce qui désynchroniserait les quiz.</li>
+<li class="kill"><b>Vrais Jenkins et SonarQube :</b> ce sont des serveurs Java lourds, qui casseraient l'installation légère.</li>
+<li class="kill"><b>L'agentique comme objectif pédagogique :</b> elle ajouterait une deuxième charge cognitive.</li>
+<li class="kill"><b>Deux produits V1 et V2 successifs :</b> remplacés par un seul produit à jalons.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2>Points faibles qui restent ouverts</h2>
+<ul>
+<li class="warn">Installer git, <code>gitleaks</code> et les autres outils sans droits administrateur.</li>
+<li class="warn"><code>pip-audit</code> interroge une base en ligne. Il faudra embarquer un instantané de la base ou simuler le résultat.</li>
+<li class="warn">La sauvegarde et la restauration du bac à sable doivent être fiables, pour les quiz où la mauvaise commande est exécutée.</li>
+<li class="warn">Le développement se fait d'un seul bloc jusqu'à la v1.0. Le retour des collègues après le socle git n'est pas garanti, et la vue du graphe des commits, qui porte tout le reste, risque de n'être validée que par son auteur.</li>
+<li class="warn">Le nom, la licence et la stack ne sont pas tranchés.</li>
+</ul>
+<h2>Plus tard</h2>
+<ul>
+<li class="later">Mode formateur pour les ateliers, mode connecté à un vrai GitHub.</li>
+<li class="later">Chatbot qui appelle Ollama et des endpoints cloud, vocabulaire GitLab (MR), commandes <code>cherry-pick</code> et <code>bisect</code>.</li>
+<li class="later">Version anglaise, hébergement sans installation, suivi de plusieurs apprenants.</li>
+<li class="later">Docker, Kubernetes et l'infrastructure as code, au mieux dans un glossaire.</li>
+</ul>
+</section>
+
+<section class="card">
+<h2>Ceux qui ont éprouvé l'idée</h2>
+<div class="personas">
+<div class="p"><b>📋 John · PM</b><i>« Qui ouvre l'appli le premier lundi ? »</i> Il a aussi demandé quel est le moment de vérité face au RSSI.</div>
+<div class="p"><b>🧑‍💼 Inès · consultante en vibe coding</b><i>« Je ne tape jamais git rebase. »</i> Elle a fait apparaître le mode B.</div>
+<div class="p"><b>🏗️ Winston · architecte</b><i>Vrai git ou git simulé, et des points d'ancrage sans fonctionnalités en trop.</i></div>
+<div class="p"><b>🎮 Théo · concurrent</b><i>« Votre seule carte, c'est le vrai. »</i></div>
+<div class="p"><b>📊 Mary · analyste</b><i>Elle a pointé la double charge cognitive et les incidents qui coûtent cher.</i></div>
+<div class="p"><b>🎓 Claire · formation client</b><i>Elle a rendu l'exécution du code facultative.</i></div>
+<div class="p"><b>😤 Grumbal · adversaire</b><i>« Le chatbot casse en démo. »</i> Il a aussi dit : « Big bang. »</div>
+<div class="p"><b>🙋 Sophie · collègue</b><i>Branche, PR et conflit. « Donnez-moi une heure. »</i></div>
+<div class="p"><b>🎨 Sally · UX</b><i>Le moment où l'agent agit, et des séances d'une heure.</i></div>
+<div class="p"><b>🧓 Hugo · formateur git</b><i>« Un agent trop propre ment aussi. »</i></div>
+<div class="p"><b>💻 Amelia · développeuse</b><i>Elle a exigé des critères vérifiables.</i></div>
+<div class="p"><b>👔 Marc · manager</b><i>« Une heure, pas une journée. »</i> Puis : « Dix minutes face à un RSSI. »</div>
+<div class="p"><b>🔒 Vex · sécurité</b><i>« Le DevSecOps, c'est une suite de barrières. Votre décor est une cible. »</i></div>
+<div class="p"><b>🏭 Nadia · DevOps bancaire</b><i>Les noms Jenkins et Sonar comptent pour l'adhésion des équipes.</i></div>
+<div class="p"><b>🧑‍🚀 Lucas · vibe coder</b><i>« Je ne savais pas revenir en arrière. »</i> Il a fait ajouter la station 4.</div>
+<div class="p"><b>🛡️ Mme Delorme · RSSI</b><i>Quelle barrière, contre quel risque, avec quelle trace ?</i></div>
+<div class="p"><b>⚖️ Paul · auditeur IA</b><i>« Quelles données partent chez quel fournisseur ? »</i></div>
+<div class="p"><b>👩‍💻 Élodie · développeuse</b><i>« Des scénarios en données, pas en code. »</i></div>
+</div>
+</section>
+
+<footer>Session BMAD Forge Idea · 2026-10-18 · voir forged-idea.md et .memlog.md dans ce dossier.</footer>
+</main>
+</body>
+</html>
