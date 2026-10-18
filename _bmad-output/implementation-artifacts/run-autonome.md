@@ -221,6 +221,14 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 21:55 · 2.5 · second-avis · lancé · —
 - 2026-10-18 22:00 · 4.3 · fusion · CI branche verte sur 6 jobs, ff sur main, story done ; 4.5 éligible, revue 6.6 débloquée · 8c6effa
 - 2026-10-18 22:00 · 2.5 · second-avis · 1 high prouvé (cp -r copie le contenu d'une jonction Windows hors espace), 3 medium (cp -r recopie un lien sortant sous POSIX, lecture/écriture intégrale sans limite, rm -rf * accepté sans décision), 5 low (noms réservés CONIN$/caractères interdits, parents créés par >, CRLF/BOM recopiés, .git imbriqué copié, OSError de ls) ; échec de perf local dû à la charge · —
+- 2026-10-18 22:01 · 2.5, 6.6 · review · reviewers Opus lancés (6.6 rebase sur l'API d'instantanés de 4.3, branchement procs.spawn) · —
+- 2026-10-18 22:01 · 4.5 · dev · lancé (dev-story Sonnet) · —
+- 2026-10-18 22:01 · 4.2 · dev · fini, 746 passed, CI verte (ProgressStore, faits dédupliqués sur ce qu'ils constatent, rejeu au démarrage) · 58f34b7
+- 2026-10-18 22:01 · 4.2 · second-avis · lancé · —
+- 2026-10-18 22:05 · 4.2 · second-avis · aucun high, 1 medium (test du Recommencer qui ne prouve que le rejeu), 7 low (atomicité non testée, verrou intra-processus, ordre du rejeu, progress.json corrompu bloquant, clé d'idempotence non vérifiée, champ manquant → fait perdu, émetteurs quiz/indice reportés) ; reviewer Opus lancé · —
+- 2026-10-18 22:15 · 9.2 · fusion · suite complète 757 passed / 37 skipped, CI branche verte sur 6 jobs, ff sur main, story done · fa3df43
+- 2026-10-18 22:15 · — · suivi · sprint-status aligné (2.5, 3.2, 4.2, 2.7, 6.6 en review ; 4.5 in-progress) · —
+- 2026-10-18 22:01 · 9.2 · fusion · rebase sur 6860667 sans conflit, suite complète en cours · —
 
 
 ## Reprise (arrêt propre du 2026-10-18 au soir)

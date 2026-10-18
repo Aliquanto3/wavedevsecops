@@ -50,9 +50,9 @@ development_status:
   2-2-faire-passer-chaque-action-par-la-file-d-opérations-de-l-esp: done
   2-3-afficher-la-disposition-principale-et-gérer-les-volets: done
   2-4-taper-de-vraies-commandes-git-dans-le-terminal: done
-  2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: backlog
+  2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: review
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
-  2-7-voir-le-graphe-la-liste-des-commits-et-l-index: in-progress
+  2-7-voir-le-graphe-la-liste-des-commits-et-l-index: review
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: backlog
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: backlog
   2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: backlog
@@ -61,7 +61,7 @@ development_status:
 
   epic-3: in-progress
   3-1-tenir-un-modèle-de-pr-complet-prêt-pour-les-stations: done
-  3-2-ouvrir-une-pr-et-la-merger: backlog
+  3-2-ouvrir-une-pr-et-la-merger: review
   3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: backlog
   3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: backlog
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
@@ -69,10 +69,10 @@ development_status:
 
   epic-4: in-progress
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: done
-  4-2-enregistrer-les-faits-du-premier-passage: backlog
+  4-2-enregistrer-les-faits-du-premier-passage: review
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
-  4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: backlog
+  4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: in-progress
   4-6-ouvrir-des-indices-par-paliers: backlog
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: backlog
   epic-4-retrospective: optional
@@ -94,7 +94,7 @@ development_status:
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
   6-5-exporter-mon-rapport-de-progression: backlog
-  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: in-progress
+  6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: review
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
   epic-6-retrospective: optional
 
@@ -118,7 +118,7 @@ development_status:
 
   epic-9: in-progress
   9-1-se-situer-grâce-au-bandeau-de-la-chaîne: done
-  9-2-déplier-la-carte-de-la-chaîne: in-progress
+  9-2-déplier-la-carte-de-la-chaîne: done
   9-3-trouver-les-scénarios-de-station-dans-le-catalogue: backlog
   9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: backlog
   9-5-publier-la-release-v0-2-0: backlog
