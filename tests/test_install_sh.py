@@ -137,7 +137,7 @@ def test_dossier_de_donnees_comme_l_application(
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
-    if xdg:
+    if xdg and sys.platform == "linux":  # macOS ignore XDG_DATA_HOME (platformdirs et install.sh)
         monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / xdg))
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith("WDS_")}
     env["WDS_INSTALL_LIBONLY"] = "1"
