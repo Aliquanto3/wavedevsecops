@@ -310,6 +310,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:52 · 7.2 · second-avis · aucun high, 3 medium (pytest -- -p charge un greffon malgré l'invariant « ni -p », prouvé ; Ctrl+C sans effet pendant la relance machine ; uv sync échoué jamais retenté), 4 low ; reviewer Opus lancé · —
 - 2026-10-19 00:58 · 3.3 · second-avis · aucun high, 1 medium (conflits textuels prévisibles avec 2.8 dans views.js et index.html), 7 low (focus après Merger, Ouvrir une PR masqué si contenue, Literal sans test d'égalité, « sur m » absent sans protection…) ; reviewer Opus lancé · —
 - 2026-10-19 01:09 · 4.7 · fusion · CI branche verte sur 6 jobs, suite complète du sommet de pile 1043 passed / 42 skipped, commit de fusion sur main, story done ; 6.5 éligible · 48fd456
+- 2026-10-19 01:10 · 4.6 · fusion · rebase de fond sur la pile 4.7 fini par dev-story Opus (steps.py, app.py, workspace.css, store.js, scenario.js : deux côtés gardés), test d'intégration bilan + indice ajouté ; tests ciblés 133 passed, suite complète en lots 936 + 133 passed, aucun échec ; branche poussée, CI en cours · 316f3dc
+- 2026-10-19 01:11 · 6.5 · dev · lancé (dev-story Sonnet ; contrat du bilan de 4.7) ; 4.4 attend la fusion de 4.6 (hints.settle) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
