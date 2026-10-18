@@ -254,6 +254,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 23:00 · — · reprise · nouvelle session d'orchestration · —
 - 2026-10-18 23:00 · 4.5 · review · reviewer Opus lancé avec la liste du second avis (worktree existant ; rebase sur main et premier essai branché sur ProgressStore) · —
 - 2026-10-18 23:00 · 3.4, 2.8, 5.2 · dev · lancés (dev-story Sonnet, nouveaux worktrees) ; 5.2 ajouté aux éligibles (4.1, 4.2, 2.6 done), chemin critique de l'Epic 5 ; 3.3, 3.5, 7.4 ★ attendent 3.4 (github_sim), 7.2 attend 2.8 (terminal), 4.4, 4.6, 4.7 attendent la revue de 4.5, 6.1 en attente d'un créneau · —
+- 2026-10-18 23:28 · 4.5 · review · rebase (store.js, workspace.js : conflits d'ajout), H1 (restart passe les deux refus), H2 (garde revérifiée à l'exécution + precheck du choix), M3, M4 (fait quiz_first_attempt dans ProgressStore), M5 (6 tests), L6 corrigés ; L7, L8 écartés ; 941 passed / 41 skipped, 1 échec instable test_toolrun (passe seul) ; CI branche verte sur 6 jobs ; pour 4.4 : restart doit remettre le repos à idle · c4898b2
+- 2026-10-18 23:31 · 4.5 · fusion · rebase sur le suivi (sans code), tests ciblés 52 passed, ff sur main, story done ; 4.4, 4.6, 4.7 éligibles (créneaux pleins : 3.4, 2.8, 5.2) · 47ed73f
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

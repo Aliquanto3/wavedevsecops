@@ -72,7 +72,7 @@ development_status:
   4-2-enregistrer-les-faits-du-premier-passage: done
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
-  4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: review
+  4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
   4-6-ouvrir-des-indices-par-paliers: backlog
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: backlog
   epic-4-retrospective: optional
