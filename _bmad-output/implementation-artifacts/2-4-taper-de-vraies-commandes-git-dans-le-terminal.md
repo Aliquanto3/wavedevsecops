@@ -37,7 +37,6 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.4 » ; s
 
 - Commandes de fichiers (`ls`, `cat`, `echo`, `touch`, `mkdir`, `rm`, `mv`, `cp`, `pwd`, `clear`) : 2.5, dans la section `files` du fichier.
 - Outils de station (`ruff`, `pytest`, `pre-commit run`, `gitleaks`…) acceptés si l'étape les déclare : stories d'outils (7.x) ; `pre-commit install` refusé avec explication : même story.
-- `terminal-prompt` : lit `views.prompt.text` (projection de la 2.6) ; en attendant, le prompt est « $ ».
 - `spans` liables de la sortie (2.6/2.7) : le front affiche le texte brut.
 - `github_sim.refresh` après `push/pull/fetch` : crochet `terminal.AFTER_COMMAND_HOOKS` (3.1).
 - Rétablissement du terminal en lecture seule pendant un quiz (`aria-readonly`, bandeau) : story du quiz.
@@ -54,4 +53,15 @@ La doublure de DOM n'a ni mise en page, ni vrai clavier, ni sélection. Restent 
 
 ## Revue
 
-À faire (second avis, puis revue).
+Rebasée sur `main` (8dd9069 : 2.6, 7.1, 9.1) sans conflit ; le prompt lit `views.prompt.text` de la 2.6 (`main $`, « HEAD détachée $ »). La 3.1 n'est pas encore sur `main` : le crochet `AFTER_COMMAND_HOOKS` reste à brancher sur `github_sim.refresh` à sa fusion.
+
+| # | Sévérité | Source | Constat | Suite |
+|---|---|---|---|---|
+| 1 | high | second avis (prouvé) | Aucune identité git en contexte apprenant : `commit`, `revert`, `merge/rebase --continue` échouaient (« Author identity unknown ») ; les tests le masquaient par `git config user.*`. | Corrigé : `gitio.learner_gitconfig` écrit `<data>/learner.gitconfig` (identité de l'apprenant du setup, Camille Durand), désigné par `GIT_CONFIG_GLOBAL` en contexte apprenant seulement ; un `git config user.name` tapé (portée du dépôt) prime. Contournement retiré des tests, test de commit sans `identify()`. |
+| 2 | medium | second avis (prouvé) | `git remote show <URL\|chemin>` passait en lecture : contact réseau réel ou lecture hors espace, même en `quiz_altered`. | Corrigé : `remote_names_from: 1` dans la liste blanche ; tous les noms de `remote show/get-url` doivent être des remotes existants (refus expliqué sinon). Tests garde et intégration. |
+| 3 | medium | second avis | Chemin français exécuté seulement sous Linux. | Limite notée : Git for Windows (et macOS) ne fournit pas les catalogues de git (`share/locale` absent, constaté sur le poste). Le test échoue désormais en CI Linux si la locale manque, au lieu d'être ignoré. |
+| 4 | low | second avis | `reflog write` classé lecture. | Corrigé : `write` ajouté aux arguments refusés (`exists` est une vraie lecture). |
+| 5 | low | second avis | `commit --no-edit` sans `-m` : pas d'explication si git échoue. | Corrigé : seuls `--amend` et `--allow-empty-message` dispensent du message (explication affichée seulement en cas d'échec : un merge en cours réussit). |
+| 6 | low | second avis | Job Object assigné après `Popen` (course). | Rejeté : `Popen` ne rend pas le fil principal pour `ResumeThread` ; la fenêtre précède tout lancement de hook par git, et `taskkill /T` reste le repli. |
+| 7 | low | second avis | `index.lock` supprimé sans vérifier qu'aucun processus de l'arbre ne vit. | Corrigé : `Handle.tree_stopped` (Job Object : processus actifs ; Unix : `killpg(…, 0)`), attendu au plus `KILL_GRACE_S` ; sinon le verrou est conservé et journalisé. |
+| 8 | low | second avis | Exceptions `-c`/`-p` de la liste blanche. | Rejeté : documentées en tête du fichier et couvertes par les tests de la garde (`-p` admis pour `log/diff/show`, `-c` pour `switch`, interdits ailleurs). |

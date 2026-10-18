@@ -61,6 +61,13 @@ def _kernel() -> Any:
     ]
     kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
     kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.QueryInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+    ]
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     return kernel
 
@@ -120,6 +127,25 @@ def _make_job(pid: int) -> int | None:
         return int(job)
     except (OSError, AttributeError):
         return None
+
+
+def _job_active(job: int) -> int | None:
+    """Processus encore vivants dans le job ; `None` si la question échoue."""
+
+    class Accounting(ctypes.Structure):
+        _fields_ = [
+            *((name, ctypes.c_int64) for name in ("tu", "tk", "pu", "pk")),
+            *((name, ctypes.c_uint32) for name in ("faults", "total", "active", "ended")),
+        ]
+
+    info = Accounting()
+    try:
+        ok = _kernel().QueryInformationJobObject(
+            job, 1, ctypes.byref(info), ctypes.sizeof(info), None
+        )
+    except (OSError, AttributeError):
+        return None
+    return int(info.active) if ok else None
 
 
 def _job_call(name: str, job: int, *extra: int) -> None:
@@ -236,6 +262,8 @@ class Handle:
         self._lock = threading.Lock()
         self.timed_out = False
         self.interrupted = False
+        self.tree_stopped = True
+        """Faux si, après un arrêt, un descendant semble encore vivre (voir `chunks`)."""
         self._done = False
         for pipe, name in ((process.stdout, "stdout"), (process.stderr, "stderr")):
             threading.Thread(target=self._pump, args=(pipe, name), daemon=True).start()
@@ -306,8 +334,39 @@ class Handle:
             self._process.wait(timeout=KILL_GRACE_S)
         except subprocess.TimeoutExpired:
             self._kill()
+        if killed_at is not None or self.interrupted:
+            self.tree_stopped = self._wait_tree_gone()
         self._done = True
         self.close()
+
+    def _tree_alive(self) -> bool | None:
+        """Un processus de l'arbre vit-il encore ? `None` : on ne sait pas le dire."""
+        if IS_WINDOWS:
+            if self._job is None:
+                return None
+            active = _job_active(self._job)
+            return None if active is None else active > 0
+        try:
+            os.killpg(self._process.pid, 0)
+        except ProcessLookupError:
+            return False
+        except OSError:
+            return None
+        return True
+
+    def _wait_tree_gone(self) -> bool:
+        """Attend (au plus `KILL_GRACE_S`) que l'arbre arrêté ait disparu ; vrai s'il l'est.
+
+        Sans moyen de le savoir (Windows sans Job Object), l'arrêt est tenu pour acquis.
+        """
+        deadline = time.monotonic() + KILL_GRACE_S
+        while True:
+            alive = self._tree_alive()
+            if not alive:
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
 
     def close(self) -> None:
         """Ferme le Job Object : tout descendant restant est arrêté (Windows)."""

@@ -62,14 +62,21 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     git_path = ctx.git_path or resolve_git(ctx.settings)
     language = gitio.learner_language(git_path, ctx.settings)
     tool = gitio.Git.for_workspace(git_path, ctx.layout.root, ctx.settings)
-    tool = replace(tool, locale=language.locale)
+    # Identité par défaut de l'apprenant, sans laquelle commit, revert ou merge échouent.
+    tool = replace(
+        tool, locale=language.locale, learner_gitconfig=gitio.learner_gitconfig(ctx.settings)
+    )
 
+    targets = command.remote_names
     if command.remote_argument is not None:
+        targets = (command.remote_argument, *targets)
+    if targets:
         remotes = tool.internal("remote", cwd=repo).split()
-        if command.remote_argument not in remotes:
+        unknown = next((name for name in targets if name not in remotes), None)
+        if unknown is not None:
             reason = allow.message(
                 "remote_target",
-                value=command.remote_argument,
+                value=unknown,
                 sub=command.sub,
                 remotes=", ".join(remotes) or "aucun",
             )
@@ -97,8 +104,11 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     killed = handle.timed_out or handle.interrupted or ctx.interrupted
     code = handle.returncode
     if killed:
-        # L'arbre a été arrêté : un verrou d'index laissé derrière est périmé (AD-12).
-        if gitio.clear_stale_index_lock(repo):
+        # L'arbre a été arrêté : un verrou d'index laissé derrière est périmé (AD-12), à
+        # condition qu'aucun processus de l'arbre ne vive encore (il pourrait le tenir).
+        if not handle.tree_stopped:
+            log.warning("Arbre encore vivant dans %s : index.lock conservé", ctx.workspace_id)
+        elif gitio.clear_stale_index_lock(repo):
             log.info("index.lock périmé supprimé dans %s", ctx.workspace_id)
         if handle.timed_out:
             seconds = f"{ctx.settings.terminal_timeout_s:g}"

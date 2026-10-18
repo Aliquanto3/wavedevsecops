@@ -81,6 +81,10 @@ def probe_language(git: Path, settings: Settings | None = None) -> GitLanguage:
 
 Context = Literal["internal", "learner"]
 
+LEARNER_NAME = "Camille Durand"
+LEARNER_EMAIL = "camille.durand@exemple.test"
+"""Identité de l'apprenant : celle de ses commits du setup, reprise par le terminal."""
+
 FORCED_CONFIG: tuple[tuple[str, str], ...] = (
     ("core.autocrlf", "false"),
     ("core.eol", "lf"),
@@ -187,6 +191,8 @@ class Git:
     timeout: float = 30.0
     locale: str | None = None
     """Locale française sondée (`probe_language`) pour le contexte apprenant."""
+    learner_gitconfig: Path | None = None
+    """`GIT_CONFIG_GLOBAL` du contexte apprenant (`learner_gitconfig`) : identité par défaut."""
 
     @classmethod
     def for_workspace(
@@ -205,8 +211,11 @@ class Git:
     def env(
         self, context: Context = "internal", extra: Mapping[str, str] | None = None
     ) -> dict[str, str]:
+        gitconfig = self.gitconfig
+        if context == "learner" and self.learner_gitconfig is not None:
+            gitconfig = self.learner_gitconfig
         return hermetic_environment(
-            gitconfig=self.gitconfig,
+            gitconfig=gitconfig,
             hooks_dir=self.hooks_dir,
             context=context,
             locale=self.locale,
@@ -289,6 +298,33 @@ def learner_language(executable: Path, settings: Settings | None = None) -> GitL
     if found is None:
         found = _LANGUAGES[executable] = probe_language(executable, settings)
     return found
+
+
+def learner_gitconfig(settings: Settings | None = None) -> Path:
+    """`<data>/learner.gitconfig` : identité par défaut des commandes tapées (AD-3).
+
+    Portée « globale » propre à l'application (jamais `~/.gitconfig`) : un
+    `git config user.name …` tapé dans le terminal (portée du dépôt) la remplace.
+    Écrit une fois, de façon atomique ; le contexte interne ne la lit pas.
+    """
+    settings = settings or get_settings()
+    path = settings.resolved_data_dir() / "learner.gitconfig"
+    content = f"[user]\n\tname = {LEARNER_NAME}\n\temail = {LEARNER_EMAIL}\n"
+    try:
+        if path.read_text(encoding="utf-8") == content:
+            return path
+    except OSError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{time.monotonic_ns()}.tmp")
+    tmp.write_text(content, encoding="utf-8", newline="\n")
+    try:
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        if not path.exists():
+            raise
+    return path
 
 
 def spawn_learner(tool: Git, *args: str, cwd: Path, timeout: float | None = None) -> procs.Handle:

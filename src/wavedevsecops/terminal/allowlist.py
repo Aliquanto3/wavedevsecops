@@ -42,6 +42,8 @@ class GitSubcommand(BaseModel):
     needs_message_with: list[str] = []
     touches_origin: bool = False
     remote_argument: bool = False
+    remote_names_from: int | None = None
+    """Positionnels, à partir de cet indice, qui doivent nommer des remotes existants."""
     positionals_max: int | None = None
     writable_keys: list[str] = []
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import http.client
+import os
 import sys
 import time
 from collections.abc import Iterator
@@ -165,6 +166,10 @@ def test_git_parle_francais_quand_la_locale_existe(
 ) -> None:
     language = gitio.probe_language(git_path)
     if language.lang != "fr":
+        # La CI Linux génère fr_FR.UTF-8 : le chemin français y est obligatoire. Git for
+        # Windows et macOS ne fournissent pas les catalogues de git : le test y est ignoré.
+        if os.environ.get("CI") and sys.platform.startswith("linux"):
+            pytest.fail("la CI Linux doit fournir une locale française à git")
         pytest.skip("aucune locale française de git sur ce poste (git parle anglais)")
     monkeypatch.setitem(gitio._LANGUAGES, git_path, gitio.GitLanguage("en"))
     english = space.run("git status")
@@ -193,10 +198,26 @@ def test_stderr_et_code_de_sortie_non_nul(space: Space, english: None) -> None:
     assert "stdout" not in result.streams
 
 
+def test_commit_sans_identite_configuree_prend_celle_de_l_apprenant(
+    space: Space, english: None
+) -> None:
+    # Aucun `git config` préalable : l'identité vient du contexte apprenant, pas du poste.
+    space.write("README.md", "# identité\n")
+    committed = space.run("git commit -am 'sans identité'")
+    assert committed.code == 0, committed.text()
+    author = space.run("git log -1 '--format=%an|%ae|%cn'")
+    assert author.text("stdout").strip() == (
+        f"{gitio.LEARNER_NAME}|{gitio.LEARNER_EMAIL}|{gitio.LEARNER_NAME}"
+    )
+    # Un `git config user.name` tapé (portée du dépôt) prime sur l'identité par défaut.
+    space.identify()
+    assert space.run("git commit --allow-empty -m 'ada'").code == 0
+    assert space.run("git log -1 --format=%an").text("stdout").strip() == "Ada Lovelace"
+
+
 def test_commit_sans_message_garde_la_sortie_de_git_puis_explique(
     space: Space, english: None
 ) -> None:
-    space.identify()
     result = space.run("git commit --allow-empty")
     assert result.code not in (0, None)
     assert "empty commit message" in result.text("stderr").lower()
@@ -212,7 +233,6 @@ def test_commit_sans_message_garde_la_sortie_de_git_puis_explique(
 def test_revert_amend_et_merge_continue_aboutissent_sans_editeur(
     space: Space, english: None
 ) -> None:
-    space.identify()
     assert space.run("git revert HEAD").code == 0
     assert space.run("git commit --amend").code == 0
     assert "Revert" in space.run("git log --oneline -1").text()
@@ -269,11 +289,15 @@ def test_push_pull_fetch_agissent_sur_origin_et_refusent_un_chemin(
     assert space.run("git pull origin main").code == 0
     assert space.run("git push origin main").code == 0
     assert calls == [("fetch", 0), ("pull", 0), ("push", 0)]
+    assert space.run("git remote get-url origin").code == 0
     for line in (
         f"git push {tmp_path.as_posix()}",
         "git push https://example.org/depot.git",
         "git pull ../origin.git",
         "git fetch main",
+        f"git remote show {tmp_path.as_posix()}",
+        "git remote show https://example.org/depot.git",
+        "git remote get-url ../origin.git",
     ):
         refused = space.run(line)
         assert refused.streams == ["refused"], line
@@ -299,7 +323,6 @@ def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None
 
 
 def test_aucune_commande_n_attend_une_saisie(space: Space, english: None) -> None:
-    space.identify()
     for line in (
         "git log",
         "git branch",
@@ -319,7 +342,6 @@ def test_aucune_commande_n_attend_une_saisie(space: Space, english: None) -> Non
 def test_ctrl_c_arrete_l_arbre_et_supprime_l_index_lock(
     space: Space, tmp_path: Path, english: None
 ) -> None:
-    space.identify()
     pid_file = space.install_hold_hook(tmp_path)
     op, future = space.start("git commit --allow-empty -m x")
     space.wait_output(op.op_id, "retenu")
@@ -348,7 +370,6 @@ def test_delai_depasse_arrete_l_arbre(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "data", terminal_timeout_s=2.0)
     space = Space(settings, git_path)
     try:
-        space.identify()
         pid_file = space.install_hold_hook(tmp_path)
         result = space.run("git commit --allow-empty -m x")
         assert result.code == terminal.EXIT_TIMEOUT
@@ -363,7 +384,6 @@ def test_delai_depasse_arrete_l_arbre(tmp_path: Path, git_path: Path) -> None:
 def test_la_mise_en_veille_interrompt_la_commande(
     space: Space, tmp_path: Path, english: None
 ) -> None:
-    space.identify()
     pid_file = space.install_hold_hook(tmp_path)
     op, future = space.start("git commit --allow-empty -m x")
     space.wait_output(op.op_id, "retenu")
@@ -376,7 +396,6 @@ def test_la_mise_en_veille_interrompt_la_commande(
 
 def test_la_sortie_arrive_au_fil_de_l_eau(space: Space, tmp_path: Path, english: None) -> None:
     """Le premier morceau est publié alors que la commande tourne encore."""
-    space.identify()
     space.install_hold_hook(tmp_path)
     op, future = space.start("git commit --allow-empty -m x")
     space.wait_output(op.op_id, "retenu")

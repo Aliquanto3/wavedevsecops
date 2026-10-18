@@ -152,10 +152,12 @@ git:
   remote:
     read: true
     choices: ["show", "get-url"]
+    # `show <URL>` contacterait l'adresse : seuls les remotes du dépôt sont nommés.
+    remote_names_from: 1
     options: ["-v", "--verbose", "--"]
   reflog:
     read: true
-    refused_arguments: ["expire", "delete"]
+    refused_arguments: ["expire", "delete", "write"]
     options: ["--all", "--date", "--oneline", "-n", "--max-count", "--"]
     value_options: ["-n", "--max-count"]
     number_option: true

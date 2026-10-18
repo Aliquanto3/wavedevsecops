@@ -14,7 +14,7 @@ from typing import Literal
 
 from wavedevsecops.config import get_settings
 from wavedevsecops.contracts import AppError, parse_element_id
-from wavedevsecops.gitio import Git
+from wavedevsecops.gitio import LEARNER_EMAIL, LEARNER_NAME, Git
 from wavedevsecops.wsfs import Layout
 
 Persona = Literal["learner", "colleague", "agent"]
@@ -27,7 +27,7 @@ class Identity:
 
 
 PERSONAS: dict[str, Identity] = {
-    "learner": Identity("Camille Durand", "camille.durand@exemple.test"),
+    "learner": Identity(LEARNER_NAME, LEARNER_EMAIL),
     "colleague": Identity("Sacha Martin", "sacha.martin@exemple.test"),
     "agent": Identity("Agent B", "agent-b@exemple.test"),
 }

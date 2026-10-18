@@ -253,6 +253,7 @@ def test_commandes_acceptees(allow: Allowlist, line: str) -> None:
         "git remote remove origin",
         "git reflog expire --all",
         "git reflog delete HEAD@{0}",
+        "git reflog write HEAD x y msg",
         "git stash frobnicate",
         "git switch --orphan x",
         "git push --repo=/tmp/x",
@@ -329,6 +330,8 @@ def test_message_manquant_et_remote_vise(allow: Allowlist) -> None:
     assert not missing("git commit -am x")
     assert not missing("git commit --amend")
     assert not missing("git commit --amend --no-edit")
+    assert missing("git commit --no-edit")  # sans merge en cours, git refuse : on explique
+    assert not missing("git commit --allow-empty-message")
     assert not missing("git tag -a v1 -m x")
     assert not missing("git tag v1")
     pushed = parse_line("git push -u origin feature", allow)
@@ -340,6 +343,10 @@ def test_message_manquant_et_remote_vise(allow: Allowlist) -> None:
     assert pulled.remote_argument == "/tmp/depot"  # refusé à l'exécution : pas un remote
     assert parse_line("git fetch --all", allow).remote_argument is None  # type: ignore[union-attr]
     assert parse_line("git status", allow).touches_origin is False  # type: ignore[union-attr]
+    shown = parse_line("git remote -v show origin /tmp/x", allow)
+    assert shown is not None and shown.read
+    assert shown.remote_names == ("origin", "/tmp/x")  # vérifiés à l'exécution
+    assert parse_line("git remote", allow).remote_names == ()  # type: ignore[union-attr]
 
 
 def test_le_fichier_unique_est_celui_du_depot() -> None:

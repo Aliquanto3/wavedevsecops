@@ -140,6 +140,8 @@ class GitCommand:
     touches_origin: bool = False
     remote_argument: str | None = None
     """Dépôt visé par `push`, `pull` ou `fetch` : à vérifier comme remote existant."""
+    remote_names: tuple[str, ...] = ()
+    """Noms passés à `remote show` ou `remote get-url` : à vérifier comme remotes existants."""
     missing_message: bool = False
     """`commit` ou `tag -a` sans message : si git échoue, le terminal explique pourquoi."""
 
@@ -243,7 +245,9 @@ def check_git(args: list[str], allow: Allowlist) -> GitCommand:
         raise _refuse(allow, allow.message("config_write"))
 
     has_message = bool(options & {"-m", "--message"})
-    missing = (spec.needs_message and not (has_message or options & {"--amend", "--no-edit"})) or (
+    # `--no-edit` seul ne fournit pas de message (sauf merge en cours : git réussit alors).
+    exempt = {"--amend", "--allow-empty-message"}
+    missing = (spec.needs_message and not (has_message or options & exempt)) or (
         bool(spec.needs_message_with)
         and bool(options & set(spec.needs_message_with))
         and not has_message
@@ -256,6 +260,11 @@ def check_git(args: list[str], allow: Allowlist) -> GitCommand:
         positionals=tuple(positionals),
         touches_origin=spec.touches_origin,
         remote_argument=positionals[0] if spec.remote_argument and positionals else None,
+        remote_names=(
+            tuple(positionals[spec.remote_names_from :])
+            if spec.remote_names_from is not None
+            else ()
+        ),
         missing_message=bool(missing),
     )
 
