@@ -7,11 +7,19 @@ Réutilise la boîte de `test_steps.py` (vrai git, scénario à trois étapes).
 from __future__ import annotations
 
 import json
+import os
+import re
 
 from test_steps import Box, make_box  # noqa: F401 - `make_box` est une fixture
 from test_steps import _kinds as kinds
 
-from wavedevsecops.engine import Operation, WorkspaceManager, load_run, save_run
+from wavedevsecops.engine import (
+    Operation,
+    WorkspaceManager,
+    list_snapshots,
+    load_run,
+    save_run,
+)
 from wavedevsecops.events import Envelope, Kind
 from wavedevsecops.progress.facts import ProgressStore
 
@@ -68,7 +76,8 @@ def test_arret_brutal_entre_run_json_et_les_faits(make_box) -> None:  # noqa: F8
     """`run.json` avance mais les faits manquent : le redémarrage les soumet, une seule fois."""
     box = make_box()
     run = load_run(box.engine.layout)
-    save_run(box.engine.layout, {**run, "step_id": "mettre_de_cote"})  # deux étapes passées
+    passed = ["creer_branche", "commiter"]  # deux étapes passées, comme `validate` l'écrit
+    save_run(box.engine.layout, {**run, "step_id": "mettre_de_cote", "validated": passed})
     assert _facts(box) == []
     manager, workspace_id = box.manager, box.engine.workspace_id
     manager.sleep(workspace_id)
@@ -86,6 +95,7 @@ def test_arret_brutal_entre_run_json_et_les_faits(make_box) -> None:  # noqa: F8
 
 
 def test_arret_brutal_apres_la_derniere_etape(make_box) -> None:  # noqa: F811
+    """`run.json` antérieur à `validated` : le rejeu retombe sur la position des étapes."""
     box = make_box()
     save_run(box.engine.layout, {**load_run(box.engine.layout), "step_id": None})
     box.manager.sleep(box.engine.workspace_id)
@@ -93,10 +103,39 @@ def test_arret_brutal_apres_la_derniere_etape(make_box) -> None:  # noqa: F811
     assert [f["kind"] for f in _facts(box)] == ["step_validated"] * 3 + ["scenario_completed"]
 
 
-def test_recommencer_ne_compte_pas_deux_fois(make_box) -> None:  # noqa: F811
+def test_rejouer_l_etape_apres_un_retablissement_ne_compte_pas_deux_fois(make_box) -> None:  # noqa: F811
+    """Vrai rétablissement de l'instantané d'installation (nouvel epoch), pointeur d'étape remis
+    au début, puis vraie seconde validation de la même étape : le fait du premier passage
+    reste, rien n'est réémis."""
     box = make_box()
     box.run("switch", "-c", "feature")
+    [first] = _facts(box)
+    [setup] = list_snapshots(box.engine.layout)
+    epoch = box.engine.epoch
+    box.manager.restore(box.engine.workspace_id, setup.snapshot_id).result(60)
+    assert box.engine.epoch != epoch
+    # Recommencer (pas encore d'opération dédiée) remet aussi le pointeur d'étape au début.
     save_run(box.engine.layout, {**load_run(box.engine.layout), "step_id": "creer_branche"})
+    events = box.run("switch", "-c", "feature")  # possible : la branche a disparu
+    assert next(e for e in events if e.kind == Kind.STEP_VERDICT).payload["passed"] is True
+    assert box.step_id() == "commiter"
+    assert Kind.PROGRESS_UPDATED not in kinds(events)
+    assert _facts(box) == [first]  # ni doublon ni remplacement (op_id et epoch d'origine)
+
+
+def test_rejeu_apres_reordonnancement_n_invente_aucune_etape(make_box) -> None:  # noqa: F811
+    """Le rejeu cite les étapes validées consignées dans `run.json`, pas leur position : une
+    étape déplacée avant l'étape courante (mise à jour du contenu) n'est pas tenue pour faite."""
+    box = make_box()
+    box.run("switch", "-c", "feature")
+    text = box.scenario_path.read_text(encoding="utf-8")
+    head, _, rest = text.partition("steps:\n")
+    blocks = re.split(r"(?m)^(?=  - step_id:)", rest)[1:]
+    box.scenario_path.write_text(
+        head + "steps:\n" + blocks[2] + blocks[0] + blocks[1], encoding="utf-8", newline="\n"
+    )
+    stamp = box.scenario_path.stat().st_mtime_ns + 10_000_000_000
+    os.utime(box.scenario_path, ns=(stamp, stamp))
     box.manager.sleep(box.engine.workspace_id)
     _reopen(box.manager, box.engine.workspace_id)
     assert [f["step_id"] for f in _facts(box)] == ["creer_branche"]

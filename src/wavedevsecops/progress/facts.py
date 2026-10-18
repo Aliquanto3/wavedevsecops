@@ -158,4 +158,15 @@ class ProgressStore:
             return added
 
     def progress(self, track: str, scenario_id: str, mode: str) -> ScenarioProgress:
+        """États dérivés d'un scénario (une lecture du fichier)."""
         return derive(self.facts(), track, scenario_id, mode)
+
+    def all_progress(self) -> dict[tuple[str, str, str], ScenarioProgress]:
+        """États dérivés de chaque `(parcours, scenario_id, mode)` ayant au moins un fait, en une
+        lecture et un passage (accueil) ; un scénario absent est « À faire »."""
+        groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+        for raw in self.facts():
+            key = (raw.get("track"), raw.get("scenario_id"), raw.get("mode"))
+            if all(isinstance(part, str) for part in key):
+                groups.setdefault(key, []).append(raw)  # type: ignore[arg-type]
+        return {key: derive(group, *key) for key, group in groups.items()}

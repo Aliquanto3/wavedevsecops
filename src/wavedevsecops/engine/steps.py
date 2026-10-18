@@ -108,7 +108,12 @@ class StepRunner:
             return None
         if verdict.status == "passed":
             following = steps[index + 1].step_id if index + 1 < len(steps) else None
-            save_run(ctx.layout, {**run, "step_id": following})
+            # `validated` : étapes réussies, citées par `step_id` (rejeu exact des faits).
+            validated = [s for s in run.get("validated") or [] if s != step.step_id]
+            save_run(
+                ctx.layout,
+                {**run, "step_id": following, "validated": [*validated, step.step_id]},
+            )
             published = StepVerdict(
                 step_id=step.step_id, passed=True, status="passed", next_step_id=following or ""
             )
@@ -143,13 +148,22 @@ class StepRunner:
 
     def replay(self, engine: WorkspaceEngine) -> list[dict[str, Any]]:
         """Faits que `run.json` établit déjà : l'écriture de `run.json` précède celle des faits,
-        un arrêt brutal entre les deux en laisse des manquants (le magasin ignore les doublons)."""
+        un arrêt brutal entre les deux en laisse des manquants (le magasin ignore les doublons).
+
+        Les étapes viennent de `run.json["validated"]`, pas de leur position dans le scénario :
+        une étape insérée ou déplacée par une mise à jour du contenu n'est pas tenue pour faite.
+        """
         run = self._run(engine.layout)
         scenario = self.scenario(run) if run is not None else None
         if run is None or scenario is None:
             return []
         ids = [s.step_id for s in scenario.steps]
         current = run.get("step_id")
+        validated = run.get("validated")
+        if isinstance(validated, list):
+            done = [s for s in validated if isinstance(s, str) and s]
+            return self._facts_of(run, done, finished=current is None and bool(done))
+        # `run.json` antérieur à `validated` : position dans le scénario.
         if current is None:
             return self._facts_of(run, ids, finished=bool(ids))
         if current not in ids:

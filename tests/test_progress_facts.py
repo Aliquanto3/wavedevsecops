@@ -142,3 +142,34 @@ def test_un_progress_json_sans_faits_reste_valide(tmp_path: Path) -> None:
     store = ProgressStore(tmp_path)
     assert store.facts() == []
     assert store.submit([fact()])
+
+
+def test_arret_pendant_l_ecriture_laisse_le_fichier_precedent(
+    store: ProgressStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Écriture interrompue avant le renommage : `progress.json` reste entier et lisible."""
+    import wavedevsecops.progress as progress_module
+
+    store.submit([fact()])
+    before = (store.data_dir / "progress.json").read_bytes()
+
+    def crash(*_args: object) -> None:
+        raise KeyboardInterrupt  # arrêt brutal entre l'écriture du temporaire et le renommage
+
+    monkeypatch.setattr(progress_module.os, "replace", crash)
+    with pytest.raises(KeyboardInterrupt):
+        store.submit([fact(step_id="s2", op_id="op2")])
+    assert (store.data_dir / "progress.json").read_bytes() == before
+    monkeypatch.undo()
+    assert [f.step_id for f in store.submit([fact(step_id="s2", op_id="op2")])] == ["s2"]
+    assert [f["step_id"] for f in stored(store)] == ["s1", "s2"]
+
+
+def test_tous_les_etats_en_un_passage(store: ProgressStore) -> None:
+    other = fact().model_copy(update={"track": "no_ai"})
+    store.submit([fact(), fact("scenario_completed", step_id="", op_id="z"), other])
+    states = store.all_progress()
+    assert set(states) == {(TRACK, SCENARIO, MODE), ("no_ai", SCENARIO, MODE)}
+    assert states[(TRACK, SCENARIO, MODE)].state == "done"
+    assert states[("no_ai", SCENARIO, MODE)] == store.progress("no_ai", SCENARIO, MODE)
+    assert states[("no_ai", SCENARIO, MODE)].state == "in_progress"
