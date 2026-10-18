@@ -2,49 +2,20 @@
 // aucune vue en particulier : il lit le registre (panes.js) et la logique de disposition pure
 // (layout.js). Le front ne mémorise que la disposition (AD-2).
 import { bindAction } from "./actions.js";
+import { buildChainBand, mountChain } from "./chain.js";
 import { el, richText } from "./dom.js";
 import * as L from "./layout.js";
 import { listPanes } from "./panes.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
+export { buildChainBand };
 export const PREPARING_TEXT = "Préparation du bac à sable…";
 export const READY_TEXT = "Le bac à sable est prêt. Les consignes du scénario s'afficheront ici.";
 export const LAST_VIEW_TEXT = "Au moins une vue reste visible.";
 
 const TOOL_HIDE = "—";
 const TOOL_MAXIMIZE = "⛶";
-
-/** Bandeau de la chaîne (Story 9.1) : textes et station courante fournis par le serveur (AD-2). */
-export function buildChainBand(chain) {
-  const band = el("section", "chain-band", { "aria-label": chain.label });
-  const list = el("ol", "chain-stations");
-  for (const station of chain.stations) {
-    const current = station.number === chain.current;
-    const afterBoundary = station.number === chain.boundary_after + 1;
-    const item = el("li", current ? "chain-station is-current" : "chain-station", {
-      "data-station": station.number,
-      "aria-current": current ? "step" : false,
-      "aria-describedby": afterBoundary ? "chain-boundary" : false,
-    });
-    item.append(station.text);
-    if (current) {
-      const pill = el("span", "chain-here");
-      pill.textContent = chain.here_text;
-      item.append(" ", pill);
-    }
-    list.append(item);
-    if (station.number === chain.boundary_after) {
-      // Séparateur visuel, pas une station : masqué du décompte de la liste, lu comme
-      // description de la station qui le suit.
-      const boundary = el("li", "chain-boundary", { id: "chain-boundary", "aria-hidden": "true" });
-      boundary.textContent = chain.boundary_text;
-      list.append(boundary);
-    }
-  }
-  band.append(list);
-  return band;
-}
 
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
 export function mountWorkspace(container, { title, store, storage, chain = null, onSelect }) {
@@ -80,9 +51,11 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   const announce = el("p", "visually-hidden", { role: "status", id: "layout-status" });
   zone.append(chipBar, grid, announce);
   // Bandeau de la chaîne : première rangée de la grille ; seule la rangée des vues rétrécit.
+  let chainView = null;
   if (chain) {
     workspace.classList.add("has-chain-band");
-    workspace.append(buildChainBand(chain));
+    chainView = mountChain(workspace, chain, { inertNodes: [panel, zone] });
+    workspace.append(chainView.band);
   }
   workspace.append(panel, zone);
   container.replaceChildren(workspace);
@@ -459,6 +432,11 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   function onKeydown(event) {
     if (event.key === "Escape") {
       if (displayPopup && !displayPopup.hidden) return; // le menu Affichage se ferme d'abord
+      if (chainView?.isOpen()) {
+        event.preventDefault();
+        chainView.close();
+        return;
+      }
       const inTerminal = event.target.closest?.('[data-pane][data-terminal="true"]');
       if (inTerminal) {
         // Dans le terminal, Échap rend seulement le focus au titre de la vue.
@@ -606,6 +584,7 @@ export function mountWorkspace(container, { title, store, storage, chain = null,
   return {
     destroy() {
       unsubscribe();
+      chainView?.close(false);
       document.removeEventListener("keydown", onKeydown);
       if (observer) observer.disconnect();
     },

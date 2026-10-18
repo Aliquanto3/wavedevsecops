@@ -18,10 +18,11 @@ import threading
 from concurrent.futures import Future
 from typing import Any
 
+import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
-from wavedevsecops.config import Settings
+from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import (
     OperationRefused,
@@ -41,25 +42,66 @@ SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
 
 
-CHAIN_STATIONS = ("Poste local", "PR et CI", "Sécurité et qualité", "Livraison")
-CHAIN_BOUNDARY_AFTER = 3
-"""La frontière CI | CD sépare la Station 3 de la Station 4."""
-
-
-def chain_body(station: int | None) -> dict[str, Any] | None:
-    """Texte du bandeau de la chaîne (Story 9.1) ; rien si le scénario ne déclare pas de station."""
-    if station is None or not 1 <= station <= len(CHAIN_STATIONS):
+def load_chain_texts(settings: Settings | None = None) -> dict[str, Any] | None:
+    """Textes de `content/chain.yaml` ; rien si le fichier manque ou est illisible (journalisé)."""
+    path = (settings or get_settings()).content_path() / "chain.yaml"
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or not isinstance(data.get("stations"), list):
+            raise ValueError("clé `stations` absente")
+        return data
+    except (OSError, UnicodeDecodeError, ValueError, yaml.YAMLError) as error:
+        log.warning("Chaîne ignorée (%s) : %s", path.name, error)
         return None
+
+
+def _map_station(station: dict[str, Any], kinds: dict[str, str]) -> dict[str, Any]:
     return {
-        "label": "Chaîne de livraison",
-        "current": station,
-        "here_text": "Vous êtes ici",
-        "boundary_text": "CI | CD",
-        "boundary_after": CHAIN_BOUNDARY_AFTER,
-        "stations": [
-            {"number": n, "name": name, "text": f"Station {n} · {name}"}
-            for n, name in enumerate(CHAIN_STATIONS, start=1)
+        "number": station["number"],
+        "name": station["name"],
+        "text": f"Station {station['number']} · {station['name']}",
+        "description": station.get("description", ""),
+        "delivered": bool(station.get("delivered", True)),
+        "tools": [
+            {"id": t["id"], "label": t["label"], "available": bool(t.get("available", True))}
+            for t in station.get("tools") or []
         ],
+        "barriers": [
+            {
+                "id": b["id"],
+                "label": b["label"],
+                "links": [
+                    {
+                        "kind": link["kind"],
+                        "kind_text": kinds.get(link["kind"], ""),
+                        "label": link["label"],
+                    }
+                    for link in b.get("links") or []
+                ],
+            }
+            for b in station.get("barriers") or []
+        ],
+    }
+
+
+def chain_body(station: int | None, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Bandeau et carte de la chaîne (Stories 9.1 et 9.2), depuis `content/chain.yaml` (AD-2)."""
+    texts = load_chain_texts(settings)
+    if texts is None:
+        return None
+    stations = texts["stations"]
+    if station is None or not 1 <= station <= len(stations):
+        return None
+    chain_map = texts.get("map") or {}
+    kinds = chain_map.get("kinds") or {}
+    return {
+        "label": texts["label"],
+        "current": station,
+        "here_text": texts["here_text"],
+        "boundary_text": texts["boundary_text"],
+        "boundary_after": texts["boundary_after"],
+        "stations": [_map_station(s, kinds) for s in stations],
+        "map": {k: v for k, v in chain_map.items() if k != "kinds"},
     }
 
 
@@ -207,6 +249,6 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 "mode": mode,
                 "track": track,
                 "title": loaded.scenario.title_text,
-                "chain": chain_body(loaded.scenario.station),
+                "chain": chain_body(loaded.scenario.station, settings),
             }
         )

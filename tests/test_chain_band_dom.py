@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
-from test_workspace_dom import NODE, _js
+from test_workspace_dom import MINIDOM, NODE, _js
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="Node absent : comportement JS non exécuté")
 
@@ -95,3 +95,164 @@ console.log(JSON.stringify({ bands: $$(".chain-band").length, first: main.childr
 """,
     )
     assert out == {"bands": 0, "first": "workspace", "inner": "scenario-panel"}
+
+
+MAP_CHAIN = {
+    **CHAIN,
+    "map": {
+        "button_text": "Carte ▾",
+        "button_label": "Carte de la chaîne",
+        "title": "Carte de la chaîne",
+        "soon_text": "Bientôt",
+        "unavailable_text": "indisponible",
+        "tools_title": "Outils",
+        "barriers_title": "Barrières",
+        "links_title": "Liée à",
+        "none_selected": "Sélectionnez une barrière.",
+    },
+}
+MAP_CHAIN["stations"] = [
+    {
+        **s,
+        "description": f"Description {s['number']}",
+        "delivered": s["number"] != 4,
+        "tools": []
+        if s["number"] == 4
+        else [
+            {"id": "a", "label": "outil-a", "available": True},
+            {"id": "b", "label": "outil-b", "available": s["number"] != 3},
+        ],
+        "barriers": []
+        if s["number"] == 4
+        else [
+            {
+                "id": f"b{s['number']}",
+                "label": f"Barrière {s['number']}",
+                "links": [
+                    {"kind": "hook", "kind_text": "Hook", "label": "pre-commit"},
+                    {"kind": "term", "kind_text": "Terme", "label": "Secret"},
+                ],
+            },
+        ],
+    }
+    for s in CHAIN["stations"]
+]
+
+
+def test_carte_depliee_clavier_souris_echap_focus_et_inert(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        f"""
+const chain = {json.dumps(MAP_CHAIN)};
+main.replaceChildren();
+mountWorkspace(main, {{ title: "Bac", store, storage, chain }});
+const {{ makeEvent }} = await import("{MINIDOM}");
+const toggle = $("#chain-map-toggle"), map = $("#chain-map");
+const state = () => ({{
+  expanded: toggle.getAttribute("aria-expanded"), hidden: map.hidden,
+  inert: [$(".scenario-panel"), $(".views")].map((n) => n.hasAttribute("inert")),
+  focus: document.activeElement.id || document.activeElement.className,
+}});
+const r = {{ controls: toggle.getAttribute("aria-controls"), mapId: map.id, closed: state() }};
+// Souris : « Carte ▾ » déplie ; le focus va sur la station courante.
+toggle.click();
+r.openByButton = state();
+// Échap ferme et rend le focus au bouton.
+press("Escape");
+r.afterEscape = state();
+// Une station du bandeau déplie la carte et le focus va sur SA zone.
+$('[data-station="3"] .chain-station-open').click();
+r.openByStation = state();
+// Clic sur une autre station alors qu'elle est ouverte : le focus change, la carte reste ouverte.
+$('[data-station="1"] .chain-station-open').click();
+r.refocus = state();
+// Clavier : Entrée sur un bouton se traduit par un clic ; la barrière lie checks, hooks et termes.
+const barrier = $('[data-barrier="b2"]');
+barrier.click();
+r.pressed = $$(".chain-barrier-btn").map((b) => b.getAttribute("aria-pressed"));
+r.detail = $$(".chain-link").map((l) => l.textContent);
+r.detailTitle = $(".chain-detail-title").textContent;
+// Survol.
+$('[data-barrier="b1"]').dispatchEvent(makeEvent("mouseenter"));
+r.hover = $$(".chain-link").length + ":" + $(".chain-detail-title").textContent;
+// « Carte ▾ » referme.
+toggle.click();
+r.toggledOff = state();
+// Contenu : zones, outils en tirets, Station 4 « Bientôt ».
+toggle.click();
+r.zones = $$(".chain-zone").map((z) => z.querySelector(".chain-zone-title").textContent);
+r.soon = $$(".chain-soon").map((s) => [s.textContent, s.className]);
+r.dashedTools = $$(".chain-tool.is-dashed").map((t) => t.textContent);
+r.station4 = [$('.chain-zone[data-station="4"] .chain-tool'), $('.chain-zone[data-station="4"] .chain-barrier')].map((n) => n === null);
+r.current = $$("[aria-current]").map((c) => c.dataset.station);
+// Échap dans le menu Affichage n'est pas géré ici ; Échap ferme bien même depuis une barrière.
+barrier.focus();
+press("Escape");
+r.escapeFromNode = state();
+console.log(JSON.stringify(r));
+""",
+    )
+    assert out["controls"] == out["mapId"] == "chain-map"
+    assert out["closed"] == {
+        "expanded": "false",
+        "hidden": True,
+        "inert": [False, False],
+        "focus": out["closed"]["focus"],
+    }
+    assert out["openByButton"] == {
+        "expanded": "true",
+        "hidden": False,
+        "inert": [True, True],
+        "focus": "chain-zone-2-title",
+    }
+    assert out["afterEscape"]["expanded"] == "false" and out["afterEscape"]["hidden"] is True
+    assert (
+        out["afterEscape"]["inert"] == [False, False]
+        and out["afterEscape"]["focus"] == "chain-map-toggle"
+    )
+    assert (
+        out["openByStation"]["focus"] == "chain-zone-3-title"
+        and out["openByStation"]["expanded"] == "true"
+    )
+    assert out["refocus"]["focus"] == "chain-zone-1-title" and out["refocus"]["inert"] == [
+        True,
+        True,
+    ]
+    assert out["pressed"] == ["false", "true", "false"]
+    assert out["detail"] == ["Hook : pre-commit", "Terme : Secret"]
+    assert out["detailTitle"] == "Barrière 2 — Liée à"
+    assert out["hover"] == "2:Barrière 1 — Liée à"
+    assert out["toggledOff"]["expanded"] == "false" and out["toggledOff"]["inert"] == [False, False]
+    assert out["zones"] == [
+        s["text"] + ("" if s["number"] != 4 else " Bientôt") for s in MAP_CHAIN["stations"]
+    ]
+    assert out["soon"] == [["Bientôt", "chain-soon is-dashed"]]
+    assert out["dashedTools"] == ["outil-b (indisponible)"]
+    assert out["station4"] == [True, True]
+    assert out["current"] == ["2"]
+    assert (
+        out["escapeFromNode"]["expanded"] == "false"
+        and out["escapeFromNode"]["focus"] == "chain-map-toggle"
+    )
+
+
+def test_carte_ne_change_ni_le_menu_volets_ni_les_zones_f6(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        f"""
+const chain = {json.dumps(MAP_CHAIN)};
+const first = mount();
+const bare = {{ menu: $$(".pane-menu-item").map((i) => i.dataset.pane), shown: shown() }};
+first.destroy();
+$("#pane-menu").remove();
+main.replaceChildren();
+const view = mountWorkspace(main, {{ title: "Bac", store, storage, chain }});
+$("#chain-map-toggle").click();
+const open = {{ menu: $$(".pane-menu-item").map((i) => i.dataset.pane), shown: shown() }};
+view.destroy();
+console.log(JSON.stringify({{ bare, open, inert: $$("[inert]").length }}));
+""",
+    )
+    assert out["open"] == out["bare"] and out["bare"]["menu"]
+    # `destroy` rend les vues interactives même carte ouverte.
+    assert out["inert"] == 0

@@ -184,3 +184,20 @@ def test_bandeau_de_la_chaine_fourni_par_le_serveur() -> None:
         "CI | CD",
         3,
     )
+
+
+def test_carte_de_la_chaine_fournie_par_le_serveur(tmp_path) -> None:
+    chain = chain_body(2)
+    assert chain is not None and chain["map"]["button_text"] == "Carte ▾"
+    assert chain["map"]["soon_text"] == "Bientôt" and "kinds" not in chain["map"]
+    stations = {s["number"]: s for s in chain["stations"]}
+    assert [s["delivered"] for s in stations.values()] == [True, True, True, False]
+    # Station 4 en v0.2 : ni outil ni barrière ; un outil indisponible est signalé comme tel.
+    assert stations[4]["tools"] == [] and stations[4]["barriers"] == []
+    assert any(not t["available"] for s in stations.values() for t in s["tools"])
+    barrier = stations[1]["barriers"][0]
+    assert {link["kind"] for link in barrier["links"]} == {"hook", "check", "term"}
+    assert {link["kind_text"] for link in barrier["links"]} == {"Hook", "Check", "Terme"}
+    # Sans `content/chain.yaml`, pas de bandeau (journalisé), sans exception.
+    empty = Settings(data_dir=tmp_path / "data", content_dir=tmp_path / "vide")
+    assert chain_body(1, empty) is None
