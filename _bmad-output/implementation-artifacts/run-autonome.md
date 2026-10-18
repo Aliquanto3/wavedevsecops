@@ -174,3 +174,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 20:19 · 9.1 · review · 2 medium corrigés (bandeau en rangée de grille, plus de constante de hauteur), 3 low ; noms des stations en contenu reportés à 9.2 · 9d2249b
 - 2026-10-18 20:19 · 9.1 · fusion · rebase sur b3b0794 par l'orchestrateur, suite complète verte, CI branche verte, ff sur main, story done · ce247ef
 - 2026-10-18 20:19 · 6.6 · incident · worktree supprimé par erreur au nettoyage de l'orchestrateur avant tout code, story relancée · —
+- 2026-10-18 20:22 · 2.4 · dev · fini, 579 tests, CI verte (Job Object, liste blanche, route interrupt) · 13dc1f3
+- 2026-10-18 20:22 · 2.7 · dev · lancé (dev-story Sonnet) · —
+- 2026-10-18 20:26 · 2.4 · second-avis · 1 high prouvé (aucune identité git pour l'apprenant : git commit échoue), 2 medium (remote show sur URL arbitraire, français non testé sous Windows), 5 low · —
+- 2026-10-18 20:28 · 6.6 · dev · fini, 523 tests, CI verte, sans modèle ni réseau ; 4 vérifications avec un vrai Ollama à faire par Anaël ; instantanés créés en avance (pivot 4.3) · 6aecf4d
+- 2026-10-18 20:28 · 9.2 · dev · lancé (dev-story Sonnet) · —
+- 2026-10-18 20:29 · 3.1 · review · rebase, medium corrigé (refresh des PR au changement externe), 7 low ; dismiss_stale_reviews en option (défaut false, décision Anaël) · 4faea1b
+- 2026-10-18 20:29 · 3.1 · fusion · conflit de fond avec 2.6 (engine/manager.py) résolu par dev-story Opus, rebase sur 8dd9069, suite complète verte, CI branche verte, ff sur main, story done · 290d078
+- 2026-10-18 20:29 · — · file · éligibles en attente de créneau : 4.3 ★, 3.2, 3.5, 7.4 ★ · —
