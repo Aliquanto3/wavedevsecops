@@ -75,7 +75,7 @@ body {
   top: -100px;
   z-index: 30;
   padding: var(--space-2) var(--space-4);
-  background: var(--color-ink);
+  background: var(--color-ink-fill);
   color: var(--color-on-ink);
   border-radius: var(--radius-md);
 }
@@ -84,9 +84,11 @@ body {
   top: var(--space-2);
 }
 
-/* Bandeau « l'application ne répond plus » : role="alert", toujours présent, vide hors panne. */
+/* Bandeau « l'application ne répond plus » : role="alert", toujours présent, vide hors panne.
+   Vide, il reste dans l'arbre d'accessibilité (pas de display:none) pour que l'annonce parte. */
 .app-alert:empty {
-  display: none;
+  padding: 0;
+  border: 0;
 }
 
 .app-alert {

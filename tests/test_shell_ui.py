@@ -269,3 +269,66 @@ def test_registre_des_volets_extensible() -> None:
     panes = (JS / "panes.js").read_text(encoding="utf-8")
     assert "export function registerPane" in panes and "export function listPanes" in panes
     assert "elementTypes" in panes
+
+
+# --- contrastes WCAG des paires texte / fond employées par la coquille ----------------------
+
+# (texte, fond, seuil) : paires de shell.css, puis celles du tableau « Contrastes des
+# combinaisons ajoutées » de DESIGN.md, recalculées depuis les valeurs servies.
+CONTRAST_PAIRS = (
+    ("ink", "surface", 4.5),
+    ("ink", "surface-raised", 4.5),
+    ("ink", "danger-soft", 4.5),
+    ("on-ink", "ink-fill", 4.5),
+    ("primary-deep", "surface-raised", 4.5),
+    ("primary", "surface-raised", 4.5),
+    ("on-primary", "primary", 4.5),
+    ("ink-soft", "surface", 4.5),
+    ("ink-soft", "surface-raised", 4.5),
+    ("ink-soft", "discipline-neutral-soft", 4.5),
+    ("terminal-fg", "terminal-bg", 4.5),
+    ("terminal-fg-soft", "terminal-bg", 4.5),
+    ("terminal-accent", "terminal-bg", 4.5),
+    ("terminal-danger", "terminal-bg", 4.5),
+    ("terminal-rule", "terminal-bg", 3),
+    ("focus-on-ink", "terminal-bg", 3),
+    ("on-vivid", "danger", 4.5),
+    ("primary-deep", "primary-soft", 4.5),
+    ("muted", "surface-raised", 3),
+    ("danger", "surface-raised", 3),
+    ("discipline-context", "discipline-context-soft", 3),
+)
+
+
+def _luminance(hex_color: str) -> float:
+    channels = [int(hex_color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _ratio(fg: str, bg: str) -> float:
+    high, low = sorted((_luminance(fg), _luminance(bg)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def _palette(block: str) -> dict[str, str]:
+    return dict(re.findall(r"--color-([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6});", block))
+
+
+def test_formule_de_contraste_wcag() -> None:
+    assert _ratio("#000000", "#FFFFFF") == pytest.approx(21.0)
+    assert _ratio("#777777", "#FFFFFF") == pytest.approx(4.48, abs=0.01)
+
+
+@pytest.mark.parametrize("theme", ["clair", "sombre"])
+def test_contrastes_des_paires_texte_fond(theme: str) -> None:
+    light, _media, forced = _blocks((CSS / "tokens.css").read_text(encoding="utf-8"))
+    palette = _palette(light)
+    if theme == "sombre":
+        palette |= _palette(forced)
+    low = [
+        f"{fg}/{bg} {_ratio(palette[fg], palette[bg]):.2f} < {minimum}"
+        for fg, bg, minimum in CONTRAST_PAIRS
+        if _ratio(palette[fg], palette[bg]) < minimum
+    ]
+    assert low == []
