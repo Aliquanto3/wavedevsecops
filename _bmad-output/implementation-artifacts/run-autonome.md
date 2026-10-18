@@ -206,6 +206,19 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 21:25 · 3.2, 2.5 · dev · lancés (dev-story Sonnet, nouveaux worktrees) ; 3.5, 7.4 ★, 7.2 en attente d'un créneau (3.5 et 7.4 touchent github_sim comme 3.2, 7.2 le terminal comme 2.5) · —
 - 2026-10-18 21:40 · 4.1 · dev · rebase fini par dev-story Opus (conflits d'ajout seulement : git_path + panel, OpContext, store.js), 731 passed / 37 skipped, CI branche verte sur 6 jobs · 09a7afd
 - 2026-10-18 21:40 · 4.1 · fusion · ff sur main, story done ; 4.2 devient éligible (test d'ordre terminal_output → step_verdict non écrit, noté) · 09a7afd
+- 2026-10-18 21:40 · 4.2 · dev · lancé (dev-story Sonnet, chemin critique) · —
+- 2026-10-18 21:45 · 4.3 · review · rebase (config.py trivial), H1 corrigé (toute erreur → restore_failed), M3 (retour arrière 3 essais, restoring gardé), M4 (reprise au démarrage suivant), H2 ramené à medium et reporté à 4.4 (spec), L5 assert moteur, L6-L8 écartés/reportés ; 714 passed, CI branche verte · 60db8da
+- 2026-10-18 21:45 · 4.3 · fusion · rebase sur eb6cfbc par l'orchestrateur (imports engine/__init__ et manager, trivial), suite complète en cours · —
+- 2026-10-18 21:45 · 3.2 · dev · fini, 703 passed / 37 skipped, CI verte ; crochet AFTER_COMMAND_HOOKS → refresh branché ; schéma de pr_updated laissé ouvert pour 3.3 · 3572cd7
+- 2026-10-18 21:45 · 3.2 · second-avis · lancé · —
+- 2026-10-18 21:45 · 9.2 · review · rebase sans conflit, M1 corrigé (chain.yaml validé par pydantic, 6 cas invalides testés), M2 corrigé (available calculé par toolrun.resolve, ~150 ms), L8 to_thread, L9 vrai test ; L3-L7 écartés (motifs en spec) ; 706 passed, CI branche verte · f3097a1
+- 2026-10-18 21:45 · — · décision pour Anaël · 9.2 : disponibilité des outils de la carte issue de la sonde réelle (gitleaks absent → tirets) au lieu du contenu figé ; défaut gardé, à confirmer · —
+- 2026-10-18 21:45 · 4.3 · fusion · ruff : ordre d'imports après résolution, corrigé ; suite relancée · —
+- 2026-10-18 21:51 · 3.2 · second-avis · aucun high, 1 medium (état github.json non écrit après update-ref réussi → second merge possible), 6 low (pas de pr_updated sur refus, préflight hors file, _update_ref trompeur, merge vide, câblage app non testé, lecture sans retry) ; reviewer Opus lancé · —
+- 2026-10-18 21:52 · 2.7 · review · rebase (3 conflits d'ajout), medium trouvé en revue corrigé (arête traversant un commit de même rang, tracé par bandes + test géométrique), M2 (a11y_name_text côté serveur), M3 (sujet tronqué 48ch), M1→low console.warn, L5, fuite externalOps ; L4 reporté (NVDA/VoiceOver), L6 écarté ; 709 passed, CI branche verte · e8361a7
+- 2026-10-18 21:55 · 4.3 · fusion · suite complète 748 passed / 37 skipped après rebase, CI branche en cours · 8c6effa
+- 2026-10-18 21:55 · 2.5 · dev · fini, 86 tests de confinement, CI verte sur les trois OS (liens symboliques testés en CI) ; test de performance de projections en échec local non relancé · b0350c5
+- 2026-10-18 21:55 · 2.5 · second-avis · lancé · —
 
 
 ## Reprise (arrêt propre du 2026-10-18 au soir)
