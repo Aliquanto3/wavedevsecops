@@ -200,6 +200,13 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 21:04 · 4.1 · fusion · reportée : rebase sur ff80137 (2.4) en conflit dans engine/manager.py, engine/operations.py, web/static/js/store.js → dev-story Opus pour finir le rebase, puis suite, CI et fusion (revue déjà faite) · 972570d
 - 2026-10-18 21:05 · 4.3 · second-avis · liste à transmettre au reviewer (session suivante) : H1 snapshots.py:210-215,256-283,332-346 _run_restore ne capte que RestoreFailed (GitError ou écriture run.json → pas de restore_failed, restoring reste écrit) ; H2 operations.py:323-325,505 + events/catalog.py:56 après restore_failed l'espace repasse en idle et accepte des écritures sur un état mélangé (« seule action : Recommencer » non appliqué, pas de garde sur restoring) ; M3 snapshots.py:218-231 retour arrière en un seul essai, restoring=None même s'il échoue → plus de reprise ; M4 snapshots.py:314-321 resume_restore supprime repo/origin.git/hooks sans réessai ; L5 tests/test_snapshots.py:306 test quiz_altered limité à Windows, test_restore_failed_dans_la_file n'assert pas l'état moteur ; L6 .staging-N et .restore/trash-* laissés jusqu'à la prochaine restauration ; L7 seuls index.lock/HEAD.lock exclus de la copie ; L8 « Dépôt chargé » annoncé après restauration · 6087374
 - 2026-10-18 21:05 · — · arrêt propre · fin de session d'orchestration (contexte chargé) ; reprise par une nouvelle session, cf. section « Reprise » · —
+- 2026-10-18 21:25 · — · reprise · nouvelle session d'orchestration · —
+- 2026-10-18 21:25 · 4.1 · dev · dev-story Opus lancé pour finir le rebase (worktree existant) · —
+- 2026-10-18 21:25 · 4.3, 2.7, 9.2 · review · reviewers Opus lancés avec la liste du second avis (worktrees existants) · —
+- 2026-10-18 21:25 · 3.2, 2.5 · dev · lancés (dev-story Sonnet, nouveaux worktrees) ; 3.5, 7.4 ★, 7.2 en attente d'un créneau (3.5 et 7.4 touchent github_sim comme 3.2, 7.2 le terminal comme 2.5) · —
+- 2026-10-18 21:40 · 4.1 · dev · rebase fini par dev-story Opus (conflits d'ajout seulement : git_path + panel, OpContext, store.js), 731 passed / 37 skipped, CI branche verte sur 6 jobs · 09a7afd
+- 2026-10-18 21:40 · 4.1 · fusion · ff sur main, story done ; 4.2 devient éligible (test d'ordre terminal_output → step_verdict non écrit, noté) · 09a7afd
+
 
 ## Reprise (arrêt propre du 2026-10-18 au soir)
 
