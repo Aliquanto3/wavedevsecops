@@ -134,3 +134,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 2.11 · review · 3 medium corrigés (test loopback par nom d'hôte, tests du gabarit en uv --offline --frozen sur cache préchargé en CI, chemin httpx exécuté), AD-13 des tests du gabarit via toolrun reporté à la station 1 · c2d4573
 - 2026-10-18 · 2.11 · fusion · ff sur main, suite complète verte, CI branche verte sur les trois OS, story done · c2d4573
 - 2026-10-18 · — · décision pour Anaël · ajouter httpx==0.28.1 à la table Stack du spine et au test de cohérence AD-16 ; diagnostic_seen à ajouter à AD-5 · —
+- 2026-10-18 · 1.7 · review · rebase (conflit ci.yml trivial), medium XDG_DATA_HOME sous macOS corrigé, avertissement voie zip sans git (sh et ps1), échange sûr de l'app, délais réseau · ba13fd2
+- 2026-10-18 · 2.2 · dev · fini, 316 tests, CI verte sur les trois OS · 9ba966f
+- 2026-10-18 · 2.2 · second-avis · 1 high prouvé (close() laisse l'opération tourner → deux écrivains à la réouverture), 2 medium, 5 low · —
+- 2026-10-18 · 1.7 · fusion · rebase sur 221000e par l'orchestrateur, suite complète 289 passed / 33 skipped, CI branche verte (5 jobs dont install.sh réel), ff sur main, story done ; Epic 1 done ; vérification poste réel macOS/Linux (9 points) en attente d'Anaël · 8df335e
