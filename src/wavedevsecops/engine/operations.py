@@ -20,6 +20,7 @@ import uuid
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
@@ -118,6 +119,11 @@ class OpContext:
         self.op_id = op.op_id
         self.layout = engine.layout
         self.settings = engine.settings
+        self.git_path = engine.git_path
+        """git du registre si l'application l'a déjà résolu ; `None` : à résoudre."""
+        self.interrupted = False
+        self._interrupt_lock = threading.Lock()
+        self._on_interrupt: Callable[[], None] | None = None
         self.workspace_id = engine.workspace_id
         self.data: dict[str, Any] = {}
         """Valeurs partagées entre la pré-vérification et le corps de l'opération."""
@@ -161,6 +167,27 @@ class OpContext:
         if Kind(kind) in SEQUENCE_KINDS:
             raise ValueError(f"« {kind} » est réservé à la file d'opérations")
         self._engine.publish(kind, payload, op_id=self.op_id)
+
+    def on_interrupt(self, callback: Callable[[], None]) -> None:
+        """Déclare comment arrêter l'opération (Ctrl+C, mise en veille) : arrêt d'arbre, etc.
+
+        Si l'interruption a déjà été demandée, `callback` est appelé aussitôt.
+        """
+        with self._interrupt_lock:
+            self._on_interrupt = callback
+            pending = self.interrupted
+        if pending:
+            callback()
+
+    def interrupt(self) -> bool:
+        """Demande l'arrêt de l'opération ; rend faux si elle ne sait pas s'arrêter."""
+        with self._interrupt_lock:
+            self.interrupted = True
+            callback = self._on_interrupt
+        if callback is None:
+            return False
+        callback()
+        return True
 
 
 OpBody = Callable[[OpContext], int | None]
@@ -224,8 +251,11 @@ class WorkspaceEngine:
         projector: Projector = no_projection,
         validator: Validator = no_validation,
         on_state: Callable[[EngineStateName], None] | None = None,
+        git_path: Path | None = None,
     ) -> None:
         self.workspace_id = workspace_id
+        self.git_path = git_path
+        self._current: OpContext | None = None
         self.layout = layout
         self.events = log_
         self.settings = settings
@@ -349,11 +379,17 @@ class WorkspaceEngine:
         with self._lock:
             return bool(self._pending) or self._state not in REST_STATES
 
+    def interrupt(self) -> bool:
+        """Arrête l'opération en cours si elle sait s'arrêter (Ctrl+C), hors de la file (AD-17)."""
+        with self._lock:
+            ctx = self._current
+        return ctx.interrupt() if ctx is not None else False
+
     def request_stop(self) -> None:
         """Met l'espace en veille sans attendre : refuse les opérations en attente.
 
         Leur `app_error` est publié par le fil de la file (seul écrivain), après
-        l'opération en cours, que la veille n'interrompt pas.
+        l'opération en cours, que la veille interrompt (arrêt d'arbre) si elle sait s'arrêter.
         """
         with self._lock:
             if self._closed:
@@ -361,9 +397,12 @@ class WorkspaceEngine:
             self._closed = True
             dropped = list(self._pending)
             self._pending.clear()
+            current = self._current
         for _, future in dropped:
             if future.set_running_or_notify_cancel():
                 future.set_exception(OperationRefused(DROPPED_TEXT))
+        if current is not None:
+            current.interrupt()
         self._queue.put(_STOP)
 
     def close(self) -> None:
@@ -465,10 +504,14 @@ class WorkspaceEngine:
         if op.state in EPOCH_STATES:
             self.epoch += 1
         self._set_state(op.state, op.reason_text, op.op_id)
+        with self._lock:
+            self._current = ctx
         try:
             self.publish(Kind.OP_STARTED, OpStarted(intent=op.intent), op_id=op.op_id)
             started = time.monotonic()
             ok, code = self._guarded(ctx, "Corps", lambda: op.body(ctx))
+            with self._lock:
+                self._current = None  # le corps est fini : plus rien à interrompre
             if op.state in EPOCH_STATES:
                 self._guarded(ctx, "Epoch", self._persist_epoch)
             self.publish(
@@ -502,4 +545,6 @@ class WorkspaceEngine:
                         self.publish(Kind.STEP_EXPLANATION, outcome.explanation, op_id=op.op_id)
             return OpResult(op.op_id, code if ok else None, projection)
         finally:
+            with self._lock:
+                self._current = None
             self._set_state(self._rest, "", op.op_id)

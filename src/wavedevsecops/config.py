@@ -84,6 +84,9 @@ class Settings(BaseModel):
     engine_stop_timeout_s: float = Field(default=30.0, gt=0)
     """Attente maximale de la fin de l'opération en cours quand un espace s'endort."""
 
+    terminal_timeout_s: float = Field(default=30.0, gt=0)
+    """Délai d'une commande tapée dans le terminal ; au-delà, l'arbre est arrêté (AD-4, AD-12)."""
+
     def gitconfig_path(self) -> Path:
         """`<data>/gitconfig`, désigné par `GIT_CONFIG_GLOBAL` (AD-3, AD-5)."""
         return self.resolved_data_dir() / "gitconfig"

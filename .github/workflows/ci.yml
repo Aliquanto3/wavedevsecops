@@ -49,6 +49,12 @@ jobs:
             rm -rf "$RUNNER_TEMP/preload-venv"
           done
 
+      # AD-3 : git parle français quand une locale française existe. Sans elle, le test du
+      # terminal en français est ignoré ; on la génère sous Linux pour qu'il tourne.
+      - name: Locale française (git en français)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends locales && sudo locale-gen fr_FR.UTF-8
+
       - name: ruff
         run: uv run ruff check .
 

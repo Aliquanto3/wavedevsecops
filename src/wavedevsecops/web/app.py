@@ -22,7 +22,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from wavedevsecops import diagnostic, osv
+from wavedevsecops import diagnostic, osv, terminal
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.engine import WorkspaceManager
@@ -203,6 +203,7 @@ def create_app(
             }
         )
 
+    terminal.register_intents()
     workspaces = workspaces or WorkspaceManager(settings)
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)

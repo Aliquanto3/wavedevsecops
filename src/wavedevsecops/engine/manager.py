@@ -304,6 +304,7 @@ class WorkspaceManager:
             projector=self._projector,
             validator=self._validator,
             on_state=on_state,
+            git_path=self._git_path,
         )
         active = _Active(engine)
         holder["active"] = active

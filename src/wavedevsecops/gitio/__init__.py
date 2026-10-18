@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -277,3 +278,47 @@ def stash_list(git: Git, repo: Path) -> list[str]:
     """Commits du stash, du plus récent au plus ancien (l'ordre compte)."""
     out = git.internal("stash", "list", "--format=%H", cwd=repo)
     return [line for line in out.splitlines() if line]
+
+
+_LANGUAGES: dict[Path, GitLanguage] = {}
+
+
+def learner_language(executable: Path, settings: Settings | None = None) -> GitLanguage:
+    """Langue de git pour le contexte apprenant, sondée une fois par exécutable (AD-3)."""
+    found = _LANGUAGES.get(executable)
+    if found is None:
+        found = _LANGUAGES[executable] = probe_language(executable, settings)
+    return found
+
+
+def spawn_learner(tool: Git, *args: str, cwd: Path, timeout: float | None = None) -> procs.Handle:
+    """Lance `git args` en contexte apprenant, sans attendre : la sortie arrive au fil de l'eau.
+
+    `tool.locale` doit porter la locale française sondée (sinon git parle anglais).
+    """
+    return procs.spawn(
+        [tool.executable, *args],
+        env=tool.env("learner"),
+        cwd=cwd,
+        timeout=tool.timeout if timeout is None else timeout,
+    )
+
+
+def clear_stale_index_lock(repo: Path, *, attempts: int = 5) -> bool:
+    """Supprime `.git/index.lock` laissé par une commande arrêtée (AD-12).
+
+    La file est le seul écrivain d'un espace : après l'arrêt de l'arbre, aucun git vivant ne
+    peut le tenir. Sous Windows, le fichier peut rester ouvert un instant : on réessaie.
+    Rend vrai si un verrou a été supprimé.
+    """
+    lock = repo / ".git" / "index.lock"
+    for attempt in range(attempts):
+        try:
+            lock.unlink()
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            if attempt + 1 < attempts:
+                time.sleep(0.1)
+    return False

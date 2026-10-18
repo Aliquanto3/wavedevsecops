@@ -1,0 +1,190 @@
+# Liste blanche du terminal (AD-4) : le seul fichier lu par la garde ET par le texte du refus.
+# Une sous-commande ou une option absente d'ici est refusée ; la liste citée à l'apprenant
+# est tirée de ce fichier. Les commandes de fichiers (ls, cat, echo…) s'ajouteront sous
+# `files` avec la story 2.5.
+schema_version: 1
+
+messages:
+  metachar: >-
+    Le terminal n'est pas un shell : « {found} » n'y a aucun effet. Tapez une seule commande
+    par ligne, sans enchaînement, redirection ni substitution.
+  unterminated: "Il manque la fin d'un guillemet ou d'un antislash dans cette ligne."
+  unknown_command: "« {command} » n'est pas une commande de ce terminal."
+  cd: >-
+    « cd » n'existe pas ici : le terminal reste toujours à la racine du dépôt du bac à sable,
+    et les chemins s'écrivent depuis cette racine (par exemple « git add src/app.py »).
+  unknown_subcommand: "« git {sub} » n'est pas dans la liste de ce terminal."
+  global_option: >-
+    Les options placées avant la sous-commande (« {option} ») ne sont pas acceptées : écrivez
+    « git » puis la sous-commande.
+  forbidden_option: "L'option « {option} » est interdite dans ce terminal."
+  unknown_option: "L'option « {option} » n'est pas acceptée pour « git {sub} »."
+  bad_positional: "« git {sub} {value} » n'est pas accepté ; arguments possibles : {choices}."
+  config_write: >-
+    « git config » ne modifie ici que « user.name » et « user.email » ; les autres clés se
+    lisent seulement.
+  remote_target: >-
+    « {value} » n'est pas un remote du dépôt. « git {sub} » vise un remote existant
+    ({remotes}), jamais un chemin ni une adresse.
+  accepted: "Commandes git acceptées : {subcommands}."
+  accepted_options: "Options acceptées pour « git {sub} » : {options}."
+  refused_argument: "« git {sub} {value} » n'est pas accepté dans ce terminal."
+  too_many: "« git {sub} » reçoit trop d'arguments pour ce terminal."
+  accepted_files: "Commandes de fichiers acceptées : {commands}."
+  hint: "Tapez une commande git, par exemple « git status »."
+  exit_code: "Code de sortie : {code}"
+  missing_message: "git attend un message de commit. Ajoutez `-m \"…\"`."
+  timeout: "La commande a dépassé {seconds} s : elle a été arrêtée."
+  interrupted: "Commande interrompue."
+
+# Options qu'aucune ligne n'obtient en dehors de la liste d'une sous-commande
+# (le refus les nomme « interdites » plutôt qu'« absentes de la liste »).
+forbidden_options:
+  - "-c"
+  - "-C"
+  - "--git-dir"
+  - "--work-tree"
+  - "--exec-path"
+  - "--config-env"
+  - "--exec"
+  - "-x"
+  - "-i"
+  - "-p"
+  - "--interactive"
+  - "--patch"
+  - "--output"
+  - "--no-index"
+  - "--upload-pack"
+  - "--receive-pack"
+  - "--ext-diff"
+  - "-F"
+  - "--file"
+
+# Commandes de fichiers, écrites en Python sur wsfs (story 2.5). Vide pour l'instant.
+files: {}
+
+# Chaque sous-commande git : `read` (vrai : lecture, admise pendant un quiz ; un objet : lecture
+# seulement si toutes ses conditions tiennent), `options`, `value_options` (options qui prennent
+# une valeur, collée ou dans l'argument suivant), `choices` (valeurs admises du premier argument).
+git:
+  add:
+    read: false
+    options: ["-A", "--all", "-u", "--update", "-n", "--dry-run", "-v", "--verbose", "-f", "--force", "-N", "--intent-to-add", "--"]
+  commit:
+    read: false
+    options: ["-m", "--message", "-a", "--all", "--amend", "--no-edit", "--allow-empty", "--allow-empty-message", "--no-verify", "-s", "--signoff", "-q", "--quiet", "--dry-run", "--"]
+    value_options: ["-m", "--message"]
+    needs_message: true
+  status:
+    read: true
+    options: ["-s", "--short", "-b", "--branch", "--porcelain", "--long", "-uno", "-unormal", "-uall", "--untracked-files", "-v", "--verbose", "--ignored", "--"]
+  log:
+    read: true
+    options: ["-p", "--oneline", "--graph", "--all", "--decorate", "--no-decorate", "--stat", "--patch", "--no-patch", "-n", "--max-count", "--skip", "--pretty", "--format", "--abbrev-commit", "--author", "--since", "--until", "--grep", "--reverse", "--first-parent", "--merges", "--no-merges", "--name-only", "--name-status", "--follow", "--date", "--branches", "--tags", "--remotes", "--reflog", "-S", "-G", "--shortstat", "--numstat", "--"]
+    value_options: ["-n", "--max-count", "--skip", "--author", "--since", "--until", "--grep", "-S", "-G"]
+    number_option: true
+  diff:
+    read: true
+    options: ["-p", "--patch", "--staged", "--cached", "--stat", "--name-only", "--name-status", "--shortstat", "--numstat", "-w", "--ignore-all-space", "-U", "--unified", "--no-patch", "--word-diff", "--check", "--summary", "--quiet", "--exit-code", "--color", "--no-color", "--"]
+    value_options: ["-U", "--unified"]
+  show:
+    read: true
+    options: ["-p", "--patch", "--stat", "--name-only", "--name-status", "--oneline", "--pretty", "--format", "--no-patch", "-s", "--abbrev-commit", "--shortstat", "--numstat", "--"]
+  branch:
+    read:
+      options_within: ["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "-l", "--show-current", "--merged", "--no-merged", "--contains"]
+      positionals_max: 0
+    options: ["-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--list", "-l", "--show-current", "--merged", "--no-merged", "--contains", "-d", "--delete", "-D", "-m", "--move", "-M", "-f", "--force", "-u", "--set-upstream-to", "--unset-upstream", "--"]
+    value_options: ["--set-upstream-to", "-u"]
+  switch:
+    read: false
+    options: ["-c", "--create", "-d", "--detach", "-f", "--force", "--discard-changes", "--guess", "--no-guess", "-t", "--track", "--"]
+  checkout:
+    read: false
+    options: ["-b", "-B", "--detach", "-f", "--force", "-t", "--track", "--ours", "--theirs", "--"]
+  restore:
+    read: false
+    options: ["--staged", "-S", "--worktree", "-W", "--source", "-s", "--ours", "--theirs", "--"]
+    value_options: ["--source", "-s"]
+  reset:
+    read: false
+    options: ["--soft", "--mixed", "--hard", "--keep", "--merge", "-q", "--quiet", "--"]
+  revert:
+    read: false
+    options: ["--no-edit", "-n", "--no-commit", "--continue", "--abort", "--skip", "-m", "--mainline", "--"]
+    value_options: ["-m", "--mainline"]
+  merge:
+    read: false
+    options: ["--no-ff", "--ff", "--ff-only", "--squash", "--no-commit", "--continue", "--abort", "--no-edit", "-m", "--message", "-q", "--quiet", "--no-verify", "--"]
+    value_options: ["-m", "--message"]
+  rebase:
+    read: false
+    options: ["--continue", "--abort", "--skip", "--onto", "--autostash", "--no-autostash", "-q", "--quiet", "--"]
+    value_options: ["--onto"]
+  stash:
+    read:
+      first_positional_in: ["list", "show"]
+    choices: ["push", "pop", "apply", "list", "show", "drop", "clear", "branch"]
+    options: ["-u", "--include-untracked", "-m", "--message", "-k", "--keep-index", "--index", "-q", "--quiet", "--"]
+    value_options: ["-m", "--message"]
+  tag:
+    read:
+      options_within: ["-l", "--list"]
+      positionals_max: 0
+    options: ["-a", "--annotate", "-m", "--message", "-d", "--delete", "-l", "--list", "-f", "--force", "--"]
+    value_options: ["-m", "--message"]
+    needs_message_with: ["-a", "--annotate"]
+  push:
+    read: false
+    touches_origin: true
+    remote_argument: true
+    options: ["-u", "--set-upstream", "-f", "--force", "--force-with-lease", "--tags", "--delete", "-d", "--dry-run", "-n", "-v", "--verbose", "-q", "--quiet", "--follow-tags", "--all", "--"]
+  pull:
+    read: false
+    touches_origin: true
+    remote_argument: true
+    options: ["--rebase", "--no-rebase", "--ff-only", "--no-ff", "--ff", "--no-edit", "--autostash", "--no-autostash", "--squash", "--no-commit", "-q", "--quiet", "-v", "--verbose", "--"]
+  fetch:
+    read: false
+    touches_origin: true
+    remote_argument: true
+    options: ["--all", "--prune", "--tags", "-t", "--no-tags", "--dry-run", "-f", "--force", "-q", "--quiet", "-v", "--verbose", "--"]
+  remote:
+    read: true
+    choices: ["show", "get-url"]
+    options: ["-v", "--verbose", "--"]
+  reflog:
+    read: true
+    refused_arguments: ["expire", "delete"]
+    options: ["--all", "--date", "--oneline", "-n", "--max-count", "--"]
+    value_options: ["-n", "--max-count"]
+    number_option: true
+  rm:
+    read: false
+    options: ["--cached", "-r", "-f", "--force", "-n", "--dry-run", "-q", "--quiet", "--"]
+  mv:
+    read: false
+    options: ["-f", "--force", "-n", "--dry-run", "-v", "--verbose", "-k", "--"]
+  config:
+    read:
+      options_within: ["--get", "--get-all", "--list", "-l"]
+      positionals_max: 1
+    options: ["--get", "--get-all", "--list", "-l"]
+    positionals_max: 2
+    writable_keys: ["user.name", "user.email"]
+  blame:
+    read: true
+    options: ["-L", "-w", "-e", "--show-email", "-s", "--porcelain", "--"]
+    value_options: ["-L"]
+  shortlog:
+    read: true
+    options: ["-s", "--summary", "-n", "--numbered", "-e", "--email", "--"]
+  ls-files:
+    read: true
+    options: ["-s", "--stage", "-c", "--cached", "-o", "--others", "-m", "--modified", "-d", "--deleted", "-u", "--unmerged", "--exclude-standard", "--error-unmatch", "--"]
+  rev-parse:
+    read: true
+    options: ["--abbrev-ref", "--short", "--show-toplevel", "--is-inside-work-tree", "--verify", "-q", "--quiet", "--symbolic-full-name", "--show-prefix", "--"]
+  cat-file:
+    read: true
+    options: ["-p", "-t", "-s", "-e"]

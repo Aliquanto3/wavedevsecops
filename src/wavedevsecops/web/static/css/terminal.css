@@ -1,0 +1,116 @@
+/* Volet Terminal (UX-DR13) : fond encre, sortie verbatim, stderr jamais rouge. */
+.pane[data-pane="terminal"] .pane-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-terminal-bg);
+  color: var(--color-terminal-fg);
+}
+
+.terminal {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  font: var(--font-size-code) / var(--line-height-code) var(--font-family-code);
+}
+
+.terminal-empty {
+  padding: var(--pane-padding);
+  color: var(--color-terminal-fg-soft);
+}
+
+.terminal-empty[hidden],
+.terminal-hidden-note[hidden],
+.terminal-running[hidden] {
+  display: none;
+}
+
+.terminal-hidden-note {
+  margin: 0;
+  padding: var(--space-1) var(--pane-padding);
+  border-bottom: 1px solid var(--color-terminal-rule);
+  color: var(--color-terminal-fg-soft);
+}
+
+.terminal-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--pane-padding);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.terminal-line {
+  margin: 0;
+}
+
+.terminal-prompt {
+  color: var(--color-terminal-accent);
+  white-space: pre;
+}
+
+.terminal-typed {
+  color: var(--color-terminal-fg);
+}
+
+.terminal-stdout {
+  color: var(--color-terminal-fg);
+}
+
+/* Erreur standard : jamais rouge (les messages de git ne sont pas des erreurs de l'apprenant). */
+.terminal-stderr {
+  color: var(--color-terminal-fg-soft);
+  font-style: italic;
+}
+
+.terminal-app-message {
+  color: var(--color-terminal-accent);
+}
+
+.terminal-exit-error {
+  color: var(--color-terminal-danger);
+  font-weight: 700;
+}
+
+.terminal-refused {
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--space-2);
+  border: 2px solid var(--color-terminal-lit-ring);
+  border-radius: var(--radius-sm);
+  background: var(--color-terminal-lit-fill);
+  color: var(--color-terminal-fg);
+}
+
+.terminal-running {
+  margin: 0;
+  padding: var(--space-1) var(--pane-padding);
+  border-top: 1px solid var(--color-terminal-rule);
+  color: var(--color-terminal-fg-soft);
+}
+
+.terminal-form {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--pane-padding);
+  border-top: 1px solid var(--color-terminal-rule);
+}
+
+.terminal-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-terminal-fg);
+  font: inherit;
+}
+
+.terminal-input[readonly] {
+  color: var(--color-terminal-fg-soft);
+  cursor: progress;
+}

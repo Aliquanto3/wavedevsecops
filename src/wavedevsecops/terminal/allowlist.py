@@ -1,0 +1,92 @@
+"""Liste blanche du terminal (AD-4) : un seul fichier de données, `content/terminal-allowlist.yaml`.
+
+La garde (`parse`) et le texte des refus lisent ce même fichier : la liste citée à l'apprenant
+est exactement celle qui est appliquée. La story 2.5 y ajoute les commandes de fichiers sous
+`files`, sans toucher à la garde.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from wavedevsecops.config import Settings, get_settings
+
+FILE_NAME = "terminal-allowlist.yaml"
+
+
+class ReadRule(BaseModel):
+    """Conditions (toutes) pour qu'une commande compte comme lecture."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    options_within: list[str] | None = None
+    positionals_max: int | None = None
+    first_positional_in: list[str] | None = None
+
+
+class GitSubcommand(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    read: bool | ReadRule = False
+    options: list[str] = []
+    value_options: list[str] = []
+    choices: list[str] = []
+    refused_arguments: list[str] = []
+    number_option: bool = False
+    needs_message: bool = False
+    needs_message_with: list[str] = []
+    touches_origin: bool = False
+    remote_argument: bool = False
+    positionals_max: int | None = None
+    writable_keys: list[str] = []
+
+    @model_validator(mode="after")
+    def _values_are_options(self) -> GitSubcommand:
+        unknown = set(self.value_options) - set(self.options)
+        if unknown:
+            raise ValueError(f"value_options hors de options : {sorted(unknown)}")
+        return self
+
+
+class Allowlist(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int
+    messages: dict[str, str]
+    forbidden_options: list[str]
+    files: dict[str, Any] = Field(default_factory=dict)
+    git: dict[str, GitSubcommand]
+
+    def message(self, key: str, **values: object) -> str:
+        return self.messages[key].format(**values).strip()
+
+    def accepted(self) -> str:
+        """Phrase qui cite la liste acceptée, tirée du fichier."""
+        text = self.message("accepted", subcommands=", ".join(self.git))
+        if self.files:
+            text += " " + self.message("accepted_files", commands=", ".join(self.files))
+        return text
+
+    def accepted_options(self, sub: str) -> str:
+        options = [o for o in self.git[sub].options if o != "--"]
+        return self.message("accepted_options", sub=sub, options=", ".join(options))
+
+
+def load_allowlist(path: Path) -> Allowlist:
+    return Allowlist.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+
+
+@lru_cache(maxsize=8)
+def _load(path: Path) -> Allowlist:
+    return load_allowlist(path)
+
+
+def get_allowlist(settings: Settings | None = None) -> Allowlist:
+    """Liste blanche du lancement (lue une fois par fichier)."""
+    settings = settings or get_settings()
+    return _load(settings.content_path() / FILE_NAME)

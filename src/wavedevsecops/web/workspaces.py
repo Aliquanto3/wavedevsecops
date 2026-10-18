@@ -32,6 +32,8 @@ from wavedevsecops.events import Envelope
 
 log = logging.getLogger("wavedevsecops")
 RESYNC_SLOW_TEXT = "Le flux a pris du retard : l'écran se recharge depuis l'état courant."
+INTERRUPT = "interrupt"
+"""Intention traitée hors file : elle arrête la commande en cours (Ctrl+C)."""
 WAIT_STEP_S = 1.0
 """Attente maximale d'un événement avant de revérifier l'arrêt et le maintien du flux."""
 
@@ -126,6 +128,14 @@ def install_workspace_routes(app: FastAPI, manager: WorkspaceManager) -> None:
 
     @app.post("/api/ws/{workspace_id}/{intent}")
     async def ws_intent(workspace_id: str, intent: str, request: Request) -> Response:
+        if intent == INTERRUPT:
+            # Ctrl+C passe hors de la file : l'opération en cours est celle qu'on arrête (AD-17).
+            try:
+                engine = await _engine(manager, workspace_id)
+            except _Refused as refused:
+                return refused.response
+            stopped = await asyncio.to_thread(engine.interrupt)
+            return JSONResponse({"workspace_id": workspace_id, "interrupted": stopped}, 202)
         if intent not in INTENTS:
             return _refusal(404, UnknownIntent(f"L'action « {intent} » n'existe pas.").reason_text)
         raw = await request.body()

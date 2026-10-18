@@ -20,7 +20,14 @@ function initial() {
     views: {}, // projection par volet : views[pane_id]
     errorText: "", // dernier app_error ou échec de lecture
     problems: [], // projections refusées (type d'élément non déclaré)
+    terminal: { entries: [], cleared: 0, version: 0 }, // sorties du terminal, dans l'ordre d'arrivée
   };
+}
+
+/** Ajoute une entrée au terminal sans copier le tableau (jusqu'à plusieurs milliers de lignes). */
+function withEntry(terminal, entry) {
+  terminal.entries.push(entry);
+  return { ...terminal, version: terminal.version + 1 };
 }
 
 /** Garde les projections dont chaque `element` a un type déclaré par son volet. */
@@ -78,6 +85,15 @@ export function createStore() {
     fail(errorText) {
       set({ errorText });
     },
+    /** Entrée locale du terminal (ligne tapée, refus venu du serveur en 409) : même ordre que le flux. */
+    terminalAppend(entry) {
+      set({ terminal: withEntry(state.terminal, entry) });
+    },
+    /** Ctrl+L : efface l'affichage, pas l'historique des commandes. */
+    terminalClear() {
+      const terminal = state.terminal;
+      set({ terminal: { ...terminal, cleared: terminal.entries.length, version: terminal.version + 1 } });
+    },
     /** Applique un événement ; rend "resync" quand il faut relire l'état, "stale" s'il est périmé. */
     applyEvent(envelope) {
       if (envelope.kind === "resync_required") return "resync";
@@ -93,6 +109,13 @@ export function createStore() {
         patch.views = acceptViews(payload.views, problems);
         patch.fingerprint = payload.fingerprint || "";
         patch.problems = problems;
+      } else if (envelope.kind === "terminal_output") {
+        // Verbatim : le front n'analyse jamais la sortie (AD-2).
+        patch.terminal = withEntry(state.terminal, {
+          kind: payload.stream,
+          text: payload.text,
+          lang: payload.lang || "",
+        });
       } else if (envelope.kind === "app_error") {
         patch.errorText = `${payload.cause_text} ${payload.action_text}`.trim();
       }

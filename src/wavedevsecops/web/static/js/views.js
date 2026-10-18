@@ -3,6 +3,7 @@
 // terminal) arrive avec leurs stories ; la disposition ne connaît aucune de ces vues.
 import { richText } from "./dom.js";
 import { registerPane } from "./panes.js";
+import { EMPTY, renderTerminal } from "./terminal.js";
 
 /** Corps d'un volet tant qu'il n'a rien à montrer : un titre et une phrase, jamais un spinner. */
 export function renderEmpty(body, empty) {
@@ -73,9 +74,6 @@ registerPane({
   rowShare: 27,
   scroll: "both",
   terminal: true,
-  empty: {
-    title: "Le terminal n'est pas encore actif.",
-    text: "La saisie des commandes git arrive avec la prochaine version du terminal.",
-  },
-  render,
+  empty: EMPTY,
+  render: renderTerminal,
 });
