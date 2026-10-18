@@ -87,3 +87,9 @@ Après le Sprint 2, sans retour d'Anaël : arrêt du run et notification. Les Ep
 Une ligne par événement : date-heure · story · étape (dev, second-avis, review, fusion, CI, attente humaine, blocked) · résultat · commit.
 
 - 2026-10-18 · — · sprint planning · `sprint-status.yaml` généré (80 stories en `backlog`), plan écrit · —
+- 2026-10-18 · — · commit · artefacts BMAD et skills commités sur main · 9e60489
+- 2026-10-18 · 1.1 · dev · lancé (dev-story Opus, worktree) · —
+- 2026-10-18 · 1.1 · dev · fini, 61 tests verts sous Windows · 08f41f5
+- 2026-10-18 · 1.1 · second-avis · 3 medium, 5 low · —
+- 2026-10-18 · 1.1 · review · 4 medium corrigés (dont DNS du hook d'audit), point 8 reporté à 1.4 (`--group chain` en CI) · 413664e
+- 2026-10-18 · 1.1 · fusion · ff sur main, suite complète 80 passed · 413664e

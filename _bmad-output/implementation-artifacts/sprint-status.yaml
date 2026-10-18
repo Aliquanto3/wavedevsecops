@@ -29,14 +29,14 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 10-18-2026 16:55
-last_updated: 10-18-2026 16:55
+last_updated: 10-18-2026 17:30
 project: wavedevsecops
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: backlog
-  1-1-amorcer-le-dépôt-et-la-ci-sur-trois-systèmes: backlog
+  epic-1: in-progress
+  1-1-amorcer-le-dépôt-et-la-ci-sur-trois-systèmes: review
   1-2-lancer-l-application-sur-un-serveur-local-protégé: backlog
   1-3-afficher-la-coquille-d-interface-avec-l-identité-wavestack: backlog
   1-4-sonder-les-outils-requis-à-partir-d-un-registre-unique: backlog
