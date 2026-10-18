@@ -31,7 +31,9 @@ Dans PowerShell (Windows 10 ou 11), un compte standard suffit :
 
 L'installeur place uv dans votre profil, récupère l'application dans
 `%LOCALAPPDATA%\WaveDevSecOps\app` (clone avec `core.autocrlf=false`), installe PortableGit
-seulement si git est absent ou antérieur à 2.38, lance `uv sync`, puis écrit `install.json`.
+seulement si git est absent ou antérieur à 2.38, lance `uv sync`, précharge le cache uv
+(`uv-cache` : Python géré et paquets des exercices, pour travailler ensuite hors ligne), installe
+gitleaks (archive vérifiée par la somme SHA-256 de la release), puis écrit `install.json`.
 Relancez la même commande pour mettre à jour : `progress.json` est conservé, et une
 installation interrompue reprend là où elle s'est arrêtée.
 
@@ -53,6 +55,7 @@ L'installeur (`sh` POSIX) place uv dans votre profil, récupère l'application d
 (Linux, ou `$XDG_DATA_HOME`), avec un clone `core.autocrlf=false`. Si git est absent ou antérieur à 2.38, il
 installe pixi 0.82.0 dans le profil puis git (conda-forge) ; sous macOS, il ne lance `/usr/bin/git`
 qu'après `xcode-select -p`, pour ne pas ouvrir la fenêtre d'installation des outils Xcode. Il lance `uv sync`,
+précharge le cache uv (`uv-cache` : Python géré et paquets des exercices, pour travailler ensuite hors ligne),
 installe gitleaks (archive vérifiée par la somme SHA-256 de la release), puis écrit `install.json`.
 Relancez la même commande pour mettre à jour : `progress.json` est conservé, et une installation
 interrompue reprend là où elle s'est arrêtée.

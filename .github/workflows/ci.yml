@@ -31,15 +31,22 @@ jobs:
       - name: Installer Python 3.14 et les dépendances (uv.lock figé)
         run: uv sync --locked --group chain
 
-      # AD-12 : précharge le cache uv avec les verrous des gabarits d'exercice (seule étape
-      # réseau). Les tests des gabarits tournent ensuite dans un environnement créé par
-      # `uv sync --offline --frozen`, `httpx` compris (WDS_EXERCISE_UV, tests/test_exercise.py).
+      # AD-12 : précharge `<data>/uv-cache` comme l'installeur (story 7.1) : interpréteur géré
+      # dans uv-cache/python et paquets de chaque uv.lock du contenu (seule étape réseau). Les
+      # tests des gabarits tournent ensuite dans un environnement créé par
+      # `toolrun.sync_environment` (`uv sync --offline --frozen`), `httpx` compris
+      # (WDS_EXERCISE_UV, WDS_EXERCISE_DATA, tests/test_exercise.py).
       - name: Précharger le cache uv des gabarits d'exercice
         shell: bash
+        env:
+          UV_CACHE_DIR: ${{ runner.temp }}/wds-exercise/uv-cache
+          UV_PYTHON_INSTALL_DIR: ${{ runner.temp }}/wds-exercise/uv-cache/python
+          UV_PYTHON_PREFERENCE: only-managed
         run: |
-          for track in llm no_ai; do
-            UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/venv-$track" \
-              uv sync --frozen --project "content/exercise/$track"
+          find content -type f -name uv.lock | sort | while IFS= read -r lock; do
+            UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/preload-venv" \
+              uv sync --frozen --all-groups --all-extras --project "$(dirname "$lock")"
+            rm -rf "$RUNNER_TEMP/preload-venv"
           done
 
       - name: ruff
@@ -51,6 +58,7 @@ jobs:
         run: uv run pytest -q --tb=short
         env:
           WDS_EXERCISE_UV: "1"
+          WDS_EXERCISE_DATA: ${{ runner.temp }}/wds-exercise
 
       # AD-13, contrôle (4) : la suite de scénarios rejouée sans réseau, sous-processus
       # (git) compris. L'espace de noms est créé par root, les tests tournent en runner.
@@ -58,6 +66,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           WDS_EXERCISE_UV: "1"
+          WDS_EXERCISE_DATA: ${{ runner.temp }}/wds-exercise
         run: >
           sudo unshare --net --
           sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
@@ -116,3 +125,44 @@ jobs:
           "$WDS_DATA_DIR/tools/bin/git" --version
           "$WDS_DATA_DIR/tools/gitleaks/gitleaks" version
           test -f "$WDS_DATA_DIR/app/pyproject.toml"
+
+      # Story 7.1 : la chaîne fonctionne réseau coupé depuis le uv-cache préchargé (sous Linux,
+      # dans un espace de noms sans réseau ; l'espace est créé par root, le script tourne en runner).
+      - name: Chaîne hors ligne (uv-cache, toolrun, diagnostic)
+        env:
+          WDS_DATA_DIR: ${{ runner.temp }}/wds-data
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          set --
+          if [ "$RUNNER_OS" = Linux ]; then
+            set -- sudo unshare --net -- sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
+          fi
+          "$@" "$WDS_DATA_DIR/app/.venv/bin/python" .github/scripts/verifier_hors_ligne.py
+
+  installeur-windows:
+    name: install.ps1 réel (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Story 7.1 : gitleaks vérifié par checksums.txt et uv-cache préchargé, sous Windows.
+      - name: Installer avec install.ps1 (durée relevée)
+        shell: powershell
+        env:
+          WDS_DATA_DIR: ${{ runner.temp }}\wds-data
+          WDS_INSTALL_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          & .\install.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          "Durée de l'installation : $([Math]::Round($watch.Elapsed.TotalSeconds)) s"
+
+      - name: Chaîne hors ligne (uv-cache, toolrun, diagnostic)
+        shell: bash
+        env:
+          WDS_DATA_DIR: ${{ runner.temp }}\wds-data
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          cat "$WDS_DATA_DIR/install.json"
+          "$WDS_DATA_DIR/tools/gitleaks/gitleaks.exe" version
+          "$WDS_DATA_DIR/app/.venv/Scripts/python.exe" .github/scripts/verifier_hors_ligne.py

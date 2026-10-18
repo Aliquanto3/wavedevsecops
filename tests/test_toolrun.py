@@ -157,3 +157,103 @@ def test_run_tool_lance_l_outil_resolu(tmp_path: Path, monkeypatch: pytest.Monke
     assert result.ok and result.stdout.strip() == "ok"
     missing = toolrun.run_tool("inconnu", [], settings=_settings(tmp_path))
     assert missing.error and not missing.ok
+
+
+# --- Story 7.1 : environnement d'exercice hors ligne (AD-12) -------------------------------
+
+
+def _fake_venv(root: Path, platform: str, packages: dict[str, str]) -> Path:
+    venv = root / "cache" / "venv"
+    if toolrun.family(platform) == "windows":
+        site, scripts, suffix = venv / "Lib" / "site-packages", venv / "Scripts", ".exe"
+    else:
+        site, scripts, suffix = venv / "lib" / "python3.14" / "site-packages", venv / "bin", ""
+    site.mkdir(parents=True)
+    scripts.mkdir(parents=True)
+    for name, version in packages.items():
+        (site / f"{name.replace('-', '_')}-{version}.dist-info").mkdir()
+        (scripts / f"{name}{suffix}").write_text("", encoding="utf-8")
+    return venv
+
+
+@pytest.mark.parametrize("platform", ["win32", "linux"])
+def test_outil_de_la_chaine_resolu_dans_le_venv(tmp_path: Path, platform: str) -> None:
+    venv = _fake_venv(tmp_path, platform, {"ruff": "0.17.1", "pytest-cov": "6.0.0"})
+    assert toolrun.venv_dir(tmp_path) == venv
+    status = toolrun.resolve("ruff", Settings(data_dir=tmp_path), platform=platform, venv=venv)
+    assert status.ok and status.source == "environment" and status.version == "0.17.1"
+    assert status.path is not None and status.path.parent.parent == venv
+    cov = toolrun.resolve("pytest-cov", Settings(), platform=platform, venv=venv)
+    assert cov.state == "mismatch" and "abîmé" in cov.reason and "uv sync" in cov.reason
+    absent = toolrun.resolve("bandit", Settings(), platform=platform, venv=venv)
+    assert absent.state == "missing" and "uv sync" in absent.reason
+    nowhere = toolrun.resolve("ruff", Settings(), platform=platform, venv=tmp_path / "x")
+    assert nowhere.state == "missing"
+
+
+def test_environnement_hors_ligne_story_7_1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.corp:3128")
+    monkeypatch.setenv("all_proxy", "socks5://proxy.corp:1080")
+    env = toolrun.offline_environment(Settings(data_dir=tmp_path))
+    assert not any(k.lower() in toolrun.PROXY_NAMES for k in env)
+    assert env["no_proxy"] == "127.0.0.1,localhost" and env["UV_PYTHON_DOWNLOADS"] == "never"
+    assert Path(env["UV_PYTHON_INSTALL_DIR"]) == tmp_path / "uv-cache" / "python"
+    assert env["WDS_NETGUARD"] == "1"
+    for name in ("RUFF_CACHE_DIR", "COVERAGE_FILE", "PRE_COMMIT_HOME"):
+        assert Path(env[name]).parent == tmp_path / "cache"
+
+
+def test_sync_environment_hors_ligne(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[list[str], dict[str, str]]] = []
+    venv = _fake_venv(tmp_path / "ws", sys.platform, {})
+
+    def fake_run(argv, *, env, cwd, timeout):  # noqa: ANN001, ANN202
+        calls.append(([str(a) for a in argv], env))
+        return procs.ProcResult(0)
+
+    uv = toolrun.ToolStatus("uv", "ok", "0.13.1", PY, "host")
+    monkeypatch.setattr(toolrun, "resolve", lambda tool_id, *a, **k: uv)
+    monkeypatch.setattr(toolrun.procs, "run", fake_run)
+    project = tmp_path / "ws" / "repo"
+    result = toolrun.sync_environment(project, venv, Settings(data_dir=tmp_path / "data"))
+    assert result.ok
+    ((argv, env),) = calls
+    assert argv == [str(PY), "sync", "--offline", "--frozen", "--project", str(project)]
+    assert env["UV_PROJECT_ENVIRONMENT"] == str(venv) and env["UV_OFFLINE"] == "1"
+    assert env["UV_CACHE_DIR"] == str(tmp_path / "data" / "uv-cache")
+    site = toolrun.site_packages(venv)
+    assert site is not None
+    assert (site / "_wds_netguard.pth").read_text("utf-8").strip() == "import _wds_netguard"
+    # Sans uv utilisable, aucune exception : l'erreur est rendue.
+    monkeypatch.setattr(
+        toolrun, "resolve", lambda *a, **k: toolrun.ToolStatus("uv", "missing", reason="absent")
+    )
+    failed = toolrun.sync_environment(project, venv, Settings(data_dir=tmp_path / "data"))
+    assert not failed.ok and failed.error == "absent"
+
+
+_CONNECT = """
+import socket
+server = socket.socket()
+server.bind(("127.0.0.1", 0))
+server.listen(1)
+client = socket.socket()
+client.connect(server.getsockname())  # loopback : permis
+client.close()
+try:
+    socket.socket().connect(("192.0.2.1", 9))  # TEST-NET-1 : refusé avant tout envoi
+except PermissionError as exc:
+    print("refusé", exc)
+"""
+
+
+def test_garde_reseau_du_venv(tmp_path: Path) -> None:
+    script = tmp_path / "essai.py"
+    script.write_text(toolrun.NETGUARD_SOURCE + _CONNECT, encoding="utf-8")
+    env = toolrun.probe_environment()
+    env["WDS_NETGUARD"] = "1"
+    result = procs.run([PY, "-I", script], env=env, timeout=30)
+    assert result.ok, result.stderr
+    assert "WaveDevSecOps" in result.stdout and "192.0.2.1" in result.stdout

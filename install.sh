@@ -22,7 +22,7 @@
 #   WDS_INSTALL_SIMULATE_UV=<version|none>, WDS_INSTALL_SIMULATE_OS=<Darwin|Linux>,
 #   WDS_INSTALL_SIMULATE_ARCH=<uname -m>, WDS_INSTALL_SIMULATE_XCODE=<ok|missing>,
 #   WDS_INSTALL_SIMULATE_TOOLS_TOML=<fichier>,
-#   WDS_INSTALL_SIMULATE_FAIL=<étapes séparées par des virgules : download, pixi, clone, sync, checksum>,
+#   WDS_INSTALL_SIMULATE_FAIL=<étapes séparées par des virgules : download, pixi, clone, sync, preload, checksum>,
 #   WDS_INSTALL_LIBONLY=1 (définit les fonctions sans rien lancer).
 
 INSTALLER_VERSION=1
@@ -594,6 +594,42 @@ run_uv_sync() {
     fi
 }
 
+# preload_uv_cache : AD-12, précharge <data>/uv-cache avec l'interpréteur Python géré et chaque
+# paquet de chaque uv.lock du contenu (gabarits d'exercice, états de scénario) : les stations
+# tournent ensuite réseau coupé (`uv sync --offline --frozen`). Seule étape réseau des exercices.
+preload_uv_cache() {
+    _cache="$DATA_DIR/uv-cache"
+    if [ "$SIMULATE" = 1 ]; then
+        sim_log "uv-cache-preload $_cache"
+        if simulated_failure preload; then
+            fail 'Le préchargement du cache uv a échoué (simulation).' "$NETWORK_SETTINGS" "$ROUTE_TEXT"
+        fi
+        return
+    fi
+    _locks=$(find "$APP_DIR/content" -type f -name uv.lock 2>/dev/null | sort)
+    [ -n "$_locks" ] || fail "L'application ne contient aucun gabarit d'exercice (uv.lock introuvable dans content)." '' "$ROUTE_TEXT"
+    _pv="$DATA_DIR/cache/preload-venv"
+    _saved_ifs=$IFS
+    IFS='
+'
+    set -f
+    for _lock in $_locks; do
+        _proj=$(dirname "$_lock")
+        info "Préchargement : ${_proj#"$APP_DIR"/}"
+        rm -rf "$_pv"
+        env UV_CACHE_DIR="$_cache" UV_PYTHON_INSTALL_DIR="$_cache/python" UV_PYTHON_PREFERENCE=only-managed \
+            UV_PROJECT_ENVIRONMENT="$_pv" "$UV_PATH" sync --frozen --all-groups --all-extras --no-progress --project "$_proj" </dev/null
+        _rc=$?
+        if [ "$_rc" -ne 0 ]; then
+            rm -rf "$_pv"
+            fail "Le préchargement du cache uv a échoué (code $_rc) : les paquets des exercices n'ont pas pu être téléchargés ($_proj)." "$NETWORK_SETTINGS" "$ROUTE_TEXT"
+        fi
+    done
+    set +f
+    IFS=$_saved_ifs
+    rm -rf "$_pv"
+}
+
 # install_gitleaks : archive officielle de la release, vérifiée par le fichier de sommes, extraite dans tools/gitleaks.
 install_gitleaks() {
     GL_VERSION=$(tool_value gitleaks provisioned_version)
@@ -782,6 +818,9 @@ main() {
 
     step 'Dépendances Python (uv sync)'
     run_uv_sync
+
+    step 'Cache uv hors ligne (uv-cache)'
+    preload_uv_cache
 
     step 'gitleaks'
     install_gitleaks

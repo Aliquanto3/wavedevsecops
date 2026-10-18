@@ -305,6 +305,22 @@ def test_somme_fausse_arrete_gitleaks(tmp_path: Path) -> None:
     assert _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0").returncode == 0
 
 
+def test_precharge_le_cache_uv_apres_le_sync(tmp_path: Path) -> None:
+    # Story 7.1 (AD-12) : uv-cache préchargé après les dépendances, avant gitleaks.
+    assert _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0").returncode == 0
+    log = _log(tmp_path)
+    preload = log.index(f"uv-cache-preload {tmp_path / 'uv-cache'}")
+    assert any(line.startswith("uv sync --frozen") for line in log[:preload])
+    assert any(line.startswith("gitleaks-extract") for line in log[preload:])
+
+
+def test_echec_du_prechargement_message_francais(tmp_path: Path) -> None:
+    out = _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0", WDS_INSTALL_SIMULATE_FAIL="preload")
+    assert out.returncode == 1
+    assert "préchargement du cache uv" in out.stderr and "HTTPS_PROXY" in out.stderr
+    assert not (tmp_path / "install.json").exists()
+
+
 def test_reprise_apres_echec_partiel_du_sync(tmp_path: Path) -> None:
     env = {"WDS_INSTALL_SIMULATE_GIT": "2.43.0"}
     assert _install(tmp_path, WDS_INSTALL_SIMULATE_FAIL="sync", **env).returncode == 1

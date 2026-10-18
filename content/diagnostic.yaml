@@ -36,7 +36,7 @@ statuses:
   ok: "Prêt"
   missing: "Absent"
   too_old: "Trop ancien"
-  mismatch: "Version inattendue"
+  mismatch: "Environnement abîmé"
   info: "Information"
   warn: "À vérifier"
 
@@ -105,7 +105,7 @@ ui:
   badge_one: "Diagnostic, 1 outil absent ou trop ancien"
   badge_many: "Diagnostic, {count} outils absents ou trop anciens"
   group_required: "Outils requis ({milestone})"
-  group_chain: "Outils de la chaîne ({milestone})"
+  group_chain: "Outils de la chaîne (v0.2+)"
   tools_title: "Outils"
   tools_subtitle: "Version trouvée sur ce poste, version requise et marche à suivre"
   tools_note: "Les versions requises sont celles du registre d'outils de l'application."

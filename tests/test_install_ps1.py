@@ -286,3 +286,53 @@ def test_dossier_app_etranger_non_supprime(tmp_path: Path) -> None:
         out = _install(tmp_path, WDS_INSTALL_METHOD=method, WDS_INSTALL_SIMULATE_GIT="2.43.0")
         assert out.returncode == 1 and "ne contient pas l'application" in out.stdout
         assert foreign.read_text("utf-8") == "à garder"
+
+
+# --- Story 7.1 : gitleaks vérifié et cache uv préchargé (AD-12, AD-15) ---------------------
+
+
+def test_gitleaks_et_cache_uv_provisionnes(tmp_path: Path) -> None:
+    out = _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0")
+    assert out.returncode == 0, out.stdout + out.stderr
+    log = _log(tmp_path)
+    base = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/"
+    preload = log.index(f"uv-cache-preload {tmp_path / 'uv-cache'}")
+    assert any(line.startswith("uv sync --frozen") for line in log[:preload])
+    assert f"download {base}gitleaks_8.30.1_windows_x64.zip" in log[preload:]
+    assert f"download {base}gitleaks_8.30.1_checksums.txt" in log
+    assert "gitleaks-extract gitleaks_8.30.1_windows_x64.zip" in log
+    assert (tmp_path / "tools" / "gitleaks" / "gitleaks.exe").exists()
+    assert not list((tmp_path / "cache" / "downloads").glob("gitleaks_*"))
+    record = json.loads((tmp_path / "install.json").read_text("utf-8"))
+    assert record["versions"]["gitleaks"] == "8.30.1"
+    # Relancé : gitleaks déjà là, pas de second téléchargement.
+    assert _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0").returncode == 0
+    assert sum(line.startswith("gitleaks-extract") for line in _log(tmp_path)) == 1
+
+
+def test_somme_fausse_arrete_gitleaks(tmp_path: Path) -> None:
+    out = _install(
+        tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0", WDS_INSTALL_SIMULATE_FAIL="checksum"
+    )
+    assert out.returncode == 1
+    assert "ne correspond pas" in out.stdout and "gitleaks" in out.stdout
+    assert "étape « gitleaks »" in out.stdout
+    assert not (tmp_path / "install.json").exists()
+    assert not (tmp_path / "tools" / "gitleaks").exists()
+    assert not list((tmp_path / "cache" / "downloads").glob("gitleaks_*"))
+    assert _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0").returncode == 0
+
+
+def test_echec_du_prechargement_message_francais(tmp_path: Path) -> None:
+    out = _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0", WDS_INSTALL_SIMULATE_FAIL="preload")
+    assert out.returncode == 1
+    assert "préchargement du cache uv" in out.stdout and "HTTPS_PROXY" in out.stdout
+    assert not (tmp_path / "install.json").exists()
+
+
+def test_somme_lue_dans_le_fichier_de_la_release(tmp_path: Path) -> None:
+    sums = tmp_path / "checksums.txt"
+    sums.write_text("ABC123  a.zip\ndef456 *b.zip\n", "utf-8")
+    assert _lib(f"Get-ExpectedChecksum '{sums}' 'a.zip'", tmp_path) == "abc123"
+    assert _lib(f"Get-ExpectedChecksum '{sums}' 'b.zip'", tmp_path) == "def456"
+    assert _lib(f"[string](Get-ExpectedChecksum '{sums}' 'c.zip')", tmp_path) == ""

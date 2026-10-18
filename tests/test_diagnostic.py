@@ -137,3 +137,47 @@ def test_diagnostic_reel_emet_chaque_resultat(tmp_path: Path) -> None:
         assert check.label_text and check.status_text and check.detail_text
         if check.status != "ok" and check.group == "tool":
             assert check.what_to_do_text, check.check_id
+
+
+# --- Story 7.1 : outils de la chaîne (v0.2+) -----------------------------------------------
+
+CHAIN = (
+    "gitleaks",
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "coverage",
+    "diff-cover",
+    "bandit",
+    "pip-audit",
+    "pre-commit",
+)
+
+
+def test_groupe_outils_de_la_chaine_v02() -> None:
+    plan = diagnostic.plan(Settings())
+    titles = {g["title_text"]: g["check_ids"] for g in plan["groups"]}
+    assert list(titles) == ["Outils requis (v0.1)", "Outils de la chaîne (v0.2+)"]
+    assert titles["Outils de la chaîne (v0.2+)"] == [f"tool.{t}" for t in CHAIN]
+    rows = {r["check_id"]: r for r in plan["rows"]}
+    assert rows["tool.ruff"]["required_version"] == "0.17.1"
+    assert rows["tool.gitleaks"]["required_version"] == "≥ 8.20.0"
+
+
+def test_ecart_avec_uv_lock_environnement_abime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken = toolrun.ToolStatus("ruff", "mismatch", "0.1.0", None, "environment", "abîmé")
+    real = toolrun.resolve
+    monkeypatch.setattr(
+        diagnostic.toolrun,
+        "resolve",
+        lambda tool_id, *a, **k: broken if tool_id == "ruff" else real(tool_id, *a, **k),
+    )
+    checks = diagnostic.run_diagnostic(
+        Settings(data_dir=tmp_path), environ={}, scenarios={"ruff": ["station-1-ruff"]}
+    )
+    ruff = next(c for c in checks if c.check_id == "tool.ruff")
+    assert ruff.status_text == "Environnement abîmé" and ruff.blocking
+    assert "uv sync" in ruff.what_to_do_text
+    assert ruff.unavailable_scenarios == ["station-1-ruff"]

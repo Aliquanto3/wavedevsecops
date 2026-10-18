@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from wavedevsecops import toolrun
 from wavedevsecops.config import Settings
 from wavedevsecops.engine import WorkspaceError, prepare_workspace
 from wavedevsecops.scenarios import LoadedScenario, SetupError, parse_scenario
@@ -104,26 +105,49 @@ def _prepare(track: str, stage: str, tmp_path: Path, git_path: Path) -> Path:
 
 USE_TEMPLATE_LOCK = os.environ.get("WDS_EXERCISE_UV") == "1"
 """En CI : les tests du gabarit tournent dans son environnement verrouillé, créé par
-`uv sync --offline --frozen` depuis le cache uv préchargé (AD-12), `httpx` compris.
+`toolrun.sync_environment` (`uv sync --offline --frozen`) depuis le cache uv préchargé comme
+le fait l'installeur, dans `WDS_EXERCISE_DATA` (AD-12), `httpx` compris. pytest est lancé par
+`toolrun.run_tool` : résolu par le registre, garde réseau active.
 Sinon : avec l'interpréteur de l'application, sans `httpx`."""
 
 
-def _run_tests(repo: Path) -> subprocess.CompletedProcess[str]:
+def _run_tests(repo: Path) -> tuple[int | None, str]:
+    if USE_TEMPLATE_LOCK:
+        settings = Settings(data_dir=Path(os.environ["WDS_EXERCISE_DATA"]))
+        venv = toolrun.venv_dir(repo.parent)
+        synced = toolrun.sync_environment(repo, venv, settings)
+        assert synced.ok, f"{synced.error}\n{synced.stdout}\n{synced.stderr}"
+        site = toolrun.site_packages(venv)
+        assert site is not None and (site / "_wds_netguard.pth").is_file()
+        assert not (repo / ".venv").exists()  # le bac à sable reste propre
+        ran = toolrun.run_tool(
+            "pytest",
+            ["-q", "--tb=short", "-rs"],
+            cwd=repo,
+            timeout=300,
+            settings=settings,
+            venv=venv,
+        )
+        # Dans l'environnement du gabarit, aucun test n'est sauté (chemin `httpx` compris).
+        assert "skipped" not in ran.stdout, ran.stdout
+        return ran.returncode, f"{ran.error or ''}{ran.stdout}{ran.stderr}"
     env = {k: v for k, v in os.environ.items() if not k.startswith(("PYTHON", "WDS_"))}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    pytest_args = ["pytest", "-q", "--tb=short", "-rs", "-p", "no:cacheprovider"]
-    if USE_TEMPLATE_LOCK:
-        env["UV_PROJECT_ENVIRONMENT"] = str(repo.parent / "cache" / "venv")
-        argv = ["uv", "run", "--offline", "--frozen", *pytest_args]
-    else:
-        argv = [sys.executable, "-I", "-m", *pytest_args]
+    argv = [
+        sys.executable,
+        "-I",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "-rs",
+        "-p",
+        "no:cacheprovider",
+    ]
     result = subprocess.run(  # noqa: S603 - sous-processus de test, argv fixe
         argv, cwd=repo, env=env, capture_output=True, text=True, timeout=300
     )
-    if USE_TEMPLATE_LOCK:
-        # Dans l'environnement du gabarit, aucun test n'est sauté (chemin `httpx` compris).
-        assert "skipped" not in result.stdout, result.stdout
-    return result
+    return result.returncode, result.stdout + result.stderr
 
 
 def test_parcours_sans_ia_pose_le_gabarit_et_ses_tests_passent(
@@ -133,8 +157,8 @@ def test_parcours_sans_ia_pose_le_gabarit_et_ses_tests_passent(
     for name in REQUIRED:
         assert (repo / name).exists(), name
     assert not (repo / "llm.toml").exists()
-    result = _run_tests(repo)
-    assert result.returncode == 0, result.stdout + result.stderr
+    code, output = _run_tests(repo)
+    assert code == 0, output
 
 
 @pytest.mark.parametrize("stage", LLM_STAGES)
@@ -146,8 +170,8 @@ def test_parcours_llm_pose_chaque_stade_et_ses_tests_passent_hors_ligne(
         assert (repo / name).exists(), name
     assert not (repo / "stages").exists()
     assert (repo / "src/inventory/assistant.py").read_bytes().count(b"\r") == 0
-    result = _run_tests(repo)
-    assert result.returncode == 0, result.stdout + result.stderr
+    code, output = _run_tests(repo)
+    assert code == 0, output
 
 
 def test_les_stades_avancent(tmp_path: Path, git_path: Path) -> None:
@@ -171,9 +195,7 @@ def test_un_stade_du_mauvais_parcours_est_refuse(tmp_path: Path, git_path: Path)
 def test_un_gabarit_absent_laisse_un_espace_propre(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "data", content_dir=tmp_path / "vide")
     with pytest.raises(SetupError, match="introuvable"):
-        prepare_workspace(
-            _loaded("no_ai", "base"), "no_ai", settings=settings, git_path=git_path
-        )
+        prepare_workspace(_loaded("no_ai", "base"), "no_ai", settings=settings, git_path=git_path)
     assert not (tmp_path / "data" / "workspaces" / "no_ai").exists() or not any(
         (tmp_path / "data" / "workspaces" / "no_ai").iterdir()
     )

@@ -13,7 +13,7 @@
 #   HTTPS_PROXY         proxy d'entreprise ; pose aussi UV_SYSTEM_CERTS=true
 # Réglages de test (aucun accès réseau, aucune installation réelle) :
 #   WDS_INSTALL_SIMULATE=1, WDS_INSTALL_SIMULATE_GIT=<version|none>, WDS_INSTALL_SIMULATE_UV=<version|none>,
-#   WDS_INSTALL_SIMULATE_FAIL=<étapes séparées par des virgules : download, portablegit, clone, sync>,
+#   WDS_INSTALL_SIMULATE_FAIL=<étapes séparées par des virgules : download, portablegit, clone, sync, preload, checksum>,
 #   WDS_INSTALL_LIBONLY=1 (définit les fonctions sans rien lancer).
 
 $script:SavedErrorActionPreference = $ErrorActionPreference
@@ -497,6 +497,111 @@ function Invoke-UvSync([string]$UvExe, [string]$AppDir) {
     }
 }
 
+function Invoke-UvCachePreload([string]$UvExe, [string]$DataDir, [string]$AppDir) {
+    # AD-12 : précharge <data>\uv-cache avec l'interpréteur Python géré et chaque paquet de chaque
+    # uv.lock du contenu (gabarits d'exercice, états de scénario) : les stations tournent ensuite
+    # réseau coupé (`uv sync --offline --frozen`). Seule étape réseau pour les exercices.
+    $cache = Join-Path $DataDir 'uv-cache'
+    if ($script:Simulate) {
+        Add-SimLog "uv-cache-preload $cache"
+        if (Test-SimulatedFailure 'preload') {
+            throw (New-InstallError 'Le préchargement du cache uv a échoué (simulation).' $script:NetworkSettings $script:RouteText)
+        }
+        return
+    }
+    $locks = @(Get-ChildItem -LiteralPath (Join-Path $AppDir 'content') -Recurse -Filter 'uv.lock' -File -ErrorAction SilentlyContinue | Sort-Object FullName)
+    if ($locks.Count -eq 0) {
+        throw (New-InstallError 'L''application ne contient aucun gabarit d''exercice (uv.lock introuvable dans content).' @() $script:RouteText)
+    }
+    $venv = Join-Path $DataDir 'cache\preload-venv'
+    $vars = [ordered]@{ UV_CACHE_DIR = $cache; UV_PYTHON_INSTALL_DIR = (Join-Path $cache 'python'); UV_PYTHON_PREFERENCE = 'only-managed'; UV_PROJECT_ENVIRONMENT = $venv }
+    $saved = @{}
+    foreach ($k in $vars.Keys) {
+        $saved[$k] = [Environment]::GetEnvironmentVariable($k, 'Process')
+        [Environment]::SetEnvironmentVariable($k, $vars[$k], 'Process')
+    }
+    try {
+        foreach ($lock in $locks) {
+            $project = $lock.DirectoryName
+            Write-Info "Préchargement : $($project.Substring($AppDir.Length).TrimStart('\'))"
+            if (Test-Path -LiteralPath $venv) { Remove-Item -LiteralPath $venv -Recurse -Force }
+            $code = Invoke-Native $UvExe @('sync', '--frozen', '--all-groups', '--all-extras', '--no-progress', '--project', $project) $project
+            if ($code -ne 0) {
+                throw (New-InstallError "Le préchargement du cache uv a échoué (code $code) : les paquets des exercices n'ont pas pu être téléchargés ($project)." $script:NetworkSettings $script:RouteText)
+            }
+        }
+    }
+    finally {
+        foreach ($k in $vars.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k], 'Process') }
+        if (Test-Path -LiteralPath $venv) { Remove-Item -LiteralPath $venv -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Get-ExpectedChecksum([string]$SumsPath, [string]$Name) {
+    # Ligne « <somme>  <nom> » (ou « <somme> *<nom> ») du fichier de sommes de la release.
+    foreach ($line in [IO.File]::ReadAllLines($SumsPath)) {
+        $parts = @($line.Trim() -split '\s+')
+        if ($parts.Count -ge 2 -and ($parts[1] -eq $Name -or $parts[1] -eq "*$Name")) { return $parts[0].ToLowerInvariant() }
+    }
+    return $null
+}
+
+function Install-Gitleaks([string]$DataDir, [hashtable]$Tool) {
+    # AD-15 : archive officielle de la release, vérifiée par son fichier de sommes, extraite dans
+    # tools\gitleaks. Une somme fausse arrête l'installation de l'outil (rien n'est extrait).
+    # Windows ARM64 lance l'archive x64 par émulation.
+    $version = Get-ProvisionedVersion $Tool
+    $target = Join-Path $DataDir 'tools\gitleaks'
+    $exe = Join-Path $target 'gitleaks.exe'
+    if (Test-Path -LiteralPath $exe) {
+        $found = if ($script:Simulate) { $version } else { Get-ToolVersionText $exe @('version') '(\d+(?:\.\d+)+)' }
+        if ($found -eq $version) { Write-Info "gitleaks $version déjà présent."; return $version }
+    }
+    $name = "gitleaks_${version}_windows_x64.zip"
+    $sumsName = "gitleaks_${version}_checksums.txt"
+    $base = "https://github.com/gitleaks/gitleaks/releases/download/v$version"
+    $downloads = Join-Path $DataDir 'cache\downloads'
+    $archive = Join-Path $downloads $name
+    $sums = Join-Path $downloads $sumsName
+    Write-Info "Installation de gitleaks $version (archive vérifiée par le fichier de sommes de la release)."
+    Save-File "$base/$name" $archive
+    if (Test-Path -LiteralPath $sums) { Remove-Item -LiteralPath $sums -Force }
+    Save-File "$base/$sumsName" $sums
+    if ($script:Simulate) {
+        $fake = if (Test-SimulatedFailure 'checksum') { '0' * 64 } else { (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() }
+        [IO.File]::WriteAllText($sums, "$fake  $name`n")
+    }
+    $expected = Get-ExpectedChecksum $sums $name
+    if (-not $expected) {
+        Remove-Item -LiteralPath $archive, $sums -Force -ErrorAction SilentlyContinue
+        throw (New-InstallError "Vérification de gitleaks : aucune somme de contrôle pour « $name » dans le fichier de sommes de la release." @() $script:RouteText)
+    }
+    $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) {
+        Remove-Item -LiteralPath $archive, $sums -Force -ErrorAction SilentlyContinue
+        throw (New-InstallError "Vérification de gitleaks : la somme SHA-256 de « $name » ne correspond pas à celle de la release (téléchargement corrompu ou intercepté). L'archive est supprimée, rien n'est installé." $script:NetworkSettings 'relancez la commande ; si cela persiste, un proxy modifie les téléchargements : demandez à votre administrateur réseau.')
+    }
+    $staging = "$target.new"
+    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    New-Item -ItemType Directory -Path $staging -Force | Out-Null
+    if ($script:Simulate) {
+        Add-SimLog "gitleaks-extract $name"
+        [IO.File]::WriteAllText((Join-Path $staging 'gitleaks.exe'), 'simulation')
+    }
+    else {
+        try { Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force } catch { }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $staging 'gitleaks.exe'))) {
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+        throw (New-InstallError 'L''archive de gitleaks ne contient pas l''exécutable attendu.' @('WDS_DATA_DIR (dossier accessible en écriture)') $script:RouteText)
+    }
+    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+    Move-Item -LiteralPath $staging -Destination $target
+    Remove-Item -LiteralPath $archive, $sums -Force -ErrorAction SilentlyContinue
+    return $version
+}
+
 function Get-RegistryPath([string]$DataDir, [string]$Ref) {
     if ($PSScriptRoot) {
         $local = Join-Path $PSScriptRoot 'tools.toml'
@@ -533,7 +638,7 @@ function Invoke-Install {
 
     Write-Step 'Registre des outils (tools.toml)'
     $registry = Read-ToolsRegistry (Get-RegistryPath $dataDir $ref)
-    foreach ($id in @('git', 'uv')) {
+    foreach ($id in @('git', 'uv', 'gitleaks')) {
         if (-not $registry.Contains($id)) {
             throw (New-InstallError "tools.toml ne déclare pas l'outil « $id »." @() 'récupérez une version à jour de l''application (zip depuis GitHub).')
         }
@@ -577,6 +682,12 @@ function Invoke-Install {
 
     Write-Step 'Dépendances Python (uv sync)'
     Invoke-UvSync $uv.Path $appDir
+
+    Write-Step 'Cache uv hors ligne (uv-cache)'
+    Invoke-UvCachePreload $uv.Path $dataDir $appDir
+
+    Write-Step 'gitleaks'
+    $versions['gitleaks'] = Install-Gitleaks $dataDir $registry['gitleaks']
 
     Write-Step 'Enregistrement'
     $watch.Stop()

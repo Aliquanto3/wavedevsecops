@@ -7,6 +7,7 @@ d'exception pour un outil absent ou abîmé : il en rend l'état et la raison.
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 from collections.abc import Mapping, Sequence
@@ -30,6 +31,34 @@ Source = Literal["host", "provisioned", "environment"]
 
 PROXY_NAMES = ("http_proxy", "https_proxy", "all_proxy")
 LOOPBACK_NO_PROXY = "127.0.0.1,localhost"
+NETGUARD_VARIABLE = "WDS_NETGUARD"
+NETGUARD_MODULE = "_wds_netguard"
+
+# Garde réseau posée dans chaque environnement d'exercice (AD-12, AD-13) : un `.pth` l'importe
+# au démarrage de tout Python du venv (outils, tests du gabarit). Quand `WDS_NETGUARD=1` (posé
+# par `offline_environment`), un hook d'audit refuse toute connexion hors loopback, même sans
+# proxy. `llmrun` lancera le code d'exercice sans cette variable : lui seul peut sortir.
+NETGUARD_SOURCE = '''"""Garde réseau de WaveDevSecOps : connexion hors loopback refusée (AD-12)."""
+import os
+import sys
+
+_LOOPBACK = ("localhost", "::1", "0:0:0:0:0:0:0:1")
+
+
+def _wds_netguard(event, args):
+    if event != "socket.connect" or len(args) < 2 or not isinstance(args[1], tuple):
+        return
+    host = str(args[1][0]).lower().removeprefix("::ffff:")
+    if host.startswith("127.") or host in _LOOPBACK:
+        return
+    raise PermissionError(
+        "WaveDevSecOps : connexion vers " + host + " refusée, l'exercice tourne hors ligne"
+    )
+
+
+if os.environ.get("WDS_NETGUARD") == "1":
+    sys.addaudithook(_wds_netguard)
+'''
 
 
 @dataclass(frozen=True)
@@ -79,8 +108,21 @@ def offline_environment(settings: Settings | None = None) -> dict[str, str]:
         COVERAGE_FILE=str(cache / "coverage"),
         PRE_COMMIT_HOME=str(cache / "pre-commit"),
         PYTEST_ADDOPTS="-p no:cacheprovider",
+        UV_PYTHON_INSTALL_DIR=str(python_install_dir(settings)),
+        UV_NO_PROGRESS="1",
     )
+    env[NETGUARD_VARIABLE] = "1"
     return env
+
+
+def python_install_dir(settings: Settings | None = None) -> Path:
+    """Interpréteurs Python gérés par uv, préchargés avec le cache par l'installeur (AD-12)."""
+    return (settings or get_settings()).resolved_data_dir() / "uv-cache" / "python"
+
+
+def venv_dir(workspace_root: Path) -> Path:
+    """Environnement d'exercice d'un espace : `cache/venv/`, hors instantanés (AD-5, AD-12)."""
+    return workspace_root / "cache" / "venv"
 
 
 def _host_candidate(tool: Tool, platform: str, timeout: float) -> tuple[Path | None, str]:
@@ -114,6 +156,61 @@ def _probe(tool: Tool, path: Path, timeout: float) -> tuple[tuple[int, ...] | No
     return version, ""
 
 
+def site_packages(venv: Path, platform: str = sys.platform) -> Path | None:
+    """Dossier `site-packages` d'un environnement virtuel, ou None s'il n'existe pas."""
+    if family(platform) == "windows":
+        found = venv / "Lib" / "site-packages"
+        return found if found.is_dir() else None
+    return next((p for p in sorted(venv.glob("lib/python*/site-packages")) if p.is_dir()), None)
+
+
+def _normalize(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def installed_version(venv: Path, package: str, platform: str = sys.platform) -> str | None:
+    """Version de `package` installée dans `venv`, lue dans son `.dist-info` sans le lancer."""
+    site = site_packages(venv, platform)
+    if site is None:
+        return None
+    wanted = _normalize(package)
+    for info in site.glob("*.dist-info"):
+        name, _, version = info.name.removesuffix(".dist-info").rpartition("-")
+        if name and _normalize(name) == wanted:
+            return version
+    return None
+
+
+def _venv_executable(venv: Path, tool_id: str, platform: str) -> Path | None:
+    if family(platform) == "windows":
+        candidate = venv / "Scripts" / f"{tool_id}.exe"
+    else:
+        candidate = venv / "bin" / tool_id
+    return candidate if candidate.is_file() else None
+
+
+def _resolve_in_venv(tool: Tool, venv: Path, platform: str) -> ToolStatus:
+    """Outil de la chaîne dans l'environnement d'exercice, comparé au `uv.lock` (AD-16)."""
+    expected = tool.provisioned_for(family(platform))
+    installed = installed_version(venv, tool.id, platform)
+    if installed is None:
+        return ToolStatus(
+            tool.id,
+            "missing",
+            reason=f"{tool.id} n'est pas dans l'environnement de l'exercice (uv sync)",
+        )
+    if installed != expected:
+        return ToolStatus(
+            tool.id,
+            "mismatch",
+            version=installed,
+            source="environment",
+            reason=f"environnement abîmé : version {installed} au lieu de {expected} (uv sync)",
+        )
+    path = _venv_executable(venv, tool.id, platform)
+    return ToolStatus(tool.id, "ok", version=installed, path=path, source="environment")
+
+
 def _resolve_python_package(tool: Tool) -> ToolStatus:
     expected = tool.provisioned_for("posix")
     try:
@@ -126,7 +223,7 @@ def _resolve_python_package(tool: Tool) -> ToolStatus:
             "mismatch",
             version=installed,
             source="environment",
-            reason=f"version {installed} au lieu de {expected} (uv sync répare)",
+            reason=f"environnement abîmé : version {installed} au lieu de {expected} (uv sync)",
         )
     return ToolStatus(tool.id, "ok", version=installed, source="environment")
 
@@ -136,10 +233,13 @@ def resolve(
     settings: Settings | None = None,
     *,
     platform: str = sys.platform,
+    venv: Path | None = None,
 ) -> ToolStatus:
     """Trouve `tool_id` selon sa résolution dans le registre et vérifie sa version minimale.
 
-    Ne lève jamais pour un outil absent, trop ancien ou qui ne répond pas.
+    Un outil de la chaîne (`uv-lock`) est cherché dans `venv` (l'environnement d'exercice),
+    sinon dans l'environnement de l'application. Ne lève jamais pour un outil absent, trop
+    ancien ou qui ne répond pas.
     """
     settings = settings or get_settings()
     try:
@@ -147,6 +247,8 @@ def resolve(
     except (OSError, ValueError, KeyError) as exc:
         return ToolStatus(tool_id, "missing", reason=f"registre d'outils illisible ({exc})")
     if tool.resolution == "uv-lock":
+        if venv is not None:
+            return _resolve_in_venv(tool, venv, platform)
         return _resolve_python_package(tool)
 
     timeout = settings.probe_timeout_s
@@ -193,10 +295,14 @@ def run_tool(
     timeout: float = 60.0,
     env: Mapping[str, str] | None = None,
     settings: Settings | None = None,
+    venv: Path | None = None,
 ) -> procs.ProcResult:
-    """Lance un outil résolu par le registre, avec l'environnement hors ligne."""
+    """Lance un outil résolu par le registre, avec l'environnement hors ligne.
+
+    Les outils de la chaîne sont lancés depuis `venv`, l'environnement d'exercice.
+    """
     settings = settings or get_settings()
-    status = resolve(tool_id, settings)
+    status = resolve(tool_id, settings, venv=venv)
     if not status.ok or status.path is None:
         return procs.ProcResult(returncode=None, error=status.reason or f"{tool_id} indisponible")
     return procs.run(
@@ -205,3 +311,43 @@ def run_tool(
         cwd=cwd,
         timeout=timeout,
     )
+
+
+def install_network_guard(venv: Path, platform: str = sys.platform) -> bool:
+    """Pose la garde réseau dans `venv` (module et `.pth`) ; False si `site-packages` manque."""
+    site = site_packages(venv, platform)
+    if site is None:
+        return False
+    (site / f"{NETGUARD_MODULE}.py").write_text(NETGUARD_SOURCE, encoding="utf-8")
+    (site / f"{NETGUARD_MODULE}.pth").write_text(f"import {NETGUARD_MODULE}\n", encoding="utf-8")
+    return True
+
+
+def sync_environment(
+    project: Path,
+    venv: Path,
+    settings: Settings | None = None,
+    *,
+    timeout: float = 600.0,
+) -> procs.ProcResult:
+    """Crée ou met à jour `venv` par `uv sync --offline --frozen` depuis le `uv.lock` de `project`.
+
+    Aucun accès réseau : tout vient du `uv-cache` préchargé à l'installation (AD-12), uv étant
+    résolu par le registre. La garde réseau est posée dans l'environnement créé.
+    """
+    settings = settings or get_settings()
+    uv = resolve("uv", settings)
+    if not uv.ok or uv.path is None:
+        return procs.ProcResult(returncode=None, error=uv.reason or "uv indisponible")
+    env = offline_environment(settings)
+    env["UV_PROJECT_ENVIRONMENT"] = str(venv)
+    argv = [uv.path, "sync", "--offline", "--frozen", "--project", str(project)]
+    result = procs.run(argv, env=env, cwd=project, timeout=timeout)
+    if result.ok and not install_network_guard(venv):
+        return procs.ProcResult(
+            returncode=None,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            error=f"environnement incomplet : site-packages introuvable dans {venv}",
+        )
+    return result

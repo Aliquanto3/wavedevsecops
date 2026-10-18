@@ -23,6 +23,7 @@ from wavedevsecops.registry import Tool, load_registry
 Emit = Callable[[str, dict[str, Any]], None]
 INSTALLER_ONLY = "install"
 REQUIRED_MILESTONE = "v0.1"
+CHAIN_GROUP = "chain"
 LOOPBACK_NAMES = ("127.0.0.1", "localhost")
 
 
@@ -213,14 +214,16 @@ def run_diagnostic(
 
 
 def group_by_milestone(items: list[tuple[str, str]], ui: dict[str, Any]) -> list[dict[str, Any]]:
-    """Regroupe `(check_id, jalon)` par jalon, dans l'ordre d'apparition, avec leur titre."""
+    """Regroupe `(check_id, jalon)` : outils requis, puis outils de la chaîne (FR-19)."""
     groups: list[dict[str, Any]] = []
     for check_id, milestone in items:
-        group = next((g for g in groups if g["key"] == milestone), None)
+        # Les outils requis par jalon ; ceux des stations, un seul groupe « chaîne (v0.2+) ».
+        key = milestone if milestone == REQUIRED_MILESTONE else CHAIN_GROUP
+        group = next((g for g in groups if g["key"] == key), None)
         if group is None:
-            template = ui["group_required" if milestone == REQUIRED_MILESTONE else "group_chain"]
+            template = ui["group_required" if key == REQUIRED_MILESTONE else "group_chain"]
             group = {
-                "key": milestone,
+                "key": key,
                 "title_text": template.format(milestone=milestone),
                 "check_ids": [],
             }
