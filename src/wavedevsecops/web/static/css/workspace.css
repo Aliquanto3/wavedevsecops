@@ -150,6 +150,143 @@ main.is-workspace {
   border-radius: var(--radius-sm);
 }
 
+/* Contenu du panneau Scénario : mode, progression, consigne, explication, encart (UX-DR8/11). */
+.scenario-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mode-badge {
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-full);
+  font-weight: 700;
+}
+
+.mode-info {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-full);
+  color: var(--color-ink);
+  font: inherit;
+  font-style: italic;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-text {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.step-count {
+  margin: 0 0 var(--space-1);
+  font-weight: 700;
+}
+
+.step-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-segment {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.step-segment[data-state="done"] {
+  background: var(--color-accent-soft);
+}
+
+.step-segment[data-state="current"] {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.step-segment[aria-current="step"] {
+  border-width: 3px;
+}
+
+.step-segment[aria-disabled="true"] {
+  border-style: dashed;
+  color: var(--color-ink-soft);
+  cursor: default;
+}
+
+.step-title,
+.step-explanation-title,
+.notice-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-chat);
+}
+
+.step-chat,
+.step-explanation-text,
+.notice-card p {
+  margin: 0 0 var(--space-1);
+  font: var(--font-weight-chat) var(--font-size-chat) / var(--line-height-chat)
+    var(--font-family-chat);
+}
+
+.step-explanation {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.notice-card.notice-warning {
+  margin: 0;
+  background: var(--color-warning-soft);
+  border-left-color: var(--color-warning);
+}
+
+.notice-observed {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-4);
+}
+
+.element-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--color-primary);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 .views {
   display: flex;
   flex-direction: column;

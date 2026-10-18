@@ -40,6 +40,7 @@ from wavedevsecops.engine.operations import (
     WorkspaceEngine,
 )
 from wavedevsecops.engine.runfile import RUN_SCHEMA_VERSION, RunFileError, load_run, save_run
+from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.workspace import (
     PreparedWorkspace,
     WorkspaceError,
@@ -61,6 +62,7 @@ __all__ = [
     "RunFileError",
     "StaleOperation",
     "StepOutcome",
+    "StepRunner",
     "UnknownIntent",
     "WorkspaceEngine",
     "WorkspaceManager",

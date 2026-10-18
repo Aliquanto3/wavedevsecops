@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class Kind(StrEnum):
@@ -127,10 +127,35 @@ class StateProjected(_Payload):
     créé par la commande, une branche supprimée) : le front remplace leurs `spans`."""
 
 
+class StepObserved(_Payload):
+    """Ce que l'étape voit : un texte et l'élément du dépôt qu'il désigne (lien), s'il y en a un."""
+
+    text: str
+    element_id: str = ""
+
+
+VerdictStatusName = Literal["passed", "failed", "unexpected"]
+
+
 class StepVerdict(_Payload):
     step_id: str
     passed: bool
     reason_text: str = ""
+    status: VerdictStatusName = "passed"
+    """`passed` : étape réussie ; `failed` : état prévu mais insuffisant ; `unexpected` : état
+    ni attendu ni prévu (encart « État inattendu »). Ajout de la story 4.1 : déduit de `passed`
+    quand il manque."""
+    expected_text: str = ""
+    observed: list[StepObserved] = []
+    next_step_id: str = ""
+    """Étape suivante après une réussite ; vide s'il n'y en a plus (ou sans réussite)."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _status_from_passed(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "status" not in data and "passed" in data:
+            return {**data, "status": "passed" if data["passed"] else "failed"}
+        return data
 
 
 class StepExplanation(_Payload):

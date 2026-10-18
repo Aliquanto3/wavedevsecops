@@ -34,8 +34,8 @@ from wavedevsecops.engine.operations import (
     Projector,
     Validator,
     WorkspaceEngine,
-    no_validation,
 )
+from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.engine.watcher import TreeWatcher
 from wavedevsecops.engine.workspace import prepare_workspace, resolve_git
 from wavedevsecops.events import EngineStateName, EventLog, ExternalChange, Kind
@@ -198,7 +198,7 @@ class WorkspaceManager:
         *,
         boot_id: str | None = None,
         projector: Projector | None = None,
-        validator: Validator = no_validation,
+        validator: Validator | None = None,
         watcher_factory: WatcherFactory | None = None,
         watch: bool = True,
         git_path: Path | None = None,
@@ -209,7 +209,8 @@ class WorkspaceManager:
         self._git_path = git_path
         self._projector = projector or repo_projector(settings, git_path)
         self._refresh_github = github_refresher(settings, git_path)
-        self._validator = validator
+        self._steps = StepRunner(settings)
+        self._validator = validator or self._steps.validate
         if watch and watcher_factory is None:
             quiet_s = settings.watch_quiet_ms / 1000
 
@@ -305,6 +306,7 @@ class WorkspaceManager:
             validator=self._validator,
             on_state=on_state,
             git_path=self._git_path,
+            panel=self._steps.panel,
         )
         active = _Active(engine)
         holder["active"] = active

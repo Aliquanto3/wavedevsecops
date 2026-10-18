@@ -21,6 +21,8 @@ function initial() {
     errorText: "", // dernier app_error ou échec de lecture
     problems: [], // projections refusées (type d'élément non déclaré)
     terminal: { entries: [], cleared: 0, version: 0 }, // sorties du terminal, dans l'ordre d'arrivée
+    stepPanel: null, // panneau Scénario écrit par le serveur (étapes, étape courante)
+    verdict: null, // dernier step_verdict de l'espace ; null après un rechargement
   };
 }
 
@@ -42,6 +44,28 @@ export function acceptViews(views, problems = []) {
     }
   }
   return accepted;
+}
+
+/** Marque `stepId` réussie et ouvre `nextId` : le serveur fournit les deux (AD-2). */
+function passStep(panel, stepId, nextId) {
+  if (!panel) return panel;
+  const steps = panel.steps.map((step) => {
+    if (step.step_id === stepId) return { ...step, state: "done" };
+    if (nextId && step.step_id === nextId) return { ...step, state: "current" };
+    return step;
+  });
+  return { ...panel, steps, current_step_id: nextId || "" };
+}
+
+/** Joint l'explication publiée par le serveur à son étape. */
+function explainStep(panel, payload) {
+  if (!panel) return panel;
+  const steps = panel.steps.map((step) =>
+    step.step_id === payload.step_id
+      ? { ...step, explanation_text: payload.explanation_text, explain_ref: payload.explain_ref }
+      : step,
+  );
+  return { ...panel, steps };
 }
 
 export function createStore() {
@@ -80,6 +104,8 @@ export function createStore() {
         views,
         errorText: "",
         problems,
+        stepPanel: snapshot.step_panel || null,
+        verdict: null,
       });
     },
     fail(errorText) {
@@ -116,6 +142,13 @@ export function createStore() {
           text: payload.text,
           lang: payload.lang || "",
         });
+      } else if (envelope.kind === "step_verdict") {
+        patch.verdict = payload;
+        if (payload.status === "passed") {
+          patch.stepPanel = passStep(state.stepPanel, payload.step_id, payload.next_step_id);
+        }
+      } else if (envelope.kind === "step_explanation") {
+        patch.stepPanel = explainStep(state.stepPanel, payload);
       } else if (envelope.kind === "app_error") {
         patch.errorText = `${payload.cause_text} ${payload.action_text}`.trim();
       }

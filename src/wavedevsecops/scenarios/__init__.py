@@ -16,12 +16,14 @@ from wavedevsecops.scenarios.loader import (
 from wavedevsecops.scenarios.model import SCHEMA_VERSION, Scenario, StepSpec
 from wavedevsecops.scenarios.ops import REGISTRY
 from wavedevsecops.scenarios.setup import run_setup
+from wavedevsecops.scenarios.steps import STEP_TYPES
 
 __all__ = [
     "PERSONAS",
     "REGISTRY",
     "SCHEMA_VERSION",
     "SETUP_EPOCH",
+    "STEP_TYPES",
     "FieldError",
     "LoadedScenario",
     "Scenario",

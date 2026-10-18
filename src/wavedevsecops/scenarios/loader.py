@@ -151,6 +151,11 @@ def locate(
     return _label(consumed), line
 
 
+def _is_step_type(loc: Iterable[Any]) -> bool:
+    parts = list(loc)
+    return parts[:1] == ["steps"] and parts[-1:] == ["type"]
+
+
 def french_message(error: dict[str, Any]) -> str:
     """Message en français d'une erreur pydantic."""
     kind = error.get("type", "")
@@ -167,7 +172,7 @@ def french_message(error: dict[str, Any]) -> str:
         "dict_type": "table (clé: valeur) attendue",
         "model_type": "table (clé: valeur) attendue",
         "model_attributes_type": "table (clé: valeur) attendue",
-        "union_tag_not_found": "champ `op` absent",
+        "union_tag_not_found": "champ `op` ou `type` absent",
         "timezone_aware": "date ISO 8601 avec fuseau attendue",
         "datetime_type": "date ISO 8601 avec fuseau attendue",
         "datetime_parsing": "date ISO 8601 avec fuseau attendue",
@@ -176,9 +181,16 @@ def french_message(error: dict[str, Any]) -> str:
     }
     if kind in messages:
         return messages[kind]
+    if kind == "literal_error" and _is_step_type(error.get("loc", ())):
+        return f"type d'étape inconnu (types connus : {ctx.get('expected')})"
     if kind == "literal_error":
         return f"valeur non admise (attendu : {ctx.get('expected')})"
     if kind == "union_tag_invalid":
+        if list(error.get("loc", ())[:1]) == ["steps"]:
+            return (
+                f"type d'étape inconnu « {ctx.get('tag')} » "
+                f"(types connus : {ctx.get('expected_tags')})"
+            )
         return f"op inconnue « {ctx.get('tag')} » (ops connues : {ctx.get('expected_tags')})"
     if kind == "string_pattern_mismatch":
         return "format invalide (kebab-case ou snake_case selon le champ)"
@@ -195,6 +207,7 @@ def parse_scenario(
     *,
     tool_ids: Iterable[str] | None = None,
     expected_key: str | None = None,
+    explain_keys: Iterable[str] | None = None,
 ) -> Scenario:
     """Valide le texte d'un scénario ; `ScenarioError` avec champs et lignes sinon."""
     data, lines = _parse(text, source)
@@ -209,7 +222,10 @@ def parse_scenario(
             errors.append(FieldError(field, line, french_message(dict(error))))
         raise ScenarioError(source, errors) from None
     found = []
-    for loc, message in scenario.semantic_errors(None if tool_ids is None else set(tool_ids)):
+    for loc, message in scenario.semantic_errors(
+        None if tool_ids is None else set(tool_ids),
+        None if explain_keys is None else set(explain_keys),
+    ):
         field, line = locate(loc, data, lines)
         found.append(FieldError(field, line, message))
     if expected_key is not None and scenario.key != expected_key:
@@ -226,13 +242,19 @@ def parse_scenario(
     return scenario
 
 
-def load_scenario(path: Path, settings: Settings | None = None) -> LoadedScenario:
-    """Charge `content/scenarios/<scenario_id>.<mode>.yaml` ; outils vérifiés par le registre."""
+def load_scenario(
+    path: Path, settings: Settings | None = None, *, explain_keys: Iterable[str] | None = None
+) -> LoadedScenario:
+    """Charge `content/scenarios/<scenario_id>.<mode>.yaml` ; outils vérifiés par le registre.
+
+    `explain_keys` : clés du catalogue d'explications (lint de contenu) ; `None` : non vérifiées."""
     settings = settings or get_settings()
     text = path.read_bytes().decode("utf-8")
     tool_ids = {tool.id for tool in load_registry(settings=settings).tool}
     expected = path.name.removesuffix(".yaml")
-    scenario = parse_scenario(text, path.name, tool_ids=tool_ids, expected_key=expected)
+    scenario = parse_scenario(
+        text, path.name, tool_ids=tool_ids, expected_key=expected, explain_keys=explain_keys
+    )
     return LoadedScenario(scenario, path, content_hash(text))
 
 

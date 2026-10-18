@@ -102,6 +102,16 @@ class StepOutcome:
     verdict: StepVerdict
     explanation: StepExplanation | None = None
 
+    @classmethod
+    def explained(
+        cls, verdict: StepVerdict, explanation_text: str, explain_ref: str = ""
+    ) -> StepOutcome:
+        """Verdict suivi de l'explication de son étape (publiée par la file, après le verdict)."""
+        explanation = StepExplanation(
+            step_id=verdict.step_id, explanation_text=explanation_text, explain_ref=explain_ref
+        )
+        return cls(verdict, explanation)
+
 
 @dataclass(frozen=True)
 class OpResult:
@@ -125,6 +135,8 @@ class OpContext:
         self._interrupt_lock = threading.Lock()
         self._on_interrupt: Callable[[], None] | None = None
         self.workspace_id = engine.workspace_id
+        self.before_views: dict[str, Any] = engine.last_projection.views
+        """Vues projetées avant l'opération : la validation d'étape les compare au nouvel état."""
         self.data: dict[str, Any] = {}
         """Valeurs partagées entre la pré-vérification et le corps de l'opération."""
         self.outputs: list[tuple[int, str, list[dict[str, Any]]]] = []
@@ -252,6 +264,7 @@ class WorkspaceEngine:
         validator: Validator = no_validation,
         on_state: Callable[[EngineStateName], None] | None = None,
         git_path: Path | None = None,
+        panel: Callable[[WorkspaceEngine], dict[str, Any] | None] | None = None,
     ) -> None:
         self.workspace_id = workspace_id
         self.git_path = git_path
@@ -262,6 +275,7 @@ class WorkspaceEngine:
         self._projector = projector
         self._validator = validator
         self._on_state = on_state
+        self._panel = panel
         self._lock = threading.Lock()
         self._queue: queue.Queue[Any] = queue.Queue()
         self._pending: list[tuple[Operation, Future[OpResult]]] = []
@@ -312,7 +326,18 @@ class WorkspaceEngine:
             "reason_text": self._reason_text,
             "fingerprint": self.last_projection.fingerprint,
             "views": self.last_projection.views,
+            "step_panel": self._step_panel(),
         }
+
+    def _step_panel(self) -> dict[str, Any] | None:
+        """Panneau Scénario (titre, étapes, étape courante) écrit par le serveur (AD-2)."""
+        if self._panel is None:
+            return None
+        try:
+            return self._panel(self)
+        except Exception:  # noqa: BLE001 - un panneau illisible ne bloque pas la lecture de l'état
+            log.exception("Panneau Scénario de %s", self.workspace_id)
+            return None
 
     def publish(self, kind: Kind | str, payload: BaseModel | dict[str, Any], *, op_id: str | None):
         return self.events.publish(kind, payload, epoch=self.epoch, op_id=op_id)

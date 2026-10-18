@@ -13,6 +13,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from wavedevsecops.scenarios.ops import op_union
+from wavedevsecops.scenarios.steps import step_union
 
 SCHEMA_VERSION = 1
 KEBAB_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -25,17 +26,8 @@ Mode = Literal["A", "B"]
 SetupOp = op_union()
 
 
-class StepSpec(BaseModel):
-    """Étape d'un scénario : `step_id` stable et type d'étape.
-
-    Les champs propres à chaque type (consigne, indices, bonnes réponses) sont validés par le
-    registre des types d'étape, livré avec les stories des étapes.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="allow")
-
-    step_id: str = Field(pattern=SNAKE_PATTERN)
-    type: str = Field(pattern=SNAKE_PATTERN)
+StepSpec = step_union()
+"""Une étape : un type du registre `scenarios/steps/`, discriminé par `type` (AD-7)."""
 
 
 class Scenario(BaseModel):
@@ -60,14 +52,16 @@ class Scenario(BaseModel):
     """Gabarit de départ du dépôt ; `empty` : dépôt vide. Les gabarits d'exercice arrivent
     avec leurs stories."""
     setup: list[SetupOp] = Field(default_factory=list)  # type: ignore[valid-type]
-    steps: list[StepSpec] = Field(default_factory=list)
+    steps: list[StepSpec] = Field(default_factory=list)  # type: ignore[valid-type]
 
     @property
     def key(self) -> str:
         """`<scenario_id>.<mode>` : nom du fichier et de l'espace."""
         return f"{self.scenario_id}.{self.mode}"
 
-    def semantic_errors(self, tool_ids: set[str] | None = None) -> list[tuple[tuple, str]]:
+    def semantic_errors(
+        self, tool_ids: set[str] | None = None, explain_keys: set[str] | None = None
+    ) -> list[tuple[tuple, str]]:
         """Règles entre champs : `(chemin du champ, message)` pour chaque écart."""
         errors: list[tuple[tuple, str]] = []
         seen_tracks: set[str] = set()
@@ -100,4 +94,23 @@ class Scenario(BaseModel):
                     (("steps", index, "step_id"), f"step_id « {step.step_id} » en double")
                 )
             step_ids.add(step.step_id)
+            for field, alias in step.references():
+                if alias not in defined:
+                    errors.append(
+                        (
+                            ("steps", index, *field),
+                            f"l'alias « @{alias} » n'est défini par aucune op du setup",
+                        )
+                    )
+            if (
+                step.explain_ref
+                and explain_keys is not None
+                and step.explain_ref not in explain_keys
+            ):
+                errors.append(
+                    (
+                        ("steps", index, "explain_ref"),
+                        f"clé d'explication inconnue : « {step.explain_ref} »",
+                    )
+                )
         return errors

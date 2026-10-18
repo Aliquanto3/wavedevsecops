@@ -36,7 +36,14 @@ setup:
     start: "@premier"
 steps:
   - step_id: premiere_etape
-    type: free
+    type: repo_state
+    title_text: Créer la branche
+    instruction_text: Créez une branche.
+    explanation_text: Bravo.
+    expect:
+      branches:
+        - name: feature
+          at: "@premier"
 """
 
 
@@ -94,14 +101,18 @@ def test_alias_non_defini_et_doublons() -> None:
     text = VALID.replace('start: "@premier"', 'start: "@absent"').replace(
         "as: premier", "as: fichier-a"
     )
-    text += "  - step_id: premiere_etape\n    type: free\n"
+    text += (
+        "  - step_id: premiere_etape\n    type: repo_state\n    title_text: T\n"
+        "    instruction_text: I\n    explanation_text: E\n"
+        "    expect:\n      head:\n        branch: feature\n"
+    )
     found = {e.field: (e.line, e.message) for e in _errors(text)}
     assert found["setup[2].start"] == (
         17,
         "l'alias « @absent » n'est défini par aucune op précédente",
     )
     assert "en double" in found["setup[1].as"][1]
-    assert found["steps[1].step_id"][0] == 21
+    assert found["steps[1].step_id"][0] == len(VALID.splitlines()) + 1
 
 
 def test_outil_inconnu_et_nom_de_fichier() -> None:

@@ -5,6 +5,7 @@ import { bindAction } from "./actions.js";
 import { el, richText } from "./dom.js";
 import * as L from "./layout.js";
 import { listPanes } from "./panes.js";
+import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
 export const PREPARING_TEXT = "Préparation du bac à sable…";
@@ -46,7 +47,7 @@ export function buildChainBand(chain) {
 }
 
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
-export function mountWorkspace(container, { title, store, storage, chain = null }) {
+export function mountWorkspace(container, { title, store, storage, chain = null, onSelect }) {
   const panes = listPanes();
   const byId = new Map(panes.map((pane) => [pane.id, pane]));
   let config = L.loadConfig(panes, storage);
@@ -66,7 +67,8 @@ export function mountWorkspace(container, { title, store, storage, chain = null 
   panelTitle.textContent = title;
   const panelStatus = el("p", "scenario-status", { role: "status" });
   const panelError = el("p", "scenario-error", { role: "alert" });
-  panel.append(panelTitle, panelStatus, panelError);
+  const scenarioView = createScenarioView({ onSelect });
+  panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
 
   const zone = el("div", "views");
   const chipBar = el("div", "chips", {
@@ -88,7 +90,12 @@ export function mountWorkspace(container, { title, store, storage, chain = null 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
   const unsubscribe = store.subscribe((state) => {
     const preparing = state.engineState === LOADING || state.engineState === "setup";
-    panelStatus.textContent = state.errorText ? "" : preparing ? PREPARING_TEXT : READY_TEXT;
+    const stepStatus = scenarioView.update(state);
+    panelStatus.textContent = state.errorText
+      ? ""
+      : preparing
+        ? PREPARING_TEXT
+        : stepStatus || READY_TEXT;
     panelError.textContent = state.errorText;
   });
 
