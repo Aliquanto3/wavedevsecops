@@ -259,6 +259,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 23:33 · 3.4 · dev · fini, 932 passed / 41 skipped, CI verte sur 6 jobs (SHA du commit collègue identique sur les trois OS) ; ops colleague_commit et colleague_reaction (trigger pr_opened | checks_green), registre pour 5.1 (commit_on_origin, add_reaction, set_check_state) ; vue review-log reportée à 3.3 · 2be1fb2
 - 2026-10-18 23:33 · 3.4 · second-avis · lancé · —
 - 2026-10-18 23:33 · 6.1 · dev · lancé (dev-story Sonnet ; ouvre 6.2, 6.4, 9.3 ; hors moteur d'étapes pris par 5.2) · —
+- 2026-10-18 23:36 · 3.4 · second-avis · aucun high, 1 medium (commit_on_origin force parent = old et ignore start : pas de commit non fast-forward pour 5.1), 3 low (add_reaction/set_check_state hors file, SHA verrouillé, empreinte pré-3.4 non épinglée) ; reviewer Opus lancé · —
+- 2026-10-18 23:37 · 5.2 · dev · fini, 936 passed / 41 skipped, CI verte sur 6 jobs ; type d'étape designate, answer_submit (409 au second essai), answer_corrected, route resolve_sha ; premier essai via quiz_first_attempt ; pour 4.4 : Recommencer vide run.json.answers · 5351412
+- 2026-10-18 23:37 · 5.2 · second-avis · lancé · —
+- 2026-10-18 23:37 · 4.6 · dev · lancé (dev-story Sonnet ; nécessaire à 6.2) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

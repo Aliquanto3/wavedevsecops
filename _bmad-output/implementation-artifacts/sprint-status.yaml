@@ -73,13 +73,13 @@ development_status:
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
-  4-6-ouvrir-des-indices-par-paliers: backlog
+  4-6-ouvrir-des-indices-par-paliers: in-progress
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: backlog
   epic-4-retrospective: optional
 
   epic-5: backlog
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: backlog
-  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: in-progress
+  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: review
   5-3-désigner-un-élément-dans-les-vues: backlog
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
