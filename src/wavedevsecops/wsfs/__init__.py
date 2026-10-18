@@ -167,12 +167,23 @@ def _replace(tmp: str, target: Path) -> None:
             time.sleep(REPLACE_PAUSE_S * attempt)
 
 
+NEW_FILE_MODE = 0o644
+"""Droits POSIX d'un fichier créé (`mkstemp` crée en 0600, que git n'attend pas)."""
+
+
 def _atomic_write(target: Path, data: bytes) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(target.stat().st_mode)
+    except OSError:
+        mode = NEW_FILE_MODE
     fd, tmp = tempfile.mkstemp(prefix=".wds-", suffix=".tmp", dir=target.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
+        if os.name != "nt":
+            # Le remplacement garde les droits du fichier d'origine (bit x d'un script).
+            os.chmod(tmp, mode)
         _replace(tmp, target)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -235,6 +246,32 @@ def iter_files(root: Path) -> list[str]:
     if not root.is_dir():
         return []
     return sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
+
+
+CODE_SKIP_DIRS = frozenset({".venv", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache"})
+"""Dossiers générés que la vue Code ne liste pas (jamais édités à la main)."""
+CODE_FILE_LIMIT = 2000
+CODE_READ_LIMIT = 512 * 1024
+"""Taille au-delà de laquelle la vue Code n'ouvre pas un fichier dans l'éditeur."""
+
+
+def code_files(root: Path, limit: int = CODE_FILE_LIMIT) -> tuple[list[str], bool]:
+    """Fichiers de l'arbre de travail pour la vue Code : chemins posix triés, hors `.git/` et
+    dossiers générés, liens non suivis ; et vrai si la liste a été coupée à `limit`."""
+    base = root.resolve()
+    found: list[str] = []
+    for directory, dirs, names in os.walk(base):
+        dirs[:] = [
+            d
+            for d in sorted(dirs)
+            if not _is_git_dir(d) and d not in CODE_SKIP_DIRS and not _is_link(Path(directory, d))
+        ]
+        for name in sorted(names):
+            if len(found) >= limit:
+                return sorted(found), True
+            if not _is_link(Path(directory, name)):
+                found.append(Path(directory, name).relative_to(base).as_posix())
+    return sorted(found), False
 
 
 def canonical_json(data: Any) -> str:

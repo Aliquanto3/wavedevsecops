@@ -441,7 +441,7 @@ wavedevsecops/
 
 ## Deferred
 
-- **Composant d'édition de la vue Code** et rendu SVG du graphe : choisis par leur story, sous AD-13 (vendorisé, sans CDN ni build à l'exécution) et AD-2 (le front dessine, il ne calcule pas).
+- **Rendu SVG du graphe** : choisi par sa story, sous AD-13 (vendorisé, sans CDN ni build à l'exécution) et AD-2 (le front dessine, il ne calcule pas). *Composant d'édition de la vue Code : levé par la story 2.8, un `<textarea>` natif avec gouttière de numéros de ligne (`static/js/editor.js`, sans dépendance ni build). Raisons : clavier, lecteur d'écran et zoom du système conservés, aucune bibliothèque à vendoriser ni à tenir à jour hors ligne. Pas de coloration syntaxique en v0.1 ; les marqueurs de conflit sont repérés dans la gouttière. Un éditeur plus riche (CodeMirror 6 vendorisé) reste possible sans toucher aux intentions.*
 - **Station 4 (v0.3)** : forme de l'artefact, mécanisme de « servir » staging et prod simulée, schéma `deliveries` de `github.json`. Déjà fixé : build hors ligne par `toolrun`, artefact nommé d'après le tag, état des environnements écrit par `github_sim` seul, approbation dans le journal de revue, `element_id` `env:` et `tag:`. À trancher quand le flow UX de la station 4 sera écrit.
 - **Options exactes de pip-audit** (fichier d'exigences lu) : story de la station 3, sous AD-11.
 - **Délais chiffrés** (mise à jour après modification externe, déblocage de la solution, délai des commandes, tailles des tampons) : valeurs de `Settings`, fixées au découpage en stories (PRD §10).

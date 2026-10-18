@@ -77,7 +77,8 @@ import fs from "node:fs";
 const snaps = JSON.parse(fs.readFileSync(process.env.SNAPS, "utf8"));
 const {{ document, main }} = installDom({{ width: 1920, height: 1080 }});
 let fetched = 0;
-globalThis.fetch = () => {{ fetched++; return Promise.reject(new Error("réseau")); }};
+// Les lectures de la vue Code (story 2.8) ne comptent pas : sélectionner un commit en montre le diff.
+globalThis.fetch = (url) => {{ if (!String(url).includes("/code/")) fetched++; return Promise.reject(new Error("réseau")); }};
 await import("@JS@/views.js");
 const {{ mountWorkspace }} = await import("@JS@/workspace.js");
 const {{ createStore }} = await import("@JS@/store.js");

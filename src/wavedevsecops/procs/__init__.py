@@ -125,7 +125,7 @@ def _make_job(pid: int) -> int | None:
             kernel.CloseHandle(job)
             return None
         return int(job)
-    except (OSError, AttributeError):
+    except OSError, AttributeError:
         return None
 
 
@@ -143,7 +143,7 @@ def _job_active(job: int) -> int | None:
         ok = _kernel().QueryInformationJobObject(
             job, 1, ctypes.byref(info), ctypes.sizeof(info), None
         )
-    except (OSError, AttributeError):
+    except OSError, AttributeError:
         return None
     return int(info.active) if ok else None
 
@@ -151,7 +151,7 @@ def _job_active(job: int) -> int | None:
 def _job_call(name: str, job: int, *extra: int) -> None:
     try:
         getattr(_kernel(), name)(job, *extra)
-    except (OSError, AttributeError):
+    except OSError, AttributeError:
         pass
 
 
@@ -180,7 +180,7 @@ def terminate_tree(process: subprocess.Popen[bytes], job: int | None = None) -> 
                 timeout=10,
             )
             killed = done.returncode == 0
-        except (OSError, subprocess.SubprocessError):
+        except OSError, subprocess.SubprocessError:
             killed = False
         if not killed and process.poll() is None:
             process.kill()
@@ -284,7 +284,7 @@ class Handle:
                     self._queue.put(Chunk(name, text))
             if tail := decoder.decode(b"", final=True):
                 self._queue.put(Chunk(name, tail))
-        except (OSError, ValueError):
+        except OSError, ValueError:
             pass
         finally:
             self._queue.put(_EOF)
@@ -396,3 +396,38 @@ def spawn(
         start_new_session=not IS_WINDOWS,
     )
     return Handle(process, timeout=timeout, job=_make_job(process.pid))
+
+
+LAUNCHER_SUFFIXES = frozenset({".desktop"})
+"""Fichiers que `xdg-open` lancerait au lieu de les ouvrir comme texte : refusés."""
+
+
+def open_path(path: Path) -> None:
+    """Ouvre `path` comme texte dans l'éditeur du système, sans attendre (story 2.8).
+
+    Jamais l'action « ouvrir » d'un fichier exécutable : un `.bat`, un `.ps1`, un `.py` (lanceur
+    `py`) ou un `.lnk` s'exécuterait au clic. Windows : verbe `edit` de `os.startfile`, sinon
+    le Bloc-notes ; macOS : `open -t` (éditeur de texte par défaut) ; ailleurs : `xdg-open`,
+    sauf lanceur `.desktop`. Sans shell, entrée et sorties fermées, détaché de la session.
+    Lève `OSError` si le système ne sait pas l'ouvrir.
+    """
+    target = os.fspath(path)
+    if IS_WINDOWS:
+        try:
+            os.startfile(target, "edit")  # type: ignore[attr-defined]  # noqa: S606
+            return
+        except OSError:
+            argv = ["notepad.exe", target]  # aucun verbe `edit` pour ce type de fichier
+    elif sys.platform == "darwin":
+        argv = ["open", "-t", target]
+    else:
+        if path.suffix.lower() in LAUNCHER_SUFFIXES:
+            raise OSError(f"lanceur refusé : {path.name}")
+        argv = ["xdg-open", target]
+    subprocess.Popen(  # noqa: S603 - argv sans shell, chemin confiné par wsfs
+        argv,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )

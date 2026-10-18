@@ -476,3 +476,8 @@ def spawn_module(
     if python is None:
         raise FileNotFoundError(f"l'environnement d'exercice est absent ({venv})")
     return procs.spawn([python, "-m", module, *args], env=env, cwd=cwd, timeout=timeout)
+
+
+def open_in_default_editor(path: Path) -> None:
+    """Ouvre un fichier de l'espace dans l'éditeur par défaut du système (AD-17 `open_external`)."""
+    procs.open_path(path)
