@@ -70,7 +70,7 @@ development_status:
   epic-4: in-progress
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: done
   4-2-enregistrer-les-faits-du-premier-passage: backlog
-  4-3-prendre-des-instantanés-et-rétablir-un-état-exact: in-progress
+  4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: backlog
   4-6-ouvrir-des-indices-par-paliers: backlog

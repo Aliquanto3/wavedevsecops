@@ -219,6 +219,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 21:55 · 4.3 · fusion · suite complète 748 passed / 37 skipped après rebase, CI branche en cours · 8c6effa
 - 2026-10-18 21:55 · 2.5 · dev · fini, 86 tests de confinement, CI verte sur les trois OS (liens symboliques testés en CI) ; test de performance de projections en échec local non relancé · b0350c5
 - 2026-10-18 21:55 · 2.5 · second-avis · lancé · —
+- 2026-10-18 22:00 · 4.3 · fusion · CI branche verte sur 6 jobs, ff sur main, story done ; 4.5 éligible, revue 6.6 débloquée · 8c6effa
+- 2026-10-18 22:00 · 2.5 · second-avis · 1 high prouvé (cp -r copie le contenu d'une jonction Windows hors espace), 3 medium (cp -r recopie un lien sortant sous POSIX, lecture/écriture intégrale sans limite, rm -rf * accepté sans décision), 5 low (noms réservés CONIN$/caractères interdits, parents créés par >, CRLF/BOM recopiés, .git imbriqué copié, OSError de ls) ; échec de perf local dû à la charge · —
 
 
 ## Reprise (arrêt propre du 2026-10-18 au soir)
