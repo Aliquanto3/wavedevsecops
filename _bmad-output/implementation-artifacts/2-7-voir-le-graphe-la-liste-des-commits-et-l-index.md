@@ -42,6 +42,8 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.7 ». UX
 
 Rebase sur `origin/main` (2.4 fusionnée) : conflits `store.js` (terminal + annonce), `views.js` (imports), `index.html` (feuilles) résolus en gardant les deux ; aucun conflit de fond.
 
+Second rebase sur `origin/main` (4.1, 4.3, 9.2) : conflit de fond dans `store.js` et `workspace.js` entre l'annonce de commande (2.7) et le statut d'étape du panneau Scénario (4.1). Résolu dans la même région `role="status"` : l'annonce de la commande d'abord, puis le statut d'étape (« Commande terminée. Vues mises à jour : … Étape réussie. Étape 2 sur 2 : … ») ; sans annonce, le statut d'étape, sinon le message d'ouverture. Test DOM `test_annonce_de_commande_puis_statut_d_etape`.
+
 - Medium, revue : arête qui traverse le disque d'un autre commit de même rang (branche qui continue après sa fusion : l'arête de fusion passait par le commit suivant de la branche, faux lien de filiation). Corrigé : tracé par bandes de rang (`edgePath`) ; test géométrique sur un vrai dépôt, qui échoue avec l'ancien tracé.
 - Medium, second avis M2 : nom accessible de l'index composé par le front (AD-2). Corrigé : `StagingItem.a11y_name_text` (ajout de schéma) calculé par `build_staging`, table des lettres retirée du front ; test dans `test_projections`. Écarté pour le reste de M2 : « Nouveau », « Collègue », « Arbre de travail propre » sont des libellés fixes de DESIGN.md, pas des noms calculés.
 - Medium, second avis M3 : sujet long qui repousse refs et « Nouveau » hors champ. Corrigé : sujet tronqué (`max-width: 48ch`, ellipse), texte complet en `title` et dans le nom accessible.
