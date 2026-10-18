@@ -49,7 +49,7 @@ development_status:
   2-1-préparer-un-bac-à-sable-déterministe-à-partir-d-un-yaml: done
   2-2-faire-passer-chaque-action-par-la-file-d-opérations-de-l-esp: done
   2-3-afficher-la-disposition-principale-et-gérer-les-volets: done
-  2-4-taper-de-vraies-commandes-git-dans-le-terminal: in-progress
+  2-4-taper-de-vraies-commandes-git-dans-le-terminal: done
   2-5-utiliser-les-commandes-de-fichiers-confinées-au-bac-à-sable: backlog
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: in-progress
@@ -70,7 +70,7 @@ development_status:
   epic-4: in-progress
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: in-progress
   4-2-enregistrer-les-faits-du-premier-passage: backlog
-  4-3-prendre-des-instantanés-et-rétablir-un-état-exact: backlog
+  4-3-prendre-des-instantanés-et-rétablir-un-état-exact: in-progress
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: backlog
   4-6-ouvrir-des-indices-par-paliers: backlog
