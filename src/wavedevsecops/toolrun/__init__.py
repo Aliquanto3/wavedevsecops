@@ -36,24 +36,67 @@ NETGUARD_MODULE = "_wds_netguard"
 
 # Garde réseau posée dans chaque environnement d'exercice (AD-12, AD-13) : un `.pth` l'importe
 # au démarrage de tout Python du venv (outils, tests du gabarit). Quand `WDS_NETGUARD=1` (posé
-# par `offline_environment`), un hook d'audit refuse toute connexion hors loopback, même sans
-# proxy. `llmrun` lancera le code d'exercice sans cette variable : lui seul peut sortir.
-NETGUARD_SOURCE = '''"""Garde réseau de WaveDevSecOps : connexion hors loopback refusée (AD-12)."""
+# par `offline_environment`), un hook d'audit refuse toute connexion, tout envoi UDP et toute
+# résolution de nom hors loopback, même sans proxy. `llmrun` lancera le code d'exercice sans
+# cette variable : lui seul peut sortir.
+NETGUARD_SOURCE = '''"""Garde réseau de WaveDevSecOps : trafic hors loopback refusé (AD-12).
+
+Garde-fou pédagogique, pas un bac à sable : `python -S` ou du code natif la contournent ;
+la preuve du fonctionnement hors ligne reste la CI sous `unshare -n` (Linux).
+"""
+import ipaddress
 import os
 import sys
 
-_LOOPBACK = ("localhost", "::1", "0:0:0:0:0:0:0:1")
+_LOOPBACK_NAMES = ("localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback")
+_RESOLUTION = ("socket.getaddrinfo", "socket.gethostbyname", "socket.gethostbyname_ex")
+_SENDING = ("socket.connect", "socket.sendto", "socket.sendmsg")
+
+
+def _text(host):
+    if isinstance(host, bytes):
+        host = host.decode("ascii", "replace")
+    return host.strip().lower() if isinstance(host, str) else None
+
+
+def _literal(host):
+    try:
+        return ipaddress.ip_address(host.split("%", 1)[0].removeprefix("::ffff:"))
+    except ValueError:
+        return None
+
+
+def _loopback(host):
+    host = _text(host)
+    if host is None:
+        return False
+    if host in _LOOPBACK_NAMES:
+        return True
+    address = _literal(host)
+    return address is not None and address.is_loopback
+
+
+def _refuse(what):
+    raise PermissionError("WaveDevSecOps : " + what + " refusée, l'exercice tourne hors ligne")
 
 
 def _wds_netguard(event, args):
-    if event != "socket.connect" or len(args) < 2 or not isinstance(args[1], tuple):
+    if event in _RESOLUTION:
+        host = args[0] if args else None
+        if host in (None, "", b""):
+            return  # adresse joker : aucune requête DNS
+        text = _text(host)
+        if text is not None and (_literal(text) is not None or _loopback(text)):
+            return  # adresse littérale ou nom loopback : aucune requête DNS sortante
+        _refuse("résolution de " + repr(host))
+    if event not in _SENDING or len(args) < 2:
         return
-    host = str(args[1][0]).lower().removeprefix("::ffff:")
-    if host.startswith("127.") or host in _LOOPBACK:
-        return
-    raise PermissionError(
-        "WaveDevSecOps : connexion vers " + host + " refusée, l'exercice tourne hors ligne"
-    )
+    address = args[1]
+    if address is None or isinstance(address, (str, bytes)):
+        return  # socket déjà connecté (sendmsg sans adresse) ou socket AF_UNIX
+    host = address[0] if isinstance(address, tuple) and address else address
+    if not _loopback(host):
+        _refuse("connexion vers " + str(host))
 
 
 if os.environ.get("WDS_NETGUARD") == "1":
@@ -125,9 +168,21 @@ def venv_dir(workspace_root: Path) -> Path:
     return workspace_root / "cache" / "venv"
 
 
+def _known_uv(platform: str) -> str | None:
+    """uv hors du PATH : celui qui a lancé l'application (`UV`, posé par `uv run`), sinon le
+    dossier de l'installeur d'astral (`UV_INSTALL_DIR`, défaut `~/.local/bin`)."""
+    name = "uv.exe" if family(platform) == "windows" else "uv"
+    environ = inherited_environment()
+    candidates = [environ.get("UV", "")]
+    candidates.append(
+        str(Path(environ.get("UV_INSTALL_DIR", "") or Path.home() / ".local" / "bin") / name)
+    )
+    return next((c for c in candidates if c and Path(c).is_file()), None)
+
+
 def _host_candidate(tool: Tool, platform: str, timeout: float) -> tuple[Path | None, str]:
     """Exécutable du PATH pour `tool`, ou (None, raison). Sous macOS : `xcode-select` d'abord."""
-    found = shutil.which(tool.id)
+    found = shutil.which(tool.id) or (_known_uv(platform) if tool.id == "uv" else None)
     if found is None:
         return None, f"{tool.id} est introuvable sur le poste"
     path = Path(found)
@@ -168,8 +223,7 @@ def _normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def installed_version(venv: Path, package: str, platform: str = sys.platform) -> str | None:
-    """Version de `package` installée dans `venv`, lue dans son `.dist-info` sans le lancer."""
+def _dist_info(venv: Path, package: str, platform: str) -> tuple[Path, str] | None:
     site = site_packages(venv, platform)
     if site is None:
         return None
@@ -177,8 +231,30 @@ def installed_version(venv: Path, package: str, platform: str = sys.platform) ->
     for info in site.glob("*.dist-info"):
         name, _, version = info.name.removesuffix(".dist-info").rpartition("-")
         if name and _normalize(name) == wanted:
-            return version
+            return info, version
     return None
+
+
+def installed_version(venv: Path, package: str, platform: str = sys.platform) -> str | None:
+    """Version de `package` installée dans `venv`, lue dans son `.dist-info` sans le lancer."""
+    found = _dist_info(venv, package, platform)
+    return found[1] if found else None
+
+
+def _declares_script(info: Path, script: str) -> bool:
+    """Vrai si le paquet déclare la commande `script` (`console_scripts`) : sinon, un greffon."""
+    try:
+        text = (info / "entry_points.txt").read_text("utf-8")
+    except OSError:
+        return False
+    section = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            section = line
+        elif section == "[console_scripts]" and line.partition("=")[0].strip() == script:
+            return True
+    return False
 
 
 def _venv_executable(venv: Path, tool_id: str, platform: str) -> Path | None:
@@ -192,8 +268,9 @@ def _venv_executable(venv: Path, tool_id: str, platform: str) -> Path | None:
 def _resolve_in_venv(tool: Tool, venv: Path, platform: str) -> ToolStatus:
     """Outil de la chaîne dans l'environnement d'exercice, comparé au `uv.lock` (AD-16)."""
     expected = tool.provisioned_for(family(platform))
-    installed = installed_version(venv, tool.id, platform)
-    if installed is None:
+    found = _dist_info(venv, tool.id, platform)
+    installed = found[1] if found else None
+    if found is None or installed is None:
         return ToolStatus(
             tool.id,
             "missing",
@@ -208,6 +285,14 @@ def _resolve_in_venv(tool: Tool, venv: Path, platform: str) -> ToolStatus:
             reason=f"environnement abîmé : version {installed} au lieu de {expected} (uv sync)",
         )
     path = _venv_executable(venv, tool.id, platform)
+    if path is None and _declares_script(found[0], tool.id):
+        return ToolStatus(
+            tool.id,
+            "mismatch",
+            version=installed,
+            source="environment",
+            reason=f"environnement abîmé : la commande {tool.id} manque (uv sync)",
+        )
     return ToolStatus(tool.id, "ok", version=installed, path=path, source="environment")
 
 

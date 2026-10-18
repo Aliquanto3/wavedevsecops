@@ -62,3 +62,18 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.1 ». Re
 5. Archive gitleaks altérée à la main dans `cache\downloads` (installation interrompue puis relancée) : message « ne correspond pas », rien dans `tools\gitleaks`.
 6. Le diagnostic affiche le groupe « Outils de la chaîne (v0.2+) », tous les outils « Prêt » après installation. Après `uv pip install ruff==0.1.0` dans l'app, ruff passe en « Environnement abîmé » avec `uv sync` comme marche à suivre.
 7. macOS (Apple Silicon) et Linux : mêmes points 2, 3 et 6 avec `install.sh`.
+8. Lancement par le chemin complet de uv sans `~/.local/bin` dans le PATH : l'ouverture d'un espace crée bien le venv (uv retrouvé par `UV`, posé par `uv run`).
+
+## Revue
+
+Revue unique (Opus) après rebase sur `main` (stories 2.2 et 8.2), sans conflit.
+
+- medium · second avis 1 · corrigé · la garde acceptait tout nom commençant par `127.` (`127.evil.example`). Seuls `localhost` (et ses alias) et les adresses IP littérales loopback (`ipaddress`, `::1` et `::ffff:127.x` compris) passent.
+- medium · second avis 2 · corrigé · seul `socket.connect` était audité. `socket.sendto`, `socket.sendmsg` et la résolution d'un nom non loopback (`getaddrinfo`, `gethostbyname[_ex]`) sont refusés. Tests : sous-processus UDP et DNS, plus une table de 14 cas sur le hook.
+- low · second avis 3 · noté · `python -S` ou du code natif contournent la garde : c'est un garde-fou pédagogique, pas un bac à sable. La limite est écrite dans la docstring du module posé dans le venv. La preuve reste la CI sous `unshare -n`.
+- low · second avis 4 · noté · la coupure réseau n'est prouvée qu'en CI Linux (`unshare -n`). Sous Windows et macOS, la garde Python et le point 3 de « À vérifier sur poste réel » en tiennent lieu.
+- low · second avis 5 · rejeté · le groupe `dev` (ruff, pytest) est inclus dans `chain` aux mêmes versions. `default-groups = ["dev", "chain"]` n'installe donc rien de plus chez l'apprenant.
+- low · second avis 6 · corrigé · un paquet qui déclare la commande `<id>` dans `console_scripts` sans exécutable dans le venv passe en « Environnement abîmé ». Un greffon sans commande (pytest-cov) reste « Prêt ».
+- low · second avis 7 · corrigé · uv absent du PATH est cherché dans `UV` (posé par `uv run`, la commande de lancement donnée par l'installeur), puis dans `UV_INSTALL_DIR` ou `~/.local/bin`.
+- low · second avis 8 · rejeté · gitleaks ne publie pas d'archive Windows arm64 (seulement x64, x32, armv6 et armv7). L'archive x64 sous émulation reste le bon choix.
+- low · second avis 9 · rejeté · la somme et l'archive viennent de la même release, comme la spec le demande.

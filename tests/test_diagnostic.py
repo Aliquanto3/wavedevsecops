@@ -88,6 +88,8 @@ def test_langue_du_vrai_git() -> None:
 
 def test_diagnostic_sans_aucun_outil(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("wavedevsecops.toolrun.shutil.which", lambda name: None)
+    monkeypatch.delenv("UV", raising=False)
+    monkeypatch.setenv("UV_INSTALL_DIR", str(tmp_path / "sans-uv"))
     checks = diagnostic.run_diagnostic(Settings(data_dir=tmp_path), environ={})
     by_id = {c.check_id: c for c in checks}
     assert by_id["tool.git"].status == "missing" and by_id["tool.git"].blocking

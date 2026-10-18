@@ -10,6 +10,7 @@ import pytest
 
 from wavedevsecops import procs, toolrun
 from wavedevsecops.config import Settings
+from wavedevsecops.registry import load_registry
 
 PY = Path(sys.executable)
 
@@ -257,3 +258,93 @@ def test_garde_reseau_du_venv(tmp_path: Path) -> None:
     result = procs.run([PY, "-I", script], env=env, timeout=30)
     assert result.ok, result.stderr
     assert "WaveDevSecOps" in result.stdout and "192.0.2.1" in result.stdout
+
+
+_UDP_ET_DNS = """
+import socket
+for essai in (
+    lambda: socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b"x", ("192.0.2.1", 53)),
+    lambda: socket.getaddrinfo("exemple.invalid", 80),
+):
+    try:
+        essai()
+        print("PASSE")
+    except PermissionError:
+        print("REFUSE")
+"""
+
+
+def test_garde_reseau_refuse_udp_et_resolution(tmp_path: Path) -> None:
+    script = tmp_path / "essai.py"
+    script.write_text(toolrun.NETGUARD_SOURCE + _UDP_ET_DNS, encoding="utf-8")
+    env = toolrun.probe_environment()
+    env["WDS_NETGUARD"] = "1"
+    result = procs.run([PY, "-I", script], env=env, timeout=30)
+    assert result.ok, result.stderr
+    assert result.stdout.split() == ["REFUSE", "REFUSE"]
+
+
+@pytest.mark.parametrize(
+    ("event", "args", "permis"),
+    [
+        ("socket.connect", (None, ("127.0.0.1", 80)), True),
+        ("socket.connect", (None, ("::1", 80, 0, 0)), True),
+        ("socket.connect", (None, ("::ffff:127.0.0.1", 80)), True),
+        ("socket.connect", (None, ("localhost", 80)), True),
+        ("socket.connect", (None, "/tmp/socket"), True),
+        ("socket.connect", (None, ("127.evil.example", 80)), False),
+        ("socket.connect", (None, ("192.0.2.1", 80)), False),
+        ("socket.sendto", (None, ("192.0.2.1", 53)), False),
+        ("socket.sendmsg", (None, ("192.0.2.1", 53)), False),
+        ("socket.sendmsg", (None, None), True),
+        ("socket.getaddrinfo", ("127.evil.example", 80, 0, 0, 0, 0), False),
+        ("socket.getaddrinfo", ("localhost", 80, 0, 0, 0, 0), True),
+        ("socket.getaddrinfo", ("192.0.2.1", 80, 0, 0, 0, 0), True),
+        ("socket.gethostbyname", ("pypi.org",), False),
+    ],
+)
+def test_garde_reseau_loopback_strict(event: str, args: tuple, permis: bool) -> None:
+    namespace: dict[str, object] = {}
+    exec(toolrun.NETGUARD_SOURCE.replace('os.environ.get("WDS_NETGUARD")', "None"), namespace)
+    hook = namespace["_wds_netguard"]
+    if permis:
+        hook(event, args)  # type: ignore[operator]
+    else:
+        with pytest.raises(PermissionError):
+            hook(event, args)  # type: ignore[operator]
+
+
+@pytest.mark.parametrize("platform", ["win32", "linux"])
+def test_commande_manquante_mais_greffon_pret(tmp_path: Path, platform: str) -> None:
+    venv = _fake_venv(tmp_path, platform, {"ruff": "0.17.1", "pytest-cov": "7.1.0"})
+    site = toolrun.site_packages(venv, platform)
+    assert site is not None
+    (site / "ruff-0.17.1.dist-info" / "entry_points.txt").write_text(
+        "[console_scripts]\nruff = ruff.__main__:main\n", encoding="utf-8"
+    )
+    (site / "pytest_cov-7.1.0.dist-info" / "entry_points.txt").write_text(
+        "[pytest11]\npytest_cov = pytest_cov.plugin\n", encoding="utf-8"
+    )
+    for name in ("ruff", "pytest-cov"):
+        for exe in venv.glob(f"*/{name}*"):
+            exe.unlink()
+    ruff = toolrun.resolve("ruff", Settings(), platform=platform, venv=venv)
+    assert ruff.state == "mismatch" and "commande ruff manque" in ruff.reason
+    cov = toolrun.resolve("pytest-cov", Settings(), platform=platform, venv=venv)
+    assert cov.ok and cov.path is None  # greffon pytest : aucune commande attendue
+
+
+def test_uv_hors_du_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(toolrun.shutil, "which", lambda name: None)
+    monkeypatch.delenv("UV", raising=False)
+    monkeypatch.setenv("UV_INSTALL_DIR", str(tmp_path / "bin"))
+    tool = load_registry().get("uv")
+    assert toolrun._host_candidate(tool, "linux", 1.0)[0] is None
+    (tmp_path / "bin").mkdir()
+    installed = tmp_path / "bin" / "uv.exe"
+    installed.write_text("", encoding="utf-8")
+    assert toolrun._host_candidate(tool, "win32", 1.0)[0] == installed
+    launcher = tmp_path / "uv-lanceur"
+    launcher.write_text("", encoding="utf-8")
+    monkeypatch.setenv("UV", str(launcher))  # posé par `uv run` au lancement de l'application
+    assert toolrun._host_candidate(tool, "linux", 1.0)[0] == launcher
