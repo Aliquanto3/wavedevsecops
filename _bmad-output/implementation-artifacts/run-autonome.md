@@ -280,6 +280,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:07 · 4.6 · dev · fini, 964 passed / 41 skipped, CI verte ; hint_open en 3 paliers ordonnés (solution après un essai ou 20 s), fait hint_opened à la clôture de lecture, rejeu au réveil, tablist avec cadenas ; aucun scénario ne déclare encore hints · bffc618
 - 2026-10-19 00:07 · 4.6 · second-avis · lancé · —
 - 2026-10-19 00:07 · 3.3 · dev · lancé (dev-story Sonnet ; ouvre 2.10 ; vue review-log reportée par 3.4) · —
+- 2026-10-19 00:10 · 4.7 · second-avis · aucun high, 2 medium (_next_scenario en ordre lexical au lieu de l'ordre FR-9 de 6.1, progress.json absent → « Aucune question »), 6 low ; reviewer Opus lancé (ordre à porter hors de web, à aligner avec 6.1) · —
+- 2026-10-19 00:11 · 4.6 · second-avis · aucun high, 1 medium (hint_pending non clos par Recommencer, restauration ni snapshot → fait hint_opened perdu), 4 low (read_ms sans plafond, hint_open admis en restore_failed, onglets verrouillés hors Tab, commande refusée non comptée comme essai) ; reviewer Opus lancé · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
