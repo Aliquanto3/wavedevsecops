@@ -27,6 +27,7 @@ from wavedevsecops.engine import (
     OpContext,
     Operation,
     WorkspaceEngine,
+    hints,
     register_intent,
     resolve_git,
 )
@@ -52,6 +53,7 @@ class TerminalLine(BaseModel):
 
 def _refused_operation(text: str) -> Operation:
     def body(ctx: OpContext) -> int:
+        hints.settle(ctx)  # une commande tapée, même refusée, est un essai (story 4.6)
         ctx.output(text, "refused")
         return EXIT_REFUSED
 

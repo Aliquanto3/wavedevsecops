@@ -24,6 +24,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from wavedevsecops.contracts import AppError
 from wavedevsecops.engine.intents import INTENTS, Intent, register_intent
 from wavedevsecops.engine.operations import OpContext, Operation, OperationRefused, WorkspaceEngine
 from wavedevsecops.engine.runfile import load_run, save_run
@@ -33,6 +34,8 @@ HINT_INTENT = "hint_open"
 ATTEMPT_INTENTS = frozenset({"terminal_line", "quiz_choice", "answer_submit"})
 """Opérations de l'apprenant qui comptent comme un essai sur l'étape."""
 SOLUTION_DELAY_S = 20
+READ_MS_MAX = 15 * 60 * 1000
+"""Plafond du temps de lecture : au-delà, l'apprenant a quitté l'application ou fait autre chose."""
 TIERS = (
     (1, "Piste", "lead_text"),
     (2, "Commande partielle", "partial_text"),
@@ -147,7 +150,8 @@ def close_pending(run: dict[str, Any], now: float) -> tuple[dict[str, Any], list
     mine = opened.get(tier)
     if not isinstance(mine, dict):
         return rest, []
-    closed = {**mine, "read_ms": max(0, int((now - float(mine.get("at") or now)) * 1000))}
+    read_ms = max(0, int((now - float(mine.get("at") or now)) * 1000))
+    closed = {**mine, "read_ms": min(read_ms, READ_MS_MAX)}
     opened[tier] = closed
     hints = {**dict(run.get("hints") or {}), step_id: {**entry, "opened": opened}}
     return {**rest, "hints": hints}, [_fact(run, step_id, int(tier), closed)]
@@ -171,6 +175,20 @@ def on_operation(ctx: OpContext, run: dict[str, Any]) -> dict[str, Any]:
     if facts:
         ctx.submit_facts(facts)
     return updated
+
+
+def settle(ctx: OpContext) -> None:
+    """Point de clôture hors de la validation d'étape : clôt la lecture du dernier indice (et
+    compte l'essai d'une commande refusée). À appeler par toute opération qui suit une action de
+    l'apprenant sans passer par `StepRunner.validate` : rétablissement, commande refusée par la
+    liste blanche, et « Recommencer » (4.4) avant de reconstruire `run.json`."""
+    if not ctx.layout.run_json.exists():
+        return
+    try:
+        run = load_run(ctx.layout)
+    except AppError:
+        return
+    on_operation(ctx, run)
 
 
 def replay_facts(run: dict[str, Any]) -> list[dict[str, Any]]:

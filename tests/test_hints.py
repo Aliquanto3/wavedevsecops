@@ -131,6 +131,7 @@ def make_box(tmp_path: Path, git_path: Path, monkeypatch) -> Iterator:
         setup.result(WAIT)
         git = Git.for_workspace(git_path, engine.layout.root, settings)
         box = Box(manager, engine, git, events, settings, clock)
+        box.loaded = loaded
         boxes.append(box)
         return box
 
@@ -309,3 +310,42 @@ def test_lint_blanc_manquant_dans_la_commande_partielle() -> None:
     messages = [m for _, m in scenario.authoring_warnings()]
     assert any("aucun blanc" in m for m in messages)
     assert not parse_scenario(SCENARIO, "indices.A.yaml").authoring_warnings()
+
+
+def test_recommencer_clot_la_lecture_avant_de_reconstruire(make_box) -> None:
+    """Revue M1 : le palier encore en lecture devient un fait avant la reconstruction."""
+    box = make_box()
+    box.hint(1)
+    box.wait(6)
+    _engine, setup = box.manager.create(box.loaded, "llm", replace=True)
+    setup.result(WAIT)
+    [fact] = box.facts()
+    assert (fact["tier"], fact["read_ms"]) == (1, 6000)
+    assert "hint_pending" not in load_run(box.engine.layout)
+
+
+def test_une_commande_refusee_compte_comme_essai(make_box) -> None:
+    """Revue L5 : une commande tapée, même refusée par la liste blanche, est un essai."""
+    from wavedevsecops import terminal  # noqa: PLC0415
+
+    terminal.register_intents()
+    box = make_box()
+    allowlist = Path(__file__).parents[1] / "content" / "terminal-allowlist.yaml"
+    (box.settings.content_path() / allowlist.name).write_bytes(allowlist.read_bytes())
+    box.hint(1)
+    box.hint(2)
+    box.wait(3)
+    op = build_operation(box.engine, "terminal_line", {"line": "rm -rf ."})
+    box.engine.submit(op).result(WAIT)
+    assert _states(box)[2] == "available"
+    assert [(f["tier"], f["read_ms"]) for f in box.facts()] == [(1, 0), (2, 3000)]
+
+
+def test_le_temps_de_lecture_est_plafonne(make_box) -> None:
+    """Revue L2 : application quittée jusqu'au lendemain, lecture plafonnée."""
+    box = make_box()
+    box.hint(1)
+    box.wait(24 * 3600)
+    box.act("status")
+    [fact] = box.facts()
+    assert fact["read_ms"] == hints.READ_MS_MAX

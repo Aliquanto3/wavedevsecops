@@ -23,6 +23,7 @@ from typing import Any, get_args
 from wavedevsecops import github_sim, projections
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
+from wavedevsecops.engine import hints
 from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.operations import (
     SILENT_STATES,
@@ -182,6 +183,8 @@ def setup_operation(
     """Opération de préparation de l'espace (état `setup`, nouvel `epoch`)."""
 
     def body(ctx: OpContext) -> int:
+        if replace:
+            hints.settle(ctx)  # le palier en lecture devient un fait avant la reconstruction
         ctx.output("Préparation de l'espace du scénario…", "app")
         prepare_workspace(loaded, track, settings=settings, git_path=git_path, replace=replace)
         ctx.output("L'espace est prêt.", "app")

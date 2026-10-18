@@ -34,3 +34,15 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 4.6 » ; F
 - Le bilan (nombre d'indices, 4.7) lit `ProgressScenario.hints`, déjà dérivé des faits ; « Recommencer » (4.4) reconstruit `run.json`, donc remet à zéro les paliers ouverts et les essais, sans toucher aux faits.
 - `answer_submit` (5.2) est déjà dans les intentions qui comptent comme un essai ; son émetteur arrive avec la 5.2.
 - Rendu visuel (cadenas, focus, annonce lecteur d'écran) à vérifier dans un navigateur : les tests tournent sur une doublure de DOM.
+
+## Revue
+
+Revue Opus (une passe), après rebase sur `main` (4.5 et 3.4), avec la liste du second avis (Haiku).
+
+- **Medium · second avis M1 · corrigé (en partie écarté)** : vérifié, instantanés et rétablissements ne réécrivent pas `run.json` (hors `SNAPSHOT_ENTRIES`, `_update_run` fusionne), donc `hint_pending` y survit ; la perte réelle est « Recommencer » (`setup` avec `replace`), qui supprime l'espace. Nouveau point de clôture `hints.settle(ctx)` : appelé par `setup_operation` quand il reconstruit et par `restore_operation` (action de l'apprenant). **La 4.4 doit appeler `hints.settle(ctx)` dans son opération `restart`, avant de reconstruire `run.json`.** Test : `test_recommencer_clot_la_lecture_avant_de_reconstruire`.
+- **Low · second avis L2 · corrigé** : `read_ms` plafonné à `READ_MS_MAX` (15 min) ; valeur à confirmer par Anaël. Test : `test_le_temps_de_lecture_est_plafonne`.
+- **Low · second avis L3 · rejeté** : `hint_open` n'écrit que `run.json`, pas l'espace ; les lectures (`terminal_line` en lecture, `writes=False`) sont déjà admises en `restore_failed`, et lire un indice y reste utile.
+- **Low · second avis L4 · rejeté** : `tabindex="-1"` est le motif WAI-ARIA des onglets (tabulation itinérante) ; l'onglet verrouillé reste focalisable par les flèches, Début et Fin, ce que vérifie `test_hints_dom.py`.
+- **Low · second avis L5 · corrigé** : l'AC dit « commande tapée » ; une ligne refusée par la liste blanche compte désormais comme essai et clôt la lecture (`hints.settle` dans `_refused_operation`). Décision à confirmer par Anaël. Test : `test_une_commande_refusee_compte_comme_essai`.
+- **Second avis, points vérifiés sans défaut** : confirmés (ordre côté serveur, pas de double compte, `run.json` avant `submit_facts`, rejeu idempotent, pas de boucle côté front).
+- **Complexité · reviewer · aucun constat** : `run.json["hints"]` grossit d'une entrée par étape (au plus trois paliers) ; `replay_facts` ne le parcourt qu'au réveil, et chaque opération ne touche que l'entrée de l'étape courante.
