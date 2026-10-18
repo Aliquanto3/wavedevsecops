@@ -74,7 +74,7 @@ development_status:
   4-4-recommencer-un-scénario-sans-perdre-son-score: backlog
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
   4-6-ouvrir-des-indices-par-paliers: review
-  4-7-lire-le-bilan-à-la-fin-d-un-scénario: review
+  4-7-lire-le-bilan-à-la-fin-d-un-scénario: done
   epic-4-retrospective: optional
 
   epic-5: backlog

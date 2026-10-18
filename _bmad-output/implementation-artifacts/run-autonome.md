@@ -306,6 +306,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:44 · 3.5 · dev · lancé (dev-story Sonnet ; ouvre 5.7 et 7.3) ; 5.4 attend 5.3 (même front), 4.4 attend 4.6 · —
 - 2026-10-19 00:44 · — · notification · 4 décisions non bloquantes envoyées à Anaël (ids du socle avant 6.2, step_id AD-17, Bloc-notes 2.8, plafond indices 4.6) · —
 - 2026-10-19 00:45 · 2.8 · fusion · CI branche verte sur 6 jobs (pile 6.1 + 2.8), commit de fusion sur main (code identique à la branche testée), story done · d60cd1d
+- 2026-10-19 00:48 · 5.1 · second-avis · aucun high, 1 medium (agent_rebase_conflict réussit en silence si un rebase est déjà en cours, reproduit), 5 low (date sans effet, commit sans pathspec, stash include_untracked, pas de reflog sur origin nu, SHA vérifiés en local sous Windows seulement) ; reviewer Opus lancé · —
+- 2026-10-19 00:52 · 7.2 · second-avis · aucun high, 3 medium (pytest -- -p charge un greffon malgré l'invariant « ni -p », prouvé ; Ctrl+C sans effet pendant la relance machine ; uv sync échoué jamais retenté), 4 low ; reviewer Opus lancé · —
+- 2026-10-19 00:58 · 3.3 · second-avis · aucun high, 1 medium (conflits textuels prévisibles avec 2.8 dans views.js et index.html), 7 low (focus après Merger, Ouvrir une PR masqué si contenue, Literal sans test d'égalité, « sur m » absent sans protection…) ; reviewer Opus lancé · —
+- 2026-10-19 01:09 · 4.7 · fusion · CI branche verte sur 6 jobs, suite complète du sommet de pile 1043 passed / 42 skipped, commit de fusion sur main, story done ; 6.5 éligible · 48fd456
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
