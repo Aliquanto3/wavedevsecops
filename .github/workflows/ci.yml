@@ -80,3 +80,39 @@ jobs:
           git reset --hard --quiet
           git ls-files --eol content/scenarios/bac-a-sable-libre.A.yaml | grep -q 'w/crlf'
           uv run pytest -q --tb=short tests/test_scenarios.py tests/test_fingerprints.py
+
+      # Contrôle statique de l'installeur POSIX (shellcheck est préinstallé sur ubuntu-latest).
+      - name: shellcheck install.sh
+        if: matrix.os == 'ubuntu-latest'
+        run: shellcheck -s sh install.sh
+
+  installeur-unix:
+    name: install.sh réel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runner neuf, sans droits administrateur requis. WDS_INSTALL_FORCE_PROVISION_GIT=1 ignore
+      # le git du runner pour exercer la voie pixi + conda-forge ; le clone cible la branche testée.
+      - name: Installer avec install.sh (durée relevée)
+        env:
+          WDS_DATA_DIR: ${{ runner.temp }}/wds-data
+          WDS_INSTALL_REF: ${{ github.head_ref || github.ref_name }}
+          WDS_INSTALL_FORCE_PROVISION_GIT: "1"
+        run: |
+          start=$(date +%s)
+          sh install.sh
+          echo "Durée de l'installation : $(( $(date +%s) - start )) s"
+
+      - name: Vérifier l'installation
+        env:
+          WDS_DATA_DIR: ${{ runner.temp }}/wds-data
+        run: |
+          cat "$WDS_DATA_DIR/install.json"
+          "$WDS_DATA_DIR/tools/bin/git" --version
+          "$WDS_DATA_DIR/tools/gitleaks/gitleaks" version
+          test -f "$WDS_DATA_DIR/app/pyproject.toml"

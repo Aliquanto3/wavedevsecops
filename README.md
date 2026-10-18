@@ -40,6 +40,28 @@ installation interrompue reprend là où elle s'est arrêtée.
 - **Sans git ou si le clone échoue** : `$env:WDS_INSTALL_METHOD = 'zip'` avant la commande.
 - **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche : `$env:WDS_INSTALL_REF`.
 
+## Installer sous macOS et Linux (sans droits administrateur)
+
+Dans un terminal, un compte standard suffit (aucun `sudo`) :
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.sh | sh
+```
+
+L'installeur (`sh` POSIX) place uv dans votre profil, récupère l'application dans
+`~/Library/Application Support/WaveDevSecOps/app` (macOS) ou `~/.local/share/WaveDevSecOps/app`
+(Linux, ou `$XDG_DATA_HOME`), avec un clone `core.autocrlf=false`. Si git est absent ou antérieur à 2.38, il
+installe pixi 0.82.0 dans le profil puis git (conda-forge) ; sous macOS, il ne lance `/usr/bin/git`
+qu'après `xcode-select -p`, pour ne pas ouvrir la fenêtre d'installation des outils Xcode. Il lance `uv sync`,
+installe gitleaks (archive vérifiée par la somme SHA-256 de la release), puis écrit `install.json`.
+Relancez la même commande pour mettre à jour : `progress.json` est conservé, et une installation
+interrompue reprend là où elle s'est arrêtée.
+
+- **Derrière un proxy** : `export HTTPS_PROXY=http://proxy.entreprise:8080` (et `NO_PROXY=127.0.0.1,localhost`) avant la
+  commande ; `curl` et l'installeur passent par lui, et l'installeur pose `UV_SYSTEM_CERTS=true`.
+- **Sans git ou si le clone échoue** : `export WDS_INSTALL_METHOD=zip` avant la commande (archive `tar.gz` de GitHub).
+- **Autre dossier** : `WDS_DATA_DIR`. Autre branche : `WDS_INSTALL_REF`.
+
 ## Jalons
 
 `v0.1` socle git → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
