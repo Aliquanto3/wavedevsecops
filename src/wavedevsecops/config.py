@@ -19,6 +19,13 @@ from platformdirs import user_data_dir
 from pydantic import BaseModel, ConfigDict, field_validator
 
 ENV_PREFIX = "WDS_"
+APP_NAME = "WaveDevSecOps"
+PROXY_VARIABLES = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "UV_SYSTEM_CERTS")
+
+
+def project_root() -> Path:
+    """Racine du dépôt (clone ou zip) : là où vivent `tools.toml` et `content/`."""
+    return Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseModel):
@@ -45,7 +52,22 @@ class Settings(BaseModel):
         """Dossier des données : `data_dir`, sinon celui de platformdirs (AD-5)."""
         if self.data_dir is not None:
             return self.data_dir
-        return Path(user_data_dir("WaveDevSecOps", appauthor=False, roaming=False))
+        return Path(user_data_dir(APP_NAME, appauthor=False, roaming=False))
+
+    tools_file: Path | None = None
+    """Registre d'outils (AD-16) ; `None` : `tools.toml` à la racine du dépôt."""
+
+    content_dir: Path | None = None
+    """Dossier `content/` ; `None` : `content/` à la racine du dépôt."""
+
+    probe_timeout_s: float = 10.0
+    """Délai maximal d'une sonde d'outil (version, locale, `xcode-select`), en secondes."""
+
+    def tools_path(self) -> Path:
+        return self.tools_file if self.tools_file is not None else project_root() / "tools.toml"
+
+    def content_path(self) -> Path:
+        return self.content_dir if self.content_dir is not None else project_root() / "content"
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -63,3 +85,18 @@ class Settings(BaseModel):
 def get_settings() -> Settings:
     """Réglages du processus courant, lus une fois."""
     return Settings.from_env()
+
+
+def read_proxy_environment(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Variables de proxy posées (casse ignorée), sous leur nom en majuscules."""
+    source = os.environ if environ is None else environ
+    found: dict[str, str] = {}
+    for name, value in source.items():
+        if name.upper() in PROXY_VARIABLES and value.strip():
+            found.setdefault(name.upper(), value.strip())
+    return found
+
+
+def inherited_environment(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Copie de l'environnement du processus, point de départ de celui d'un outil."""
+    return dict(os.environ if environ is None else environ)

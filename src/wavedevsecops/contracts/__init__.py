@@ -5,6 +5,10 @@ Module feuille (AD-1) : n'importe rien du projet ; tout module peut l'importer.
 
 from __future__ import annotations
 
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
+
 
 class AppError(Exception):
     """Erreur métier typée (convention « Erreurs »).
@@ -17,3 +21,28 @@ class AppError(Exception):
         super().__init__(f"{cause_text} {action_text}")
         self.cause_text = cause_text
         self.action_text = action_text
+
+
+CheckStatus = Literal["ok", "missing", "too_old", "mismatch", "info", "warn"]
+
+
+class DiagnosticCheck(BaseModel):
+    """Résultat d'une sonde du diagnostic : charge utile de l'événement `diagnostic_check`.
+
+    Les textes sont écrits par le serveur (convention `_text`).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    check_id: str
+    group: Literal["tool", "git_language", "proxy"]
+    label_text: str
+    status: CheckStatus
+    blocking: bool
+    """Vrai si l'état bloque les scénarios qui exigent cet outil (jamais une information)."""
+    status_text: str
+    detail_text: str
+    what_to_do_text: str = ""
+    """Texte « Que faire ? » de `content/diagnostic.yaml` ; vide si rien à régler."""
+    milestone: str = ""
+    version: str = ""

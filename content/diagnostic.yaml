@@ -1,0 +1,75 @@
+# Textes du diagnostic (AD-16, AD-17). Les outils, versions et sondes sont dans tools.toml.
+# Les gabarits utilisent {nom} ; vouvoiement.
+schema_version: 1
+
+tools:
+  git:
+    label: "git"
+    todo:
+      missing: >-
+        Installez git, ou relancez l'installeur de WaveDevSecOps : il place un git dans le
+        dossier tools/ de l'application, sans droits administrateur.
+      too_old: >-
+        Votre git est trop ancien. Relancez l'installeur de WaveDevSecOps : il place un git
+        récent dans le dossier tools/ de l'application, sans toucher à celui de votre poste.
+  uv:
+    label: "uv"
+    todo:
+      missing: >-
+        Installez uv (installeur de WaveDevSecOps, ou la commande indiquée sur le site
+        d'uv), puis relancez le diagnostic.
+      too_old: "Mettez uv à jour avec la commande uv self update, puis relancez le diagnostic."
+  gitleaks:
+    label: "gitleaks"
+    todo:
+      missing: >-
+        Relancez l'installeur de WaveDevSecOps : il télécharge gitleaks, vérifie sa somme de
+        contrôle et le place dans le dossier tools/. Seule la station 1 en a besoin.
+      too_old: >-
+        Relancez l'installeur de WaveDevSecOps pour obtenir la version de gitleaks attendue.
+  _python_package:
+    todo:
+      missing: "Lancez uv sync pour installer les outils de la chaîne."
+      mismatch: "L'environnement est abîmé : lancez uv sync pour le réparer."
+
+statuses:
+  ok: "Prêt"
+  missing: "Absent"
+  too_old: "Trop ancien"
+  mismatch: "Version inattendue"
+  info: "Information"
+  warn: "À vérifier"
+
+tool_detail:
+  ok: "{label} {version} ({source_text})."
+  problem: "{label} : {reason}."
+sources:
+  host: "outil de votre poste"
+  provisioned: "installé par l'application"
+  environment: "environnement de l'application"
+
+git_language:
+  label: "Langue de git"
+  fr: "git parle français."
+  en: "git parle anglais : traductions absentes."
+  todo_en: >-
+    Information seulement : les messages de git s'affichent en anglais. Pour les avoir en
+    français, utilisez le git installé par l'application (PortableGit sous Windows).
+  todo_fr: ""
+
+proxy:
+  label: "Proxy"
+  none: "Aucun proxy détecté."
+  present: "Proxy détecté : {proxies}."
+  no_proxy_ok: "NO_PROXY contient 127.0.0.1 et localhost."
+  no_proxy_missing: "NO_PROXY ne contient pas {missing}."
+  system_certs_set: "UV_SYSTEM_CERTS est posé ({value})."
+  system_certs_unset: "UV_SYSTEM_CERTS n'est pas posé."
+  todo_none: ""
+  todo_no_proxy: >-
+    Ajoutez 127.0.0.1 et localhost à la variable NO_PROXY : sans cela, votre proxy
+    intercepte les appels de l'application à elle-même.
+  todo_certs: >-
+    Si votre entreprise inspecte le trafic HTTPS, posez UV_SYSTEM_CERTS=true pour qu'uv
+    utilise les certificats du système.
+  todo_ok: ""

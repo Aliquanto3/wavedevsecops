@@ -1,0 +1,146 @@
+# Registre d'outils unique (AD-16). Lu par le diagnostic, `toolrun`, la disponibilité des
+# scénarios, les installeurs (install.ps1, install.sh) et le test de cohérence de la CI,
+# qui le compare à la table Stack du spine et à `uv.lock`.
+#
+# Champs :
+#   id                  identifiant (celui que les scénarios déclarent)
+#   usage               à quoi l'outil sert (texte affiché)
+#   milestone           jalon qui en a besoin
+#   resolution          host-or-provisioned : poste d'abord, sinon <data>/tools/
+#                       host                : PATH du poste seulement
+#                       provisioned         : <data>/tools/ seulement
+#                       uv-lock             : paquet Python du venv, version du uv.lock
+#   min_version         version minimale (vide : aucune, la version exacte fait foi)
+#   provisioned_version version installée par l'installeur (table `windows` / `posix` si
+#                       elle diffère selon le système)
+#   paths               chemins relatifs à <data>/tools/ par famille de systèmes
+#   probe               arguments qui affichent la version ; version_regex en extrait le numéro
+#   network             l'outil peut-il sortir sur le réseau ?
+#   network_switch      réglage qui le coupe (AD-12)
+
+[[tool]]
+id = "git"
+usage = "Dépôts, commits, branches : le terminal de l'apprenant et les projections"
+milestone = "v0.1"
+resolution = "host-or-provisioned"
+min_version = "2.38"
+probe = ["--version"]
+version_regex = 'git version (\d+(?:\.\d+)+)'
+network = true
+network_switch = "GIT_TERMINAL_PROMPT=0, variables de proxy retirées, dépôts locaux seulement"
+[tool.provisioned_version]
+windows = "2.56.0.windows.2"
+posix = "2.56.0"
+[tool.paths]
+windows = ["git/cmd/git.exe"]
+posix = ["git/bin/git", "bin/git"]
+
+[[tool]]
+id = "uv"
+usage = "Environnements Python hors ligne des exercices et des runs de CI"
+milestone = "v0.1"
+resolution = "host"
+min_version = "0.11.0"
+provisioned_version = "0.13.1"
+probe = ["--version"]
+version_regex = 'uv (\d+(?:\.\d+)+)'
+network = true
+network_switch = "UV_OFFLINE=1"
+
+[[tool]]
+id = "gitleaks"
+usage = "Recherche de secrets avant commit (station 1)"
+milestone = "station-1"
+resolution = "provisioned"
+min_version = "8.20.0"
+provisioned_version = "8.30.1"
+probe = ["version"]
+version_regex = '(\d+(?:\.\d+)+)'
+network = false
+network_switch = ""
+[tool.paths]
+windows = ["gitleaks/gitleaks.exe", "gitleaks.exe"]
+posix = ["gitleaks/gitleaks", "gitleaks"]
+
+[[tool]]
+id = "pixi"
+usage = "Installation de git conda-forge hors Windows (installeur seulement)"
+milestone = "install"
+resolution = "host"
+provisioned_version = "0.82.0"
+probe = ["--version"]
+version_regex = 'pixi (\d+(?:\.\d+)+)'
+network = true
+network_switch = "installeur seulement, jamais lancé par l'application"
+
+[[tool]]
+id = "ruff"
+usage = "Analyse statique du code d'exercice (station 1 et pipeline)"
+milestone = "station-1"
+resolution = "uv-lock"
+provisioned_version = "0.17.1"
+network = false
+network_switch = ""
+
+[[tool]]
+id = "pytest"
+usage = "Tests du code d'exercice (pipeline)"
+milestone = "station-2"
+resolution = "uv-lock"
+provisioned_version = "9.1.1"
+network = false
+network_switch = "PYTEST_ADDOPTS=-p no:cacheprovider"
+
+[[tool]]
+id = "pytest-cov"
+usage = "Mesure de couverture dans pytest (quality gate)"
+milestone = "station-2"
+resolution = "uv-lock"
+provisioned_version = "7.1.0"
+network = false
+network_switch = ""
+
+[[tool]]
+id = "coverage"
+usage = "Moteur de couverture"
+milestone = "station-2"
+resolution = "uv-lock"
+provisioned_version = "7.16.2"
+network = false
+network_switch = ""
+
+[[tool]]
+id = "diff-cover"
+usage = "Couverture des lignes modifiées (quality gate, seuil 80 %)"
+milestone = "station-2"
+resolution = "uv-lock"
+provisioned_version = "10.6.0"
+network = false
+network_switch = ""
+
+[[tool]]
+id = "bandit"
+usage = "Analyse de sécurité du code Python (station 2)"
+milestone = "station-2"
+resolution = "uv-lock"
+provisioned_version = "1.9.4"
+network = false
+network_switch = ""
+
+[[tool]]
+id = "pip-audit"
+usage = "Audit des dépendances contre l'extrait OSV local (station 3)"
+milestone = "station-3"
+resolution = "uv-lock"
+provisioned_version = "2.10.1"
+network = true
+network_switch = "--osv-url vers le point local /osv/, NO_PROXY=127.0.0.1,localhost"
+
+[[tool]]
+id = "pre-commit"
+usage = "Exécution des hooks de commit (station 1)"
+milestone = "station-1"
+resolution = "uv-lock"
+provisioned_version = "4.7.0"
+network = true
+network_switch = "PRE_COMMIT_HOME dans cache/, dépôts `repo: local` seulement"
