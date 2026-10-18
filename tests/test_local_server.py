@@ -102,7 +102,8 @@ def test_refus_post_origine_differente(instance: cli.Instance) -> None:
 
 
 def test_osv_public_en_post_seulement(instance: cli.Instance) -> None:
-    assert request(instance, "POST", "/osv/v1/query").status == 404  # route livrée plus tard
+    # Route livrée par la story 8.2 : sans cookie ni origine, un corps vide est un 400, pas un 401.
+    assert request(instance, "POST", "/osv/v1/query").status == 400
     resp = request(instance, "GET", "/osv/v1/query")
     assert resp.status == 405
     assert_no_cors(resp)

@@ -22,7 +22,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from wavedevsecops import diagnostic
+from wavedevsecops import diagnostic, osv
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.engine import WorkspaceManager
@@ -201,6 +201,17 @@ def create_app(
     workspaces = workspaces or WorkspaceManager(settings)
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)
+
+    osv_extract = osv.load_extract(settings.osv_path())
+
+    @app.post("/osv/v1/query")
+    async def osv_query(request: Request) -> JSONResponse:
+        """Point OSV local (AD-11) : en mémoire, sans verrou ni file, sans cookie (AD-19)."""
+        body = await request.body()
+        if len(body) > osv.MAX_BODY_BYTES:
+            return JSONResponse({"code": 3, "message": "Requête trop volumineuse."}, 413)
+        status, payload = osv.answer(osv_extract, body)
+        return JSONResponse(payload, status_code=status)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 

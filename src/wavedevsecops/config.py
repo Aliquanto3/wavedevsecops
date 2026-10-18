@@ -96,6 +96,14 @@ class Settings(BaseModel):
         """`content/scenarios/` : un YAML par scénario et par mode (AD-7)."""
         return self.content_path() / "scenarios"
 
+    def osv_path(self) -> Path:
+        """`content/osv/` : l'extrait figé de la base de vulnérabilités (AD-11)."""
+        return self.content_path() / "osv"
+
+    def osv_url(self, port: int) -> str:
+        """URL du point OSV local pour le serveur sur `port` : la seule source (AD-11)."""
+        return f"http://127.0.0.1:{port}/osv/v1/query"
+
     def tools_path(self) -> Path:
         return self.tools_file if self.tools_file is not None else project_root() / "tools.toml"
 
