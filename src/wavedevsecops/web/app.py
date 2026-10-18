@@ -28,7 +28,7 @@ from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.engine import WorkspaceManager, designation, pr_intents
 from wavedevsecops.web.catalogue import install_catalogue_routes
 from wavedevsecops.web.exercise import register_exercise_intent
-from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
+from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces, track_options
 from wavedevsecops.web.workspaces import install_workspace_routes
 
 SESSION_COOKIE = "wds_session"
@@ -197,6 +197,7 @@ def create_app(
         return JSONResponse(
             {
                 "milestone": milestone,
+                "tracks": track_options(),
                 "surfaces": [
                     {"key": s.key, "label": s.label, "path": s.path, "subtitle": s.subtitle}
                     for s in surfaces

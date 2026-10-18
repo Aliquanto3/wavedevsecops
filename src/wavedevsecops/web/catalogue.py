@@ -1,12 +1,13 @@
 """Catalogue (première version) et ouverture d'un espace de travail (Story 2.3).
 
-- `GET /api/catalogue` : la section « Socle git », avec les scénarios déclarés dans
-  `content/scenarios/` (titre, modes, parcours) ;
+- `GET /api/catalogue[?track=<parcours>]` : sans parcours, seulement le choix du parcours
+  (`path-picker`) ; avec un parcours, la section « Socle git » dans l'ordre conseillé (FR-9),
+  l'état de chaque mode dérivé par `progress` (AD-14) et l'indisponibilité par outil (AD-16) ;
 - `POST /api/open` : ouvre l'espace d'un mode (le prépare s'il n'existe pas) et rend son
-  `workspace_id` ; le parcours par défaut est le parcours sans IA ;
+  `workspace_id` ; refuse un mode indisponible ; le parcours par défaut est le parcours sans IA ;
 - `GET /api/workspaces/<workspace_id>` : titre et mode du scénario d'un espace.
 
-La Story 6.1 étend cet écran (choix du parcours, états, cartes indisponibles).
+Contrat du catalogue (Story 6.1) : voir `6-1-choisir-son-parcours-et-parcourir-le-catalogue.md`.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from wavedevsecops import toolrun
+from wavedevsecops import diagnostic, toolrun
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import (
@@ -33,7 +34,9 @@ from wavedevsecops.engine import (
     parse_workspace_id,
     workspace_id_for,
 )
+from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
+from wavedevsecops.web.shell import TRACKS, track_options
 
 log = logging.getLogger("wavedevsecops")
 
@@ -42,6 +45,27 @@ DEFAULT_TRACK = "no_ai"
 SOCLE_SECTION = "socle-git"
 SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
+SOCLE_ORDER: tuple[str, ...] = (
+    "add-commit",
+    "push-pull",
+    "branche",
+    "pr-merge",
+    "conflit",
+    "stash",
+    "rebase",
+    "recuperation",
+)
+"""Ordre conseillé du socle git (FR-9), par `scenario_id`. Un identifiant qui n'est pas encore
+livré est simplement absent du catalogue ; un scénario déclaré mais absent de cette liste vient
+après, par ordre alphabétique."""
+PICKER_QUESTION = (
+    "Choisissez votre parcours. Les deux suivent la même progression ; "
+    "seul le code d'exercice change."
+)
+STATE_TEXTS = {"todo": "À faire", "in_progress": "En cours", "done": "Terminé"}
+UNAVAILABLE_TEXT = "⊘ Indisponible"
+DIAGNOSTIC_TEXT = "Voir le diagnostic"
+DIAGNOSTIC_PATH = "/diagnostic"
 
 
 class _ChainModel(BaseModel):
@@ -211,39 +235,108 @@ def default_track(loaded: LoadedScenario) -> str:
     return DEFAULT_TRACK if DEFAULT_TRACK in tracks else tracks[0]
 
 
-def catalogue_body(settings: Settings) -> dict[str, Any]:
+def _hint_text(count: int) -> str:
+    return f"{count} indice" + ("s" if count > 1 else "")
+
+
+def detail_text(progress: ScenarioProgress) -> str:
+    """« n sur m du premier coup · k indice(s) » ; rien tant que le scénario n'est pas commencé."""
+    if progress.state == "todo":
+        return ""
+    parts = []
+    if progress.quiz_total:
+        parts.append(f"{progress.quiz_correct} sur {progress.quiz_total} du premier coup")
+    parts.append(_hint_text(progress.hints))
+    return " · ".join(parts)
+
+
+def _missing_tool(
+    tools: list[str], settings: Settings, cache: dict[str, bool], labels: dict[str, str]
+) -> tuple[str, str] | None:
+    """Premier outil requis absent ou trop ancien : `(identifiant, libellé)` (AD-16)."""
+    for tool_id in tools:
+        if tool_id not in cache:
+            cache[tool_id] = toolrun.resolve(tool_id, settings).ok
+        if not cache[tool_id]:
+            return tool_id, labels.get(tool_id, tool_id)
+    return None
+
+
+def _socle_rank(scenario_id: str) -> tuple[int, str]:
+    if scenario_id in SOCLE_ORDER:
+        return SOCLE_ORDER.index(scenario_id), scenario_id
+    return len(SOCLE_ORDER), scenario_id
+
+
+def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, Any]:
+    """Catalogue du `track` choisi ; sans parcours, seulement le choix du parcours.
+
+    Lit le disque et sonde les outils : à appeler hors de la boucle d'événements.
+    """
+    body: dict[str, Any] = {
+        "default_track": DEFAULT_TRACK,
+        "track": track,
+        "tracks": track_options(),
+        "picker": {"question": PICKER_QUESTION},
+        "sections": [],
+    }
+    if track is None:
+        return body
+    progress = ProgressStore.for_dir(settings.resolved_data_dir()).all_progress()
+    try:
+        tool_texts = diagnostic.load_texts(settings).get("tools", {})
+    except (OSError, UnicodeDecodeError, yaml.YAMLError, AttributeError) as error:
+        log.warning("Libellés d'outils illisibles (%s) : identifiants utilisés", error)
+        tool_texts = {}
+    labels = {k: v.get("label", k) for k, v in tool_texts.items() if isinstance(v, dict)}
+    probed: dict[str, bool] = {}
     grouped: dict[str, dict[str, Any]] = {}
     for loaded in load_catalogue(settings):
         scenario = loaded.scenario
         if not scenario.catalogue or scenario.section not in (None, SOCLE_SECTION):
             continue
+        if track not in scenario.tracks:
+            continue
         entry = grouped.setdefault(
             scenario.scenario_id,
             {"scenario_id": scenario.scenario_id, "title": scenario.title_text, "modes": []},
         )
-        track = default_track(loaded)
-        entry["modes"].append(
-            {
-                "mode": scenario.mode,
-                "tracks": list(scenario.tracks),
-                "track": track,
-                "workspace_id": workspace_id_for(track, scenario.key),
+        done = progress.get((track, scenario.scenario_id, scenario.mode))
+        state = done.state if done else "todo"
+        missing = _missing_tool(list(scenario.tools), settings, probed, labels)
+        mode: dict[str, Any] = {
+            "mode": scenario.mode,
+            "tracks": list(scenario.tracks),
+            "track": track,
+            "workspace_id": workspace_id_for(track, scenario.key),
+            "state": state,
+            "state_text": STATE_TEXTS[state],
+            "detail_text": detail_text(done) if done else "",
+            "available": missing is None,
+        }
+        if missing is not None:
+            mode["unavailable"] = {
+                "tool_id": missing[0],
+                "tool_label": missing[1],
+                "text": UNAVAILABLE_TEXT,
+                "needs_text": f"Nécessite {missing[1]}",
+                "diagnostic_text": DIAGNOSTIC_TEXT,
+                "diagnostic_path": DIAGNOSTIC_PATH,
             }
-        )
-    scenarios = sorted(grouped.values(), key=lambda s: s["scenario_id"])
-    for entry in scenarios:
+        entry["modes"].append(mode)
+    scenarios = sorted(grouped.values(), key=lambda s: _socle_rank(s["scenario_id"]))
+    for number, entry in enumerate(scenarios, start=1):
+        entry["number"] = number
         entry["modes"].sort(key=lambda m: m["mode"])
-    return {
-        "default_track": DEFAULT_TRACK,
-        "sections": [
-            {
-                "key": SOCLE_SECTION,
-                "title": SOCLE_TITLE,
-                "subtitle": SOCLE_SUBTITLE,
-                "scenarios": scenarios,
-            }
-        ],
-    }
+    body["sections"] = [
+        {
+            "key": SOCLE_SECTION,
+            "title": SOCLE_TITLE,
+            "subtitle": SOCLE_SUBTITLE,
+            "scenarios": scenarios,
+        }
+    ]
+    return body
 
 
 def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: Settings) -> None:
@@ -266,8 +359,10 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         return manager.layout(workspace_id).root.is_dir()
 
     @app.get("/api/catalogue")
-    async def catalogue() -> Response:
-        return JSONResponse(await asyncio.to_thread(catalogue_body, settings))
+    async def catalogue(track: str | None = None) -> Response:
+        if track is not None and track not in {key for key, _, _ in TRACKS}:
+            return _refusal(422, "Ce parcours n'existe pas. Choisissez-en un dans la liste.")
+        return JSONResponse(await asyncio.to_thread(catalogue_body, settings, track))
 
     @app.post("/api/open")
     async def open_workspace(request: Request) -> Response:
@@ -282,6 +377,15 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         track = body.get("track") or default_track(loaded)
         if track not in loaded.scenario.tracks:
             return _refusal(422, "Ce scénario n'est pas proposé dans ce parcours.")
+        missing = await asyncio.to_thread(
+            _missing_tool, list(loaded.scenario.tools), settings, {}, {}
+        )
+        if missing is not None:
+            return _refusal(
+                409,
+                f"Ce scénario nécessite {missing[0]}, qui manque sur ce poste. "
+                "Ouvrez le diagnostic pour voir quoi faire.",
+            )
         workspace_id = workspace_id_for(track, loaded.scenario.key)
 
         def open_it() -> bool:

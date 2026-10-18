@@ -6,11 +6,29 @@ import { initDisplayMenu } from "./display.js";
 import { STOPPED_MESSAGE, watchHealth } from "./health.js";
 import { currentSurface, renderNav } from "./nav.js";
 import { connectWorkspace, createStore } from "./store.js";
+import { getTrack, renderPathMenu, setTrack } from "./track.js";
 import "./views.js";
 import { mountWorkspace } from "./workspace.js";
 
 const WORKSPACE_PATH = /^\/espace\/([^/]+)$/;
-const TRACKS = { no_ai: "Parcours sans IA", llm: "Parcours LLM" };
+let tracks = [];
+const trackLabel = (key) => (tracks.find((t) => t.key === key) || {}).label || key;
+
+/** Parcours mémorisé, s'il est encore proposé par le serveur. */
+function chosenTrack() {
+  const stored = getTrack();
+  return tracks.some((t) => t.key === stored) ? stored : null;
+}
+
+/** `path-menu` de l'en-tête : changer de parcours ramène au catalogue du nouveau parcours. */
+function showPathMenu() {
+  const menu = document.getElementById("path-menu");
+  if (!menu || tracks.length === 0) return;
+  renderPathMenu(menu, tracks, chosenTrack(), (track) => {
+    setTrack(track);
+    window.location.assign("/");
+  });
+}
 const LOAD_FAILED = "Le catalogue n'a pas pu être lu. Rechargez la page.";
 const WORKSPACE_MISSING = "Cet espace n'existe pas. Revenez au catalogue.";
 
@@ -49,7 +67,10 @@ async function showWorkspace(container, workspaceId) {
   }
   document.getElementById("page-title").textContent = info.title;
   document.getElementById("page-subtitle").textContent =
-    `${TRACKS[info.track] || info.track} · Mode ${info.mode}`;
+    `${trackLabel(info.track)} · Mode ${info.mode}`;
+  // Le parcours de l'espace ouvert devient le parcours choisi (le menu et le catalogue suivent).
+  setTrack(info.track);
+  showPathMenu();
   document.title = `${info.title} · WaveDevSecOps`;
   const store = createStore();
   mountWorkspace(container, { title: info.title, store, chain: info.chain, track: info.track });
@@ -58,11 +79,28 @@ async function showWorkspace(container, workspaceId) {
 
 async function showCatalogue(container) {
   try {
-    const catalogue = await loadCatalogue();
-    renderCatalogue(container, catalogue, async (scenario, mode) => {
-      const opened = await openMode(scenario, mode);
-      window.location.assign(workspacePath(opened.workspace_id));
-    });
+    const track = chosenTrack();
+    let catalogue;
+    try {
+      catalogue = await loadCatalogue({ track });
+    } catch (err) {
+      if (!track) throw err;
+      // Parcours mémorisé devenu invalide : retour au choix du parcours.
+      catalogue = await loadCatalogue();
+    }
+    renderCatalogue(
+      container,
+      catalogue,
+      async (scenario, mode) => {
+        const opened = await openMode(scenario, mode, { track: catalogue.track });
+        window.location.assign(workspacePath(opened.workspace_id));
+      },
+      (picked) => {
+        setTrack(picked);
+        showPathMenu();
+        showCatalogue(container);
+      },
+    );
   } catch (err) {
     message(container, LOAD_FAILED);
   }
@@ -74,6 +112,7 @@ async function start() {
   watchHealth(showAlive);
   try {
     const shell = await loadShell();
+    tracks = shell.tracks || [];
     current = currentSurface(shell.surfaces, window.location.pathname);
     renderNav(document.getElementById("surfaces"), shell.surfaces, current);
     if (current) {
@@ -84,6 +123,7 @@ async function start() {
   } catch (err) {
     // Le point de vie signale l'arrêt du serveur ; l'en-tête reste vide en attendant.
   }
+  showPathMenu();
   const container = document.getElementById("panes");
   const badgeLink = document.querySelector('#surfaces a[href="/diagnostic"]');
   const workspace = WORKSPACE_PATH.exec(window.location.pathname);

@@ -55,9 +55,9 @@ def call(inst: cli.Instance, method: str, path: str, cookie: dict, body: object 
 def test_catalogue_liste_le_socle_git_avec_titres_et_modes(
     instance: cli.Instance, cookie: dict
 ) -> None:
-    status, body = call(instance, "GET", "/api/catalogue", cookie)
+    status, body = call(instance, "GET", "/api/catalogue?track=no_ai", cookie)
     assert status == 200
-    assert body["default_track"] == "no_ai"
+    assert body["default_track"] == "no_ai" and body["track"] == "no_ai"
     (section,) = body["sections"]
     assert section["title"] == "Socle git"
     by_id = {s["scenario_id"]: s for s in section["scenarios"]}
@@ -73,6 +73,10 @@ def test_catalogue_liste_le_socle_git_avec_titres_et_modes(
         "tracks": ["llm", "no_ai"],
         "track": "no_ai",
         "workspace_id": "no_ai.bac-a-sable-libre.A",
+        "state": "todo",
+        "state_text": "À faire",
+        "detail_text": "",
+        "available": True,
     }
 
 

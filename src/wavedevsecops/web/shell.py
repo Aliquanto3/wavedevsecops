@@ -27,6 +27,26 @@ SURFACES: tuple[Surface, ...] = (
 )
 
 
+TRACKS: tuple[tuple[str, str, str], ...] = (
+    (
+        "llm",
+        "Parcours LLM",
+        "Le code d'exercice est écrit par un assistant, que vous relisez et corrigez.",
+    ),
+    (
+        "no_ai",
+        "Parcours sans IA",
+        "Le code d'exercice est écrit à la main, sans assistant.",
+    ),
+)
+"""Parcours proposés : `(clé, libellé, phrase du choix)`. Source unique du `path-picker` et du
+`path-menu` (UX-DR4, UX-DR29)."""
+
+
+def track_options() -> list[dict[str, str]]:
+    return [{"key": k, "label": label, "text": text} for k, label, text in TRACKS]
+
+
 def _version(milestone: str) -> tuple[int, ...]:
     return tuple(int(part) for part in milestone.lstrip("v").split("."))
 
