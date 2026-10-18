@@ -1,4 +1,4 @@
-# Idée forgée : git-commands-training
+# Idée forgée : WaveDevSecOps (ex-git-commands-training)
 
 Appli locale pour apprendre git/GitHub puis la chaîne CI/CD et DevSecOps, pédagogie WaveStack. Public : Anaël, puis collègues en vibe coding (autonomie, puis ateliers), puis clients. Open source, topic `ai-portfolio`.
 

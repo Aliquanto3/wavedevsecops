@@ -1,4 +1,4 @@
-# git-commands-training
+# WaveDevSecOps
 
 > ⚪ **En spécification** : aucun code pour l'instant.
 
