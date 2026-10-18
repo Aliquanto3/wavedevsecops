@@ -282,6 +282,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:07 · 3.3 · dev · lancé (dev-story Sonnet ; ouvre 2.10 ; vue review-log reportée par 3.4) · —
 - 2026-10-19 00:10 · 4.7 · second-avis · aucun high, 2 medium (_next_scenario en ordre lexical au lieu de l'ordre FR-9 de 6.1, progress.json absent → « Aucune question »), 6 low ; reviewer Opus lancé (ordre à porter hors de web, à aligner avec 6.1) · —
 - 2026-10-19 00:11 · 4.6 · second-avis · aucun high, 1 medium (hint_pending non clos par Recommencer, restauration ni snapshot → fait hint_opened perdu), 4 low (read_ms sans plafond, hint_open admis en restore_failed, onglets verrouillés hors Tab, commande refusée non comptée comme essai) ; reviewer Opus lancé · —
+- 2026-10-19 00:15 · 5.2 · review · rebase sur main (un conflit de fond dans engine/steps.py validate et panel : tout 4.5 gardé, marques designable ajoutées), M1 corrigé (step_id obligatoire, 422 sinon), L4 (test de rejeu stabilisé), L6 (annonce non relancée sur même op_id) ; M2 écarté (quiz_altered laisse le quiz courant, désignation refusée), L5 sans objet ; 960 passed / 41 skipped, CI branche verte sur 6 jobs · cf75e4f
+- 2026-10-19 00:15 · — · décision pour Anaël · 5.2 : ajouter step_id (obligatoire) à answer_submit dans AD-17 du spine · —
+- 2026-10-19 00:19 · 5.2 · fusion · rebase sur le suivi (sans code), tests ciblés 58 passed, ff sur main, story done ; 5.3, 5.4 et 4.4 éligibles (créneaux pleins : 7.2, 5.1, 3.3 ; 4.4 attendra aussi 4.6 pour la clôture des indices) · 884560f
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

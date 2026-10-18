@@ -79,7 +79,7 @@ development_status:
 
   epic-5: backlog
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: in-progress
-  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: review
+  5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: backlog
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
