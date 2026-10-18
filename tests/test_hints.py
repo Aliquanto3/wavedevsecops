@@ -349,3 +349,15 @@ def test_le_temps_de_lecture_est_plafonne(make_box) -> None:
     box.act("status")
     [fact] = box.facts()
     assert fact["read_ms"] == hints.READ_MS_MAX
+
+
+def test_le_bilan_compte_l_indice_ouvert(make_box) -> None:
+    """Intégration 4.6 → 4.7 : le fait `hint_opened` émis à la clôture arrive dans le bilan."""
+    box = make_box()
+    box.hint(1)
+    box.act("switch", "-c", "feature")
+    box.act("switch", "main")  # dernière étape : scénario terminé
+    summary = box.engine.snapshot()["step_panel"]["summary"]
+    assert summary is not None
+    assert summary["hints"] == 1
+    assert summary["text"].endswith("1 indice")
