@@ -230,3 +230,26 @@ console.log(JSON.stringify({ same: $(".step-segment") === before, focused: docum
 """,
     )
     assert out == {"same": True, "focused": True}
+
+
+def test_le_focus_survit_au_redessin_et_a_continuer(tmp_path: Path) -> None:
+    """Revue 4.1 : un verdict redessine le panneau sans renvoyer le focus sur `body`."""
+    out = _js(
+        tmp_path,
+        """
+const store = setup();
+$(".step-segment").focus();
+const unexpected = { step_id: "creer_branche", passed: false, status: "unexpected",
+  expected_text: "Attendu : x.", observed: [], reason_text: "Rien n'est bloqué." };
+event(store, "step_verdict", unexpected);
+const afterVerdict = document.activeElement.dataset.step || null;
+const next = $(".notice-actions .btn");
+next.focus();
+next.click();
+console.log(JSON.stringify({ afterVerdict, afterContinue: document.activeElement.className,
+  body: document.activeElement === document.body }));
+""",
+    )
+    assert out["afterVerdict"] == "creer_branche"
+    assert out["afterContinue"] == "step-title"
+    assert out["body"] is False

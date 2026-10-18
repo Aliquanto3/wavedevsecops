@@ -3,8 +3,9 @@
 Chaque module `<nom>.py` déclare :
 
 - `Args`, sous-classe de `StepArgs`, dont le champ `type` vaut `Literal["<nom>"]` ;
-- `check(state, ctx) -> Verdict`, qui juge l'état réel du dépôt (`RepoState`) pour l'étape
-  `ctx.step` ; `ctx` est un `StepContext`.
+- `check(state, ctx) -> Verdict`, qui juge l'étape `ctx.step` ; `state` est l'état réel du
+  dépôt (`RepoState`), ou `None` si la vue `repo` est illisible ; `ctx` est un `StepContext`
+  (alias, état d'avant, intention, données de l'opération, vues).
 
 Ajouter un type, c'est ajouter un module : ni le moteur, ni le chargeur, ni les scénarios
 existants ne changent. Les modules dont le nom commence par `_` ne sont pas des types.
@@ -36,7 +37,7 @@ class StepType:
 
     name: str
     args: type[StepArgs]
-    check: Callable[[RepoState, StepContext], Verdict]
+    check: Callable[[RepoState | None, StepContext], Verdict]
     summary: str
 
 

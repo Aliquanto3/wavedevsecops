@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,8 +31,8 @@ from wavedevsecops.scenarios import (
     parse_scenario,
     scenario_files,
 )
-from wavedevsecops.scenarios.steps import StepContext
-from wavedevsecops.scenarios.steps.repo_state import Args, check
+from wavedevsecops.scenarios.steps import StepContext, StepType
+from wavedevsecops.scenarios.steps.repo_state import MISSING_FORESEEN_TEXT, Args, check
 
 WAIT = 60.0
 ROOT = Path(__file__).resolve().parent.parent
@@ -498,6 +499,8 @@ def test_lint_de_contenu_des_scenarios_du_depot() -> None:
         assert len(ids) == len(set(ids))
         for step in loaded.scenario.steps:
             assert step.type in STEP_TYPES
+        for field, message in loaded.scenario.authoring_warnings():
+            warnings.warn(f"{path.name} : {field} : {message}", UserWarning, stacklevel=1)
 
 
 def _lint_errors(text: str, **kwargs) -> dict[str, str]:
@@ -534,3 +537,101 @@ def test_lint_type_d_etape_alias_cle_d_explication_et_step_id() -> None:
 
     bad_id = _lint_errors(head + step.format(id="Mauvais", type="repo_state", extra="", at="HEAD"))
     assert "steps[0].step_id" in bad_id
+
+
+# ------------------------------------------------------------------ revue 4.1
+def test_lecture_seule_dans_un_etat_prevu_ne_republie_rien(make_box) -> None:
+    box = make_box()
+    events = box.run("branch", "feature")
+    assert next(e for e in events if e.kind == Kind.STEP_VERDICT).payload["status"] == "failed"
+    assert Kind.STEP_VERDICT not in _kinds(box.run("status"))
+    assert Kind.STEP_VERDICT not in _kinds(box.run("log", "--oneline"))
+
+
+def test_reference_introuvable_echoue_ferme() -> None:
+    state = _state()
+    for expect in (
+        {"commits": [{"ahead_of": "supprimee", "min": 1}]},
+        {"commits": [{"ahead_of": "@absent", "min": 1}]},
+        {"commits": [{"on": "@absent", "min": 0}]},
+        {"head": {"at": "@absent"}},
+        {"branches": [{"name": "@absent"}]},
+    ):
+        verdict = _verdict(expect, state, aliases={})
+        assert verdict.status == "unexpected", expect
+    texts = {o.text for o in _verdict({"commits": [{"ahead_of": "supprimee"}]}, state).observed}
+    assert texts == {"`supprimee` est introuvable dans le dépôt."}
+
+
+def test_depot_illisible_rien_a_dire() -> None:
+    step = Args.model_validate(
+        {
+            "step_id": "essai",
+            "type": "repo_state",
+            "title_text": "T",
+            "instruction_text": "I",
+            "explanation_text": "E",
+            "expect": {"head": {"branch": "main"}},
+        }
+    )
+    assert check(None, StepContext(step)).status == "pending"
+
+
+def test_un_type_recoit_l_intention_et_les_vues(make_box, monkeypatch) -> None:
+    """Un type qui ne juge pas le dépôt (quiz, désignation) lit l'opération : le moteur ne
+    change pas."""
+    seen: list[tuple] = []
+    real = STEP_TYPES["repo_state"]
+
+    def spy(state, ctx):
+        seen.append((state is not None, ctx.intent, sorted(ctx.views), dict(ctx.data)))
+        return real.check(state, ctx)
+
+    monkeypatch.setitem(
+        STEP_TYPES, "repo_state", StepType("repo_state", real.args, spy, real.summary)
+    )
+    box = make_box()
+
+    def body(ctx: OpContext) -> int:
+        ctx.data["answer"] = "b"
+        return 0
+
+    box.engine.submit(Operation("quiz_answer", body)).result(WAIT)
+    assert seen == [
+        (True, "quiz_answer", sorted(box.engine.last_projection.views), {"answer": "b"})
+    ]
+
+
+def test_scenario_devenu_invalide_ne_fait_pas_d_erreur(make_box) -> None:
+    box = make_box()
+    box.scenario_path.write_text("schema_version: [", encoding="utf-8")
+    stamp = box.scenario_path.stat().st_mtime_ns + 10_000_000_000
+    os.utime(box.scenario_path, ns=(stamp, stamp))
+    kinds = _kinds(box.run("switch", "-c", "feature"))
+    assert Kind.APP_ERROR not in kinds
+    assert Kind.STEP_VERDICT not in kinds
+    assert box.engine.snapshot()["step_panel"] is None
+
+
+def test_lint_avertit_d_une_etape_sans_etat_prevu() -> None:
+    loaded = parse_scenario(SCENARIO, "etapes.A.yaml")
+    warned = loaded.authoring_warnings()
+    assert warned == [
+        (("steps", 1, "foreseen"), MISSING_FORESEEN_TEXT),
+        (("steps", 2, "foreseen"), MISSING_FORESEEN_TEXT),
+    ]
+
+
+def test_type_absent_d_une_etape_nomme_le_champ_type() -> None:
+    text = SCENARIO.replace("    type: repo_state\n", "", 1)
+    errors = _lint_errors(text)
+    # Un seul type : pydantic signale le champ ; à plusieurs, `union_tag_not_found` le nomme.
+    assert errors == {"steps[0].type": "champ obligatoire absent"}
+    from wavedevsecops.scenarios.loader import french_message
+
+    assert french_message({"type": "union_tag_not_found", "loc": ("steps", 0)}) == (
+        "champ `type` absent"
+    )
+    assert french_message({"type": "union_tag_not_found", "loc": ("setup", 0)}) == (
+        "champ `op` absent"
+    )

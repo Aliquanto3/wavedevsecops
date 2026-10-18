@@ -24,9 +24,10 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 4.1 ».
 
 ## Décisions
 
+- Ordre de `check` (revue) : `passed`, puis `pending` si l'état n'a pas bougé, puis `foreseen` (`failed`), puis `unexpected`. Une lecture seule dans un état prévu ne republie donc rien ; une étape déjà satisfaite passe à la commande suivante, même de lecture.
 - Quatre issues pour `check` : `passed`, `failed` (un `foreseen` correspond : la raison de l'auteur s'affiche dans la région de statut), `unexpected` (l'état a bougé, ni attendu ni prévu : encart) et `pending` (l'état est identique à celui d'avant l'opération : `git status`, `git log`… ne produisent aucun événement). Sans cette dernière, toute commande de lecture ouvrirait l'encart.
 - « Continuer » écarte l'encart côté front (choix d'affichage, rien n'est calculé) ; l'étape reste ouverte et chaque opération suivante la revalide. Rien n'est bloqué.
-- Une étape sans `foreseen` ne produit jamais `failed` : un pas intermédiaire licite (`git add` avant `git commit`) qui change l'état sans être attendu ouvre l'encart. À l'auteur de déclarer ces états dans `foreseen` pour les éviter ; le lint de contenu ne peut pas le deviner.
+- Une étape sans `foreseen` ne produit jamais `failed` : un pas intermédiaire licite (`git add` avant `git commit`) qui change l'état sans être attendu ouvre l'encart. Règle conservée (AD-7 : « ni attendu ni prévu → `unexpected` ») ; une règle « progresse vers l'attendu » ne couvre pas `git add` (aucune condition ne change) et taire le cas d'une faute de frappe (`switch -c featur`) : écartée. À la place, le lint de contenu avertit (`Scenario.authoring_warnings()`, sans erreur) toute étape `repo_state` qui attend un commit ou un stash sans `foreseen`.
 - La progression est la seule donnée de `run.json` (`step_id`) ; l'état `done|current|todo` est dérivé de la position de l'étape courante. Les faits du premier passage (essais, indices, score) sont à la story 4.2 : le `step_id` est la clé qu'elle citera.
 - Le chargeur n'importe pas `projections` (cycle) : le lint des clés d'explication reçoit `explain_keys` (`parse_scenario`, `load_scenario`) ; le test de lint les passe depuis `projections.EXPLAIN_REFS`. Il n'y a pas encore de `content/explanations.yaml` : à brancher quand il existera.
 - Aucun scénario du dépôt ne déclare encore d'étape (les 3 YAML ont `steps: []`) : le comportement est exercé par des scénarios de test. Les 8 scénarios du mode A sont écrits avec l'Epic 5.
@@ -42,3 +43,21 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 4.1 ».
 ## À voir dans un vrai navigateur
 
 - Mise en page du panneau de 440 px (segments qui passent à la ligne, encart, bouton « i »), contraste des jetons `warning`, focus visible sur les segments et « Continuer », annonce de la région `role="status"` au lecteur d'écran.
+
+## Revue
+
+Revue unique (Opus) après rebase sur `main` 87f5124 (conflits de cumul résolus dans `engine/manager.py` : `github_refresher` + `StepRunner` ; `workspace.js` : `chain` + `onSelect`).
+
+| Sévérité | Source | Constat | Issue |
+|---|---|---|---|
+| medium | second avis 1 | `foreseen` testé avant « état inchangé » : `git status` dans un état prévu republiait `failed` à chaque commande | corrigé : `pending` avant `foreseen` ; test réel `test_lecture_seule_dans_un_etat_prevu_ne_republie_rien` |
+| medium | second avis 2 | `ahead_of` (ou `on`) introuvable → base vide → `commits` passait à tort ; alias absent de `run.json` → `KeyError` (app_error) | corrigé : échec fermé (« `x` est introuvable dans le dépôt. »), alias inconnu résolu à vide ; `test_reference_introuvable_echoue_ferme` |
+| medium | second avis 3 | un pas licite sans `foreseen` ouvre « État inattendu » | documenté (règle d'AD-7 conservée, règle de progression ambiguë écartée, voir Décisions) + avertissement du lint de contenu (`authoring_warnings`, émis par `test_lint_de_contenu_des_scenarios_du_depot`) |
+| medium | second avis 4 | `validate` exigeait la vue `repo` ; `StepContext` sans intention ni données : un quiz ou une désignation aurait demandé de modifier le moteur | corrigé : `check(state: RepoState | None, ctx)`, `StepContext` gagne `intent`, `data` (= `OpContext.data`), `views` ; `repo_state` rend `pending` sans dépôt ; test d'un type espion sans changer le moteur |
+| low | second avis 5 | focus renvoyé sur `body` au redessin et après « Continuer » | corrigé : focus restauré sur l'élément équivalent, sinon sur le titre de la consigne (`tabindex=-1`) ; test DOM |
+| low | second avis 6 | `passStep` recalcule `done/current` côté front | rejeté : le serveur fournit `step_id` et `next_step_id`, le front n'applique qu'un état d'affichage, et le snapshot (`step_panel`) le réécrit à chaque rechargement ; embarquer le panneau dans `step_verdict` changerait le contrat d'événement pour un gain nul |
+| low | second avis 7 | YAML devenu invalide en cours de partie → `app_error` à chaque commande, et `GET /state` exposé | corrigé : `ScenarioError` journalisée une fois par version du fichier, étape non validée, panneau absent ; test |
+| low | second avis 8 | une commande qui satisfait deux étapes ne fait passer la seconde qu'à l'opération suivante | rejeté : enchaîner demande plusieurs verdicts par opération (contrat `StepOutcome`, ordre d'AD-1) ; avec l'ordre corrigé, la commande suivante, même `git status`, la valide, et chaque explication garde son moment |
+| low | second avis 9 | « champ `op` ou `type` absent » aussi pour le setup | corrigé : message selon le chemin (`steps` → `type`, sinon `op`) ; test |
+
+Reste à voir dans un vrai navigateur : focus restauré après « Continuer » (lecteur d'écran), en plus des points déjà listés.

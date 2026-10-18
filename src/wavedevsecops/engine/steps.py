@@ -23,7 +23,7 @@ from wavedevsecops.contracts import RepoState
 from wavedevsecops.engine.operations import OpContext, Projection, StepOutcome, WorkspaceEngine
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import StepObserved, StepVerdict
-from wavedevsecops.scenarios import STEP_TYPES, Scenario, load_scenario
+from wavedevsecops.scenarios import STEP_TYPES, Scenario, ScenarioError, load_scenario
 from wavedevsecops.scenarios.steps import StepContext
 from wavedevsecops.wsfs import Layout
 
@@ -51,10 +51,11 @@ class StepRunner:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._cache: dict[Path, tuple[tuple[int, int], Scenario]] = {}
+        self._cache: dict[Path, tuple[tuple[int, int], Scenario | None]] = {}
 
     def scenario(self, run: dict[str, Any]) -> Scenario | None:
-        """Scénario de l'espace (relu quand son fichier change) ; `None` s'il n'existe plus."""
+        """Scénario de l'espace (relu quand son fichier change) ; `None` s'il n'existe plus ou
+        s'il est invalide (journalisé une fois par version du fichier : l'étape reste ouverte)."""
         scenario_id, mode = run.get("scenario_id"), run.get("mode")
         if not isinstance(scenario_id, str) or not isinstance(mode, str):
             return None
@@ -66,7 +67,12 @@ class StepRunner:
             return None
         cached = self._cache.get(path)
         if cached is None or cached[0] != stamp:
-            cached = (stamp, load_scenario(path, self._settings).scenario)
+            try:
+                scenario: Scenario | None = load_scenario(path, self._settings).scenario
+            except (ScenarioError, OSError, UnicodeDecodeError) as exc:
+                log.warning("Scénario %s illisible, étapes non validées : %s", path.name, exc)
+                scenario = None
+            cached = (stamp, scenario)
             self._cache[path] = cached
         return cached[1]
 
@@ -80,8 +86,7 @@ class StepRunner:
         if run is None or not run.get("step_id"):
             return None
         scenario = self.scenario(run)
-        state = _state_from_views(projection.views)
-        if scenario is None or state is None:
+        if scenario is None:
             return None
         steps = scenario.steps
         index = next((i for i, s in enumerate(steps) if s.step_id == run["step_id"]), None)
@@ -92,7 +97,11 @@ class StepRunner:
             step=step,
             aliases=dict(run.get("aliases") or {}),
             previous=_state_from_views(ctx.before_views),
+            intent=ctx.op.intent,
+            data=dict(ctx.data),
+            views=dict(projection.views or {}),
         )
+        state = _state_from_views(projection.views)
         verdict = STEP_TYPES[step.type].check(state, context)
         if verdict.status == "pending":
             return None

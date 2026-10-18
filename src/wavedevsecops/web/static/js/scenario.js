@@ -179,7 +179,7 @@ export function createScenarioView({ onSelect } = {}) {
     const view = { ...state, shownId: shown.step_id };
 
     const instruction = el("section", "step-instruction", { "data-step": shown.step_id });
-    const heading = el("h3", "step-title");
+    const heading = el("h3", "step-title", { tabindex: "-1" });
     heading.textContent = shown.title_text;
     const chat = el("p", "step-chat");
     richText(chat, shown.instruction_text);
@@ -197,7 +197,28 @@ export function createScenarioView({ onSelect } = {}) {
       explained = byId.get(verdict.step_id) || null;
     }
     if (explained && explained.explanation_text) children.push(explanationBlock(explained));
+    const focusKey = focusKeyOf(document.activeElement);
     root.replaceChildren(...children);
+    if (focusKey) restoreFocus(focusKey);
+  }
+
+  // Le redessin remplace les nœuds : le focus qui était dans le panneau revient sur l'élément
+  // équivalent (même segment, même bouton), sinon sur le titre de la consigne, jamais sur `body`.
+  function focusKeyOf(active) {
+    if (!active || active === root || !root.contains(active)) return null;
+    if (active.dataset && active.dataset.step && active.classList.contains("step-segment")) {
+      return `.step-segment[data-step="${active.dataset.step}"]`;
+    }
+    if (active.classList.contains("mode-info")) return ".mode-info";
+    if (active.dataset && active.dataset.elementId) {
+      return `.element-link[data-element-id="${active.dataset.elementId}"]`;
+    }
+    return ".step-title";
+  }
+
+  function restoreFocus(selector) {
+    const target = root.querySelector(selector) || root.querySelector(".step-title");
+    if (target) target.focus();
   }
 
   return {

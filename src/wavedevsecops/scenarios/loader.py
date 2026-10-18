@@ -172,13 +172,15 @@ def french_message(error: dict[str, Any]) -> str:
         "dict_type": "table (clé: valeur) attendue",
         "model_type": "table (clé: valeur) attendue",
         "model_attributes_type": "table (clé: valeur) attendue",
-        "union_tag_not_found": "champ `op` ou `type` absent",
+        "union_tag_not_found": "champ `op` absent",
         "timezone_aware": "date ISO 8601 avec fuseau attendue",
         "datetime_type": "date ISO 8601 avec fuseau attendue",
         "datetime_parsing": "date ISO 8601 avec fuseau attendue",
         "datetime_from_date_parsing": "date ISO 8601 avec fuseau attendue",
         "greater_than_equal": f"valeur trop petite (minimum {ctx.get('ge')})",
     }
+    if kind == "union_tag_not_found" and list(error.get("loc", ())[:1]) == ["steps"]:
+        return "champ `type` absent"
     if kind in messages:
         return messages[kind]
     if kind == "literal_error" and _is_step_type(error.get("loc", ())):

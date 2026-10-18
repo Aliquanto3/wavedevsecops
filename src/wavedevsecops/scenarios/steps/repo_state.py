@@ -118,10 +118,23 @@ class Foreseen(_Cond):
     reason_text: str = Field(min_length=1)
 
 
+MISSING_FORESEEN_TEXT = (
+    "aucun état prévu : un pas intermédiaire licite (par exemple `git add` avant `git commit`) "
+    "ouvrira l'encart « État inattendu » ; décrivez-le dans `foreseen`"
+)
+
+
 class Args(StepArgs):
     type: Literal["repo_state"]
     expect: Conditions
     foreseen: list[Foreseen] = []
+
+    def authoring_warnings(self) -> list[tuple[tuple[str | int, ...], str]]:
+        """Règle actuelle : tout état qui change sans être attendu ni prévu est « inattendu ».
+        Une étape qui attend un commit ou un stash passe presque toujours par un état
+        intermédiaire (fichiers indexés, modifiés) : sans `foreseen`, l'auteur est averti."""
+        multi = self.expect.commits or self.expect.stash is not None
+        return [(("foreseen",), MISSING_FORESEEN_TEXT)] if multi and not self.foreseen else []
 
 
 @dataclass
@@ -140,9 +153,15 @@ class _State:
         self.commits: dict[str, Commit] = {c.sha: c for c in state.commits}
 
     def alias(self, value: str) -> tuple[str, str]:
-        """`(type, valeur)` de l'élément désigné par `@alias`."""
-        kind, segments = parse_element_id(self.aliases[value[1:]])
-        return kind, segments[0]
+        """`(type, valeur)` de l'élément désigné par `@alias` ; `("", "")` s'il est inconnu."""
+        target = self.aliases.get(value[1:])
+        if not target:
+            return "", ""
+        try:
+            kind, segments = parse_element_id(target)
+        except ValueError:
+            return "", ""
+        return kind, segments[0] if segments else ""
 
     def branch_name(self, value: str) -> str:
         if not value.startswith("@"):
@@ -162,6 +181,8 @@ class _State:
             return self.state.head.commit or None
         if spec.startswith("@"):
             kind, value = self.alias(spec)
+            if not value:
+                return None
             if kind == "commit":
                 return value
             spec = value
@@ -283,9 +304,25 @@ def _tag(cond: TagCond, st: _State) -> list[Finding]:
 
 def _commits(cond: CommitsCond, st: _State) -> list[Finding]:
     tip = st.commit(cond.on)
+    where = f" depuis `{cond.ahead_of.removeprefix('@')}`" if cond.ahead_of else ""
+    # Échec fermé : une référence introuvable ne compte jamais comme une base vide.
+    missing = [
+        spec for spec in (cond.on, cond.ahead_of) if spec is not None and st.commit(spec) is None
+    ]
+    if missing:
+        noun = "commit" if cond.min == 1 else "commits"
+        return [
+            Finding(
+                False,
+                f"au moins {cond.min} {noun} sur `{cond.on.removeprefix('@')}`{where}",
+                [
+                    Observed(text=f"`{spec.removeprefix('@')}` est introuvable dans le dépôt.")
+                    for spec in missing
+                ],
+            )
+        ]
     base = st.reachable(st.commit(cond.ahead_of)) if cond.ahead_of else set()
     new = [st.commits[sha] for sha in st.reachable(tip) - base]
-    where = f" depuis `{cond.ahead_of.removeprefix('@')}`" if cond.ahead_of else ""
     found = []
     ok = len(new) >= cond.min
     noun = "commit" if cond.min == 1 else "commits"
@@ -416,14 +453,18 @@ def _join(texts: list[str]) -> str:
     return "Attendu : " + " ; ".join(unique) + "." if unique else ""
 
 
-def check(state: RepoState, ctx: StepContext) -> Verdict:
+def check(state: RepoState | None, ctx: StepContext) -> Verdict:
     """Jugement de l'état : réussi, prévu mais insuffisant, inattendu, ou rien à dire."""
+    if state is None:
+        return Verdict(status="pending")  # dépôt illisible : la projection l'a déjà signalé
     step: Args = ctx.step
     st = _State(state, ctx.aliases)
     findings = evaluate(step.expect, st)
     failed = [f for f in findings if not f.ok]
     if not failed:
         return Verdict(status="passed")
+    if ctx.previous is not None and ctx.previous == state:
+        return Verdict(status="pending")  # lecture seule ou sans effet : rien à signaler
     expected = _join([f.expected for f in findings])
     observed = [o for f in failed for o in f.observed]
     for foreseen in step.foreseen:
@@ -434,8 +475,6 @@ def check(state: RepoState, ctx: StepContext) -> Verdict:
                 expected_text=expected,
                 observed=observed,
             )
-    if ctx.previous is not None and ctx.previous == state:
-        return Verdict(status="pending")  # lecture seule ou sans effet : rien à signaler
     return Verdict(
         status="unexpected",
         reason_text=step.unexpected_text or GENERIC_UNEXPECTED_TEXT,

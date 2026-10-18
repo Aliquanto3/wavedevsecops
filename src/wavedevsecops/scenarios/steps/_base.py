@@ -74,13 +74,28 @@ class StepArgs(BaseModel):
         walk(self.model_dump(mode="python"), ())
         return found
 
+    def authoring_warnings(self) -> list[tuple[tuple[str | int, ...], str]]:
+        """`(chemin du champ, message)` des avertissements à l'auteur : pas des erreurs, le
+        scénario reste chargé. Chaque type ajoute les siens."""
+        return []
+
 
 @dataclass
 class StepContext:
-    """Ce que `check` voit de l'étape : ses arguments, les alias du setup, l'état d'avant."""
+    """Ce que `check` voit de l'étape et de l'opération qui la fait juger.
+
+    Les types qui ne jugent pas le dépôt (quiz, désignation) lisent `intent` et `data` : ils
+    reçoivent `state=None` quand la vue `repo` est illisible, et le moteur ne change pas."""
 
     step: Any
     aliases: dict[str, str] = field(default_factory=dict)
     """`alias -> element_id` du setup (`run.json`)."""
     previous: RepoState | None = None
     """État projeté avant l'opération ; `None` pour la première."""
+    intent: str = ""
+    """Intention de l'opération jugée (`terminal_line`, `external_change`, une réponse…)."""
+    data: dict[str, Any] = field(default_factory=dict)
+    """Valeurs portées par l'opération (`OpContext.data`) : la réponse d'un quiz, l'élément
+    désigné… ; lecture seule."""
+    views: dict[str, Any] = field(default_factory=dict)
+    """Toutes les vues projetées après l'opération (pas seulement `repo`)."""

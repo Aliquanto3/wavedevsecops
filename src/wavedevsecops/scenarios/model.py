@@ -114,3 +114,11 @@ class Scenario(BaseModel):
                     )
                 )
         return errors
+
+    def authoring_warnings(self) -> list[tuple[tuple, str]]:
+        """Avertissements du lint de contenu à l'auteur : le scénario reste valide."""
+        return [
+            (("steps", index, *field), message)
+            for index, step in enumerate(self.steps)
+            for field, message in step.authoring_warnings()
+        ]
