@@ -304,6 +304,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:44 · 5.1 · dev · fini, 966 passed / 41 skipped, CI verte (SHA épinglés identiques sur trois OS) ; ops agent_commit, agent_push_force, stash, agent_rebase_conflict ; commit_on_origin reçoit parent et force en ajout · 1c4c899
 - 2026-10-19 00:44 · 5.1 · second-avis · lancé · —
 - 2026-10-19 00:44 · 3.5 · dev · lancé (dev-story Sonnet ; ouvre 5.7 et 7.3) ; 5.4 attend 5.3 (même front), 4.4 attend 4.6 · —
+- 2026-10-19 00:44 · — · notification · 4 décisions non bloquantes envoyées à Anaël (ids du socle avant 6.2, step_id AD-17, Bloc-notes 2.8, plafond indices 4.6) · —
+- 2026-10-19 00:45 · 2.8 · fusion · CI branche verte sur 6 jobs (pile 6.1 + 2.8), commit de fusion sur main (code identique à la branche testée), story done · d60cd1d
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
