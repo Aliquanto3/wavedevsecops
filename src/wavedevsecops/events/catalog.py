@@ -79,11 +79,34 @@ class OpStarted(_Payload):
     """Intention (`terminal_line`…) ou opération interne (`external_change`, `setup`)."""
 
 
+class Span(_Payload):
+    """Passage liable d'une sortie (SHA, ref, chemin, fichier:ligne), résolu contre le
+    `RepoState` : seuls les éléments qui existent dans le bac à sable sont liables (AD-2).
+
+    `start` et `end` sont des positions en unités UTF-16 dans `text` de la ligne (celles de
+    `String.prototype.slice`) ; `text` répète le passage pour contrôle.
+    """
+
+    start: int
+    end: int
+    text: str
+    element_id: str
+
+
 class TerminalOutput(_Payload):
     stream: Stream
     text: str
     lang: str = ""
-    spans: list[dict[str, Any]] = []
+    """`fr` ou `en`, déterminé par le serveur ; vide si la sortie n'a pas de langue."""
+    spans: list[Span] = []
+
+
+class OutputSpans(_Payload):
+    """Passages liables d'une sortie, résolus à nouveau contre l'état d'après l'opération."""
+
+    seq: int
+    """`seq` de l'événement `terminal_output` concerné."""
+    spans: list[Span] = []
 
 
 class OpExit(_Payload):
@@ -94,9 +117,13 @@ class OpExit(_Payload):
 
 class StateProjected(_Payload):
     views: dict[str, Any] = {}
-    """Projections calculées par le serveur (AD-2) ; leurs schémas vivent dans `contracts`."""
+    """Projections calculées par le serveur (AD-2) : `contracts.Views` sérialisé (module
+    feuille : pas d'import de `contracts`), validé par `projections` qui le produit."""
     fingerprint: str = ""
     """Empreinte canonique de l'espace après l'opération (AD-6) ; vide si l'espace est absent."""
+    output_spans: list[OutputSpans] = []
+    """Sorties de l'opération dont les passages liables changent avec le nouvel état (un SHA
+    créé par la commande, une branche supprimée) : le front remplace leurs `spans`."""
 
 
 class StepVerdict(_Payload):

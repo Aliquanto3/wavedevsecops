@@ -82,10 +82,16 @@ class StaleOperation(OperationRefused):
     """Opération produite hors de la file avec un `epoch` qui n'est plus le courant (AD-1)."""
 
 
+SpanLinker = Callable[[str], list[dict[str, Any]]]
+"""Passages liables d'un texte de sortie, résolus contre l'état projeté (AD-2)."""
+
+
 @dataclass(frozen=True)
 class Projection:
     views: dict[str, Any]
     fingerprint: str
+    linker: SpanLinker | None = field(default=None, compare=False)
+    """Résolveur des `spans` des sorties ; `None` : aucune sortie n'est liable."""
 
 
 @dataclass(frozen=True)
@@ -115,6 +121,8 @@ class OpContext:
         self.workspace_id = engine.workspace_id
         self.data: dict[str, Any] = {}
         """Valeurs partagées entre la pré-vérification et le corps de l'opération."""
+        self.outputs: list[tuple[int, str, list[dict[str, Any]]]] = []
+        """Sorties émises par `output` : `(seq, texte, spans)`, relues après la projection."""
 
     @property
     def epoch(self) -> int:
@@ -124,13 +132,29 @@ class OpContext:
     def last_fingerprint(self) -> str:
         return self._engine.last_projection.fingerprint
 
+    @property
+    def last_views(self) -> dict[str, Any]:
+        """Vues de la dernière projection publiée (l'état d'avant l'opération)."""
+        return self._engine.last_projection.views
+
     def set_rest_state(self, state: EngineStateName) -> None:
         """État de repos après l'opération : `quiz_altered` (quiz) ou `idle` (rétablissement)."""
         self._engine.set_rest_state(state)
 
     def output(self, text: str, stream: Stream = "stdout", *, lang: str = "") -> None:
-        """Émet une sortie de l'opération (`terminal_output`)."""
-        self.emit(Kind.TERMINAL_OUTPUT, TerminalOutput(stream=stream, text=text, lang=lang))
+        """Émet une sortie de l'opération (`terminal_output`).
+
+        Ses `spans` sont résolus contre le dernier état projeté ; après l'opération,
+        `state_projected.output_spans` donne ceux qui changent avec le nouvel état.
+        """
+        linker = self._engine.last_projection.linker
+        spans = linker(text) if linker is not None else []
+        envelope = self._engine.publish(
+            Kind.TERMINAL_OUTPUT,
+            TerminalOutput(stream=stream, text=text, lang=lang, spans=spans),  # type: ignore[arg-type]
+            op_id=self.op_id,
+        )
+        self.outputs.append((envelope.seq, text, spans))
 
     def emit(self, kind: Kind | str, payload: BaseModel | dict[str, Any]) -> None:
         """Émet un événement de l'opération ; les `kind` de la séquence sont réservés."""
@@ -414,6 +438,18 @@ class WorkspaceEngine:
             self._fail(ctx, GENERIC_CAUSE, GENERIC_ACTION)
         return False, None
 
+    @staticmethod
+    def _relinked(ctx: OpContext, projection: Projection) -> list[dict[str, Any]]:
+        """Sorties de l'opération dont les passages liables changent avec le nouvel état."""
+        if projection.linker is None:
+            return []
+        changed = []
+        for seq, text, spans in ctx.outputs:
+            fresh = projection.linker(text)
+            if fresh != spans:
+                changed.append({"seq": seq, "spans": fresh})
+        return changed
+
     def _execute(self, op: Operation) -> OpResult:
         # L'epoch est revérifié à l'exécution : un Recommencer passé devant l'a peut-être changé.
         self._check_epoch(op)
@@ -449,7 +485,11 @@ class WorkspaceEngine:
             self.last_projection = projection
             self.publish(
                 Kind.STATE_PROJECTED,
-                StateProjected(views=projection.views, fingerprint=projection.fingerprint),
+                StateProjected(
+                    views=projection.views,
+                    fingerprint=projection.fingerprint,
+                    output_spans=self._relinked(ctx, projection),  # type: ignore[arg-type]
+                ),
                 op_id=op.op_id,
             )
             if ok and op.validate:

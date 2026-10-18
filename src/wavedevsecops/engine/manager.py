@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, get_args
 
+from wavedevsecops import projections
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine.fingerprint import fingerprint
@@ -45,8 +46,7 @@ from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger("wavedevsecops")
 STILL_STOPPING_TEXT = (
-    "Cet espace termine sa mise en veille : l'action en cours s'achève. Réessayez dans un "
-    "instant."
+    "Cet espace termine sa mise en veille : l'action en cours s'achève. Réessayez dans un instant."
 )
 
 _ID = re.compile(
@@ -81,8 +81,11 @@ def parse_workspace_id(workspace_id: str) -> tuple[str, str, str]:
     return match["track"], match["scenario_id"], match["mode"]
 
 
-def fingerprint_projector(settings: Settings, git_path: Path | None = None) -> Projector:
-    """Projection de 2.2 : l'empreinte canonique (les vues arrivent avec `projections`)."""
+def repo_projector(settings: Settings, git_path: Path | None = None) -> Projector:
+    """Projection d'un espace : empreinte canonique (AD-6) et vues calculées (AD-2).
+
+    Les marques `new` comparent l'état relu à celui de la dernière projection publiée.
+    """
     resolved: dict[str, Path] = {}
 
     def project(ctx: OpContext) -> Projection:
@@ -91,7 +94,9 @@ def fingerprint_projector(settings: Settings, git_path: Path | None = None) -> P
         if "git" not in resolved:
             resolved["git"] = git_path or resolve_git(settings)
         git = Git.for_workspace(resolved["git"], ctx.layout.root, settings)
-        return Projection({}, fingerprint(ctx.layout, git))
+        digest = fingerprint(ctx.layout, git)
+        projected = projections.project(git, ctx.layout, ctx.last_views)
+        return Projection(projected.views.model_dump(mode="json"), digest, projected.linker)
 
     return project
 
@@ -169,7 +174,7 @@ class WorkspaceManager:
         self.settings = settings
         self.boot_id = boot_id or secrets.token_hex(8)
         self._git_path = git_path
-        self._projector = projector or fingerprint_projector(settings, git_path)
+        self._projector = projector or repo_projector(settings, git_path)
         self._validator = validator
         if watch and watcher_factory is None:
             quiet_s = settings.watch_quiet_ms / 1000
