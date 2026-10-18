@@ -14,6 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from wavedevsecops.scenarios.ops import op_union
 from wavedevsecops.scenarios.steps import step_union
+from wavedevsecops.scenarios.steps._base import BLANK
+
+NO_BLANK_WARNING = f"la commande partielle ne montre aucun blanc « {BLANK} »"
 
 SCHEMA_VERSION = 1
 KEBAB_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -140,8 +143,14 @@ class Scenario(BaseModel):
 
     def authoring_warnings(self) -> list[tuple[tuple, str]]:
         """Avertissements du lint de contenu à l'auteur : le scénario reste valide."""
-        return [
+        warnings = [
             (("steps", index, *field), message)
             for index, step in enumerate(self.steps)
             for field, message in step.authoring_warnings()
         ]
+        warnings += [
+            (("steps", index, "hints", "partial_text"), NO_BLANK_WARNING)
+            for index, step in enumerate(self.steps)
+            if step.hints is not None and BLANK not in step.hints.partial_text
+        ]
+        return warnings

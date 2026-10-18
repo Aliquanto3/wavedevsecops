@@ -33,6 +33,7 @@ from typing import Any
 from wavedevsecops import wsfs
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
+from wavedevsecops.engine import hints
 from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.operations import OpContext, Operation
 from wavedevsecops.engine.runfile import load_run, save_run
@@ -393,6 +394,7 @@ def restore_operation(snapshot_id: int, git_path: Path, *, sleep: Sleep = time.s
     """
 
     def body(ctx: OpContext) -> int:
+        hints.settle(ctx)  # action de l'apprenant : la lecture du dernier indice se clôt
         return _run_restore(
             ctx,
             snapshot_id,

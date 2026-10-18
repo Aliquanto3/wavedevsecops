@@ -78,6 +78,9 @@ def prepare_workspace(
     except BaseException:
         wsfs.remove_tree(layout.root)
         raise
+    from wavedevsecops.engine import hints  # noqa: PLC0415 - hints importe le moteur
+
+    first_step = scenario.steps[0].step_id if scenario.steps else None
     wsfs.write_json(
         layout.run_json,
         {
@@ -86,7 +89,8 @@ def prepare_workspace(
             "mode": scenario.mode,
             "track": track,
             "epoch": 0,
-            "step_id": scenario.steps[0].step_id if scenario.steps else None,
+            "step_id": first_step,
+            "hints": hints.start_step({}, first_step, hints.clock()),  # début de la 1re étape
             "content_hash": loaded.content_hash,
             "setup_fingerprint": digest,
             "aliases": aliases,

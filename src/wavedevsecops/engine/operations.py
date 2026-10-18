@@ -179,6 +179,10 @@ class OpContext:
         """État de repos après l'opération : `quiz_altered` (quiz) ou `idle` (rétablissement)."""
         self._engine.set_rest_state(state)
 
+    def submit_facts(self, drafts: list[dict[str, Any]]) -> None:
+        """Soumet des faits du premier passage à `progress`, après l'écriture de `run.json`."""
+        self._engine.submit_facts(drafts, self.op_id)
+
     def output(self, text: str, stream: Stream = "stdout", *, lang: str = "") -> None:
         """Émet une sortie de l'opération (`terminal_output`).
 
@@ -532,6 +536,13 @@ class WorkspaceEngine:
             except BaseException as exc:  # noqa: BLE001 - la file survit à tout
                 log.exception("Opération %s en échec dans %s", op.intent, self.workspace_id)
                 future.set_exception(exc)
+
+    def submit_facts(self, drafts: list[dict[str, Any]], op_id: str | None) -> None:
+        """Soumission des faits par une opération qui en produit hors d'un verdict (indices)."""
+        try:
+            self._submit_facts(drafts, op_id)
+        except Exception:  # noqa: BLE001 - un suivi illisible ne bloque pas l'opération
+            log.exception("Faits de %s", self.workspace_id)
 
     def _submit_facts(self, drafts: list[dict[str, Any]], op_id: str | None) -> None:
         """Soumet les faits à `progress` (après `run.json`) ; `progress_updated` si du neuf."""

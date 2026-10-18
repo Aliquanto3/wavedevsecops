@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import RepoState
+from wavedevsecops.engine import hints
 from wavedevsecops.engine.designation import accepted_types, mark_views
 from wavedevsecops.engine.operations import (
     OpContext,
@@ -144,6 +145,8 @@ class StepRunner:
     def validate(self, ctx: OpContext, projection: Projection) -> StepOutcome | None:
         """Verdict de l'étape courante sur l'état projeté ; `None` : rien à publier."""
         run = self._run(ctx.layout)
+        if run is not None:
+            run = hints.on_operation(ctx, run)  # essai compté, lecture du dernier indice close
         if run is None or not run.get("step_id"):
             return None
         scenario = self.scenario(run)
@@ -172,7 +175,12 @@ class StepRunner:
             validated = [s for s in run.get("validated") or [] if s != step.step_id]
             save_run(
                 ctx.layout,
-                {**run, "step_id": following, "validated": [*validated, step.step_id]},
+                {
+                    **run,
+                    "step_id": following,
+                    "validated": [*validated, step.step_id],
+                    "hints": hints.start_step(run, following, hints.clock()),
+                },
             )
             published = StepVerdict(
                 step_id=step.step_id, passed=True, status="passed", next_step_id=following or ""
@@ -267,7 +275,13 @@ class StepRunner:
         scenario = self.scenario(run) if run is not None else None
         if run is None or scenario is None:
             return []
-        return self._quiz_facts(run) + self._replay_steps(run, scenario)
+        current = run.get("step_id")
+        has_hints = any(s.step_id == current and s.hints is not None for s in scenario.steps)
+        if has_hints and current not in (run.get("hints") or {}):
+            # Début de l'étape courante : le temps avant une demande d'indice se mesure d'ici.
+            run = {**run, "hints": hints.start_step(run, current, hints.clock())}
+            save_run(engine.layout, run)
+        return self._quiz_facts(run) + self._replay_steps(run, scenario) + hints.replay_facts(run)
 
     def _replay_steps(self, run: dict[str, Any], scenario: Scenario) -> list[dict[str, Any]]:
         ids = [s.step_id for s in scenario.steps]
@@ -355,6 +369,8 @@ class StepRunner:
             extra = STEP_TYPES[step.type].panel
             if i == position and extra is not None:
                 entry.update(extra(step))  # champs propres au type, pour l'étape courante
+            if i == position and (hint_tabs := hints.panel_hints(run, step)) is not None:
+                entry["hints"] = hint_tabs
             steps.append(entry)
         altered = run.get("quiz") if engine.rest_state == "quiz_altered" else None
         failed = run.get("restore_failed")
@@ -366,6 +382,7 @@ class StepRunner:
             "title_text": scenario.title_text,
             "mode": scenario.mode,
             "mode_text": MODE_TEXTS[scenario.mode],
+            "has_hints": any(s.hints is not None for s in scenario.steps),
             "current_step_id": current if position < len(ids) else "",
             "steps": steps,
             "summary": self._summary(run, scenario) if not current else None,
