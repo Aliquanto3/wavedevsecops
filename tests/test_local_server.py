@@ -220,3 +220,78 @@ def test_window_sans_extra_replie_sur_le_navigateur(
     assert code == 0
     assert opened == [started[0].url]
     assert "extra « window »" in capsys.readouterr().err
+
+
+# --- Revue : correctifs ---------------------------------------------------------------------
+
+
+def test_lancement_concurrent_perdant_n_ecrit_rien(instance: cli.Instance) -> None:
+    """Le perdant d'une course au verrou s'arrête avant le journal et `progress.json`."""
+    before = {p: p.stat().st_mtime_ns for p in instance.data_dir.rglob("*") if p.is_file()}
+    handlers = list(logging.getLogger("wavedevsecops").handlers)
+    with pytest.raises(FileExistsError):
+        cli.start_instance(Settings(data_dir=instance.data_dir))
+    after = {p: p.stat().st_mtime_ns for p in instance.data_dir.rglob("*") if p.is_file()}
+    assert after == before
+    assert logging.getLogger("wavedevsecops").handlers == handlers
+
+
+def test_verrou_perime_neuf_d_un_concurrent_rendu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si un concurrent remplace le verrou périmé juste avant nous, son verrou est rendu."""
+    lock = tmp_path / cli.LOCK_NAME
+    lock.write_text(json.dumps({"pid": 1, "port": 1, "token": "x"}), "utf-8")
+    fresh = json.dumps({"pid": 2, "port": 2, "token": "neuf"})
+    real_replace = cli.os.replace
+
+    def concurrent_replace(src: object, dst: object) -> None:
+        lock.write_text(fresh, "utf-8")  # le concurrent a écarté le périmé et pris le verrou
+        real_replace(src, dst)
+
+    monkeypatch.setattr(cli.os, "replace", concurrent_replace)
+    with pytest.raises(FileExistsError):
+        cli._take_lock(tmp_path, 3, "moi")
+    assert lock.read_text("utf-8") == fresh
+    assert sorted(p.name for p in tmp_path.iterdir()) == [cli.LOCK_NAME]
+
+
+def test_erreur_systeme_message_clair_sans_trace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def refuse(*_: object) -> None:
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(cli.os, "link", refuse)  # p. ex. clé FAT, partage réseau
+    data = tmp_path / "d"
+    code = cli.main([], settings=Settings(data_dir=data), opener=lambda _u: None)
+    err = capsys.readouterr().err
+    assert code == 1
+    assert "dossier de données" in err and "WDS_DATA_DIR" in err
+    assert "Traceback" not in err
+    assert not (data / cli.LOCK_NAME).exists()
+
+
+def test_arret_inattendu_du_serveur_code_1(capsys: pytest.CaptureFixture[str]) -> None:
+    from types import SimpleNamespace
+
+    dead = SimpleNamespace(is_alive=lambda: False, join=lambda timeout=None: None)
+    inst = SimpleNamespace(
+        thread=dead, server=SimpleNamespace(should_exit=False), data_dir=Path("d")
+    )
+    assert cli._stopped_code(inst) == 1  # type: ignore[arg-type]
+    assert "inattendue" in capsys.readouterr().err
+    inst.server.should_exit = True
+    assert cli._stopped_code(inst) == 0  # type: ignore[arg-type]
+
+
+def test_methodes_non_sures_controlent_l_origine(instance: cli.Instance) -> None:
+    cookie = session_cookie(instance)
+    for method in ("PUT", "PATCH", "DELETE"):
+        resp = request(instance, method, "/api/x", {**cookie, "Origin": "http://evil.example"})
+        assert resp.status == 403, method
+        assert_no_cors(resp)
+
+
+def test_wds_data_dir_vide_vaut_dossier_par_defaut() -> None:
+    assert Settings.from_env({"WDS_DATA_DIR": ""}).data_dir is None

@@ -53,7 +53,8 @@ def create_app(*, port: int, token: str) -> FastAPI:
             if request.method != "POST":
                 return refuse(405, "Ce point n'accepte que la méthode POST.")
             return await call_next(request)
-        if request.method == "POST" and request.headers.get("origin") != f"http://{host}":
+        unsafe = request.method not in ("GET", "HEAD", "OPTIONS")
+        if unsafe and request.headers.get("origin") != f"http://{host}":
             return refuse(403, _ORIGIN_REFUSED)
         if path == "/" and request.method == "GET":
             offered = request.query_params.get("t")

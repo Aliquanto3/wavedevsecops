@@ -32,3 +32,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.2 ».
 - `--window` : seul le repli sans extra est testé ; le test de l'extra pywebview sous Windows reste reporté (déjà noté Story 1.1).
 - Diagnostic dans la console (AD-20) : avec la Story 1.4.
 - `content_hash`, mise à jour par l'installeur : stories concernées.
+
+## Revue
+
+Revue unique (Opus) sur c19fdc1, avec la liste du second avis (Haiku).
+
+- medium · second avis 1 · corrigé · `OSError` hors `FileExistsError` (droits, disque plein, `os.link` refusé sur FAT ou partage réseau) remontait en trace Python : `main` affiche cause et action en français (dossier, `WDS_DATA_DIR`) et sort en 1. Test `test_erreur_systeme_message_clair_sans_trace`.
+- medium · second avis 2 · corrigé · reprise d'un verrou périmé non atomique (`unlink` après lecture : deux lancements simultanés pouvaient garder chacun un serveur). Le périmé est écarté par `os.replace` vers un nom propre au processus, son contenu comparé à celui jugé périmé ; un verrou neuf déplacé par erreur est remis en place. Test `test_verrou_perime_neuf_d_un_concurrent_rendu`.
+- low · second avis 3 · reporté · vivacité jugée sur un port qui écoute : une réponse HTTP identifiable ne convient pas tant que le verrou est pris avant le démarrage d'uvicorn (un lancement en cours serait jugé mort). Port d'écoute éphémère réutilisé par un autre service : rare. À reprendre si le cas se présente (piste : vérifier aussi le `pid` du verrou).
+- low · second avis 4 · corrigé · le cas nominal du critère (instance vivante) n'écrivait déjà rien ; seul le perdant d'une course écrivait journal et `progress.json` (avec un temporaire `progress.json.tmp` partagé). Le verrou est désormais pris avant le journal et `progress`. Test `test_lancement_concurrent_perdant_n_ecrit_rien`.
+- low · second avis 5 · corrigé · mort du fil uvicorn sans demande d'arrêt : message et code 1. Test `test_arret_inattendu_du_serveur_code_1`.
+- low · second avis 6 · corrigé · `WDS_DATA_DIR=""` vaut « non fixé » (validateur `data_dir`). Test `test_wds_data_dir_vide_vaut_dossier_par_defaut`.
+- low · second avis 7 · corrigé · le critère ne vise que `POST` et les autres méthodes inter-origines passent par un pré-vol que l'absence de CORS bloque déjà ; contrôle d'`Origin` étendu à toute méthode hors `GET`/`HEAD`/`OPTIONS` par défense en profondeur. Test `test_methodes_non_sures_controlent_l_origine`.
+- info · revue · noté · `ruff format --check` signale `web/app.py` (chaîne `_INDEX`) ; non exigé par la CI.

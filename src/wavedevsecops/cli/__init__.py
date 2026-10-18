@@ -63,24 +63,39 @@ def read_running_instance(data_dir: Path) -> str | None:
 def _take_lock(data_dir: Path, port: int, token: str) -> Path:
     """Crée `app.lock` de façon exclusive et atomique, contenu déjà écrit.
 
-    Un verrou périmé est remplacé ; `FileExistsError` si une instance l'a pris entre-temps.
+    Un verrou périmé est écarté par renommage atomique : un seul lancement peut le déplacer,
+    et s'il a déplacé le verrou tout neuf d'un concurrent, il le remet en place.
+    `FileExistsError` si une instance vivante détient le verrou.
     """
     lock = data_dir / LOCK_NAME
     tmp = data_dir / f"{LOCK_NAME}.{os.getpid()}.tmp"
+    stale = data_dir / f"{LOCK_NAME}.{os.getpid()}.stale"
     tmp.write_text(json.dumps({"pid": os.getpid(), "port": port, "token": token}), "utf-8")
     try:
-        for _ in range(2):
+        for _ in range(3):
             try:
                 os.link(tmp, lock)
                 return lock
             except FileExistsError:
-                if read_running_instance(data_dir) is not None:
-                    raise
-                with contextlib.suppress(FileNotFoundError):
-                    lock.unlink()
+                pass
+            try:
+                seen = lock.read_bytes()
+            except FileNotFoundError:
+                continue
+            if read_running_instance(data_dir) is not None:
+                raise FileExistsError(str(lock))
+            try:
+                os.replace(lock, stale)
+            except FileNotFoundError:
+                continue  # un concurrent l'a déjà écarté
+            if stale.read_bytes() != seen:  # verrou neuf d'un concurrent : on le rend
+                with contextlib.suppress(FileExistsError):
+                    os.link(stale, lock)
+                raise FileExistsError(str(lock))
         raise FileExistsError(str(lock))
     finally:
         tmp.unlink(missing_ok=True)
+        stale.unlink(missing_ok=True)
 
 
 def setup_logging(data_dir: Path, settings: Settings) -> logging.Handler:
@@ -142,19 +157,21 @@ def start_instance(settings: Settings, now: datetime | None = None) -> Instance:
     """
     data_dir = settings.resolved_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
-    handler = setup_logging(data_dir, settings)
+    # Verrou d'abord : un lancement concurrent qui perd n'écrit ni journal ni progress.json.
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
+        sock.bind((HOST, 0))  # port libre choisi par le système
+        sock.listen(128)
+        port = sock.getsockname()[1]
+        token = secrets.token_urlsafe(32)
+        lock = _take_lock(data_dir, port, token)
+    except BaseException:
+        sock.close()
+        raise
+    handler: logging.Handler | None = None
+    try:
+        handler = setup_logging(data_dir, settings)
         ensure_progress(data_dir, now or datetime.now().astimezone())
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.bind((HOST, 0))  # port libre choisi par le système
-            sock.listen(128)
-            port = sock.getsockname()[1]
-            token = secrets.token_urlsafe(32)
-            lock = _take_lock(data_dir, port, token)
-        except BaseException:
-            sock.close()
-            raise
         config = uvicorn.Config(
             create_app(port=port, token=token),
             log_config=None,
@@ -169,15 +186,17 @@ def start_instance(settings: Settings, now: datetime | None = None) -> Instance:
             time.sleep(0.02)
         if not server.started:
             server.should_exit = True
-            sock.close()
-            lock.unlink(missing_ok=True)
             raise AppError(
                 "Le serveur local n'a pas démarré.",
                 f"Consultez le journal {data_dir / LOG_RELATIVE}, puis relancez la commande.",
             )
     except BaseException:
-        logging.getLogger("wavedevsecops").removeHandler(handler)
-        handler.close()
+        sock.close()
+        lock.unlink(missing_ok=True)
+        if handler is not None:
+            for name in ("wavedevsecops", "uvicorn"):
+                logging.getLogger(name).removeHandler(handler)
+            handler.close()
         raise
     logging.getLogger("wavedevsecops").info("Serveur local démarré sur le port %d", port)
     return Instance(data_dir, port, token, server, thread, lock, handler, sock)
@@ -210,9 +229,16 @@ def _run_window(url: str) -> bool:
     return True
 
 
-def _wait(instance: Instance) -> None:
+def _wait(instance: Instance) -> bool:
+    """Attend la fin du serveur ; `False` s'il s'est arrêté sans qu'on le lui demande."""
     while instance.thread.is_alive():
         instance.thread.join(timeout=0.5)  # reste interruptible par Ctrl+C
+    return bool(instance.server.should_exit)
+
+
+def _error(cause: str, action: str) -> int:
+    print(f"{cause}\n{action}", file=sys.stderr)
+    return 1
 
 
 def main(
@@ -242,8 +268,7 @@ def main(
     try:
         instance = start_instance(settings)
     except AppError as exc:
-        print(f"{exc.cause_text}\n{exc.action_text}", file=sys.stderr)
-        return 1
+        return _error(exc.cause_text, exc.action_text)
     except FileExistsError:  # une autre instance a pris le verrou entre-temps
         url = read_running_instance(data_dir)
         if url is None:
@@ -255,6 +280,14 @@ def main(
             return 1
         opener(url)
         return 0
+    except OSError as exc:  # droits, disque plein, liens physiques non pris en charge…
+        return _error(
+            f"WaveDevSecOps n'a pas pu écrire dans son dossier de données {data_dir} "
+            f"({exc.strerror or exc}).",
+            "Vérifiez les droits et la place libre de ce dossier, ou choisissez-en un autre "
+            "sur un disque local avec la variable WDS_DATA_DIR, puis relancez la commande.",
+        )
+    code = 0
     try:
         _console(instance.url, existing=False)
         if args.window:
@@ -265,12 +298,21 @@ def main(
                     file=sys.stderr,
                 )
                 opener(instance.url)
-                _wait(instance)
+                code = _stopped_code(instance)
         else:
             opener(instance.url)
-            _wait(instance)
+            code = _stopped_code(instance)
     except KeyboardInterrupt:
         pass
     finally:
         instance.stop()
-    return 0
+    return code
+
+
+def _stopped_code(instance: Instance) -> int:
+    if _wait(instance):
+        return 0
+    return _error(
+        "Le serveur local s'est arrêté de façon inattendue.",
+        f"Consultez le journal {instance.data_dir / LOG_RELATIVE}, puis relancez la commande.",
+    )

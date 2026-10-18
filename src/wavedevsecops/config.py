@@ -16,7 +16,7 @@ from functools import cache
 from pathlib import Path
 
 from platformdirs import user_data_dir
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 ENV_PREFIX = "WDS_"
 
@@ -28,6 +28,12 @@ class Settings(BaseModel):
 
     data_dir: Path | None = None
     """Dossier des données utilisateur ; `None` : dossier par défaut de platformdirs."""
+
+    @field_validator("data_dir", mode="before")
+    @classmethod
+    def _empty_data_dir(cls, value: object) -> object:
+        """`WDS_DATA_DIR=""` vaut « non fixé », pas le répertoire courant."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     log_max_bytes: int = 1_000_000
     """Taille d'un fichier de `<data>/logs/app.log` avant rotation."""
