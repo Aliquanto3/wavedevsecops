@@ -366,16 +366,14 @@ def test_un_fichier_cree_figure_dans_le_diff_de_l_arbre_de_travail(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="droits POSIX")
-def test_l_enregistrement_garde_le_bit_executable(space: Space, git_path: Path) -> None:
+def test_l_enregistrement_garde_le_bit_executable(space: Space) -> None:
+    # Git ignore les droits ici (`core.filemode=false`) ; le disque, lui, garde le bit x.
     _commit(space, "run.sh", "#!/bin/sh\necho un\n")
     script = space.layout.repo / "run.sh"
     script.chmod(0o755)
-    assert space.run("git add run.sh").code == 0
-    assert space.run("git commit -m 'exécutable'").code == 0
     _, outcome = _save(space, "run.sh", "#!/bin/sh\necho deux\n")
     assert outcome.code == 0
     assert stat.S_IMODE(script.stat().st_mode) == 0o755
-    assert "old mode" not in _git(space, git_path).internal("diff", cwd=space.layout.repo)
     _, created = _save(space, "neuf.txt", "x\n", base="")
     assert created.code == 0
     assert stat.S_IMODE((space.layout.repo / "neuf.txt").stat().st_mode) == wsfs.NEW_FILE_MODE
