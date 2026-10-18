@@ -101,3 +101,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 · 1.2 · review · 6 corrigés (verrou atomique, OSError, second lancement sans écriture…), vivacité par pid reportée · 6d1c425
 - 2026-10-18 · 1.2 · fusion · ff sur main, suite complète 100 passed · 6d1c425
 - 2026-10-18 · 1.4 · second-avis · 1 high (terminate_tree n'arrête pas l'arbre si le chef est sorti), 2 medium, 5 low · —
+- 2026-10-18 · 1.2 · CI · verte sur les trois OS, story done · 522f9a3
+- 2026-10-18 · 1.3 · dev · lancé (dev-story Sonnet, worktree) · —
+- 2026-10-18 · 1.4 · review · rebase sur main (config.py unifié sur resolved_data_dir), high corrigé (arrêt d'arbre borné, test enfant+petit-enfant), Job Object Windows reporté à procs.spawn · 78c397a
+- 2026-10-18 · 1.4 · fusion · ff sur main, suite complète 150 passed, CI branche verte sur les trois OS · 78c397a
+- 2026-10-18 · 1.3 · dev · fini, 120 tests (exclusion des licences OFL du contrôle AD-13 (2)) · 3dcd853
