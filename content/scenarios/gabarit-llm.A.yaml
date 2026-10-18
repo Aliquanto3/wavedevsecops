@@ -1,0 +1,30 @@
+# Dépôt d'exercice du parcours LLM (Story 2.11) : le code d'exercice avance de stade en
+# stade (appel simple, prompt système, outils, boucle), un commit par stade.
+schema_version: 1
+scenario_id: gabarit-llm
+mode: A
+title_text: Dépôt d'exercice avec assistant LLM
+tracks: [llm]
+tools: [git]
+template: empty
+setup:
+  - op: exercise_stage
+    stage: simple_call
+  - op: commit
+    message: Ajoute l'assistant du stock (appel simple)
+  - op: exercise_stage
+    stage: system_prompt
+  - op: commit
+    message: Cadre l'assistant avec un prompt système
+  - op: exercise_stage
+    stage: tools
+  - op: commit
+    message: Donne des outils à l'assistant
+  - op: exercise_stage
+    stage: loop
+  - op: commit
+    message: Boucle sur les appels d'outils
+  - op: push
+    branch: main
+    as: origin-main
+steps: []

@@ -71,7 +71,7 @@ def prepare_workspace(
         wsfs.remove_tree(layout.root)
     git = Git.for_workspace(git_path or resolve_git(settings), layout.root, settings)
     try:
-        aliases = run_setup(scenario, layout, git)
+        aliases = run_setup(scenario, layout, git, settings.content_path() / "exercise")
         digest = fingerprint(layout, git)
     except BaseException:
         wsfs.remove_tree(layout.root)

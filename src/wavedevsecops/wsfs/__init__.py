@@ -54,6 +54,11 @@ class Layout:
         return cls(workspaces / track / f"{scenario_id}.{mode}")
 
     @property
+    def track(self) -> str:
+        """Parcours de l'espace (`llm` ou `no_ai`) : le dossier qui contient `root`."""
+        return self.root.parent.name
+
+    @property
     def repo(self) -> Path:
         return self.root / "repo"
 

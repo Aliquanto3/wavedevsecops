@@ -7,6 +7,8 @@ dans l'ordre. git est lancé par `gitio` en contexte interne ; les fichiers sont
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from wavedevsecops import wsfs
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios.context import SetupContext, SetupError
@@ -18,8 +20,12 @@ ORIGIN_URL = "../origin.git"
 """URL du remote `origin`, relative à `repo/` : l'espace reste déplaçable (AD-5)."""
 
 
-def run_setup(scenario: Scenario, layout: Layout, git: Git) -> dict[str, str]:
-    """Prépare l'espace et rend les alias résolus (`alias -> element_id`)."""
+def run_setup(
+    scenario: Scenario, layout: Layout, git: Git, exercise_root: Path | None = None
+) -> dict[str, str]:
+    """Prépare l'espace et rend les alias résolus (`alias -> element_id`).
+
+    `exercise_root` : `content/exercise/` ; par défaut celui des réglages."""
     if scenario.template != "empty":
         raise SetupError(f"Le gabarit « {scenario.template} » n'est pas disponible.")
     wsfs.make_dirs(layout.root)
@@ -30,6 +36,8 @@ def run_setup(scenario: Scenario, layout: Layout, git: Git) -> dict[str, str]:
     git.internal("init", "-q", "--template=", layout.repo.name, cwd=layout.root)
     git.internal("remote", "add", "origin", ORIGIN_URL, cwd=layout.repo)
     ctx = SetupContext(layout=layout, git=git)
+    if exercise_root is not None:
+        ctx.exercise_root = exercise_root
     for op in scenario.setup:
         produced = REGISTRY[op.op].apply(op, ctx)
         if op.as_ is not None:

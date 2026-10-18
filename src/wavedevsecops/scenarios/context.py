@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Literal
 
+from wavedevsecops.config import get_settings
 from wavedevsecops.contracts import AppError, parse_element_id
 from wavedevsecops.gitio import Git
 from wavedevsecops.wsfs import Layout
@@ -58,6 +60,8 @@ class SetupContext:
 
     layout: Layout
     git: Git
+    exercise_root: Path = field(default_factory=lambda: get_settings().content_path() / "exercise")
+    """`content/exercise/` : un gabarit par parcours (`llm/`, `no_ai/`)."""
     aliases: dict[str, str] = field(default_factory=dict)
     commits: int = 0
 

@@ -1,0 +1,17 @@
+# Dépôt d'exercice du parcours sans IA (Story 2.11) : le petit projet Python, un commit.
+schema_version: 1
+scenario_id: gabarit-sans-ia
+mode: A
+title_text: Dépôt d'exercice sans IA
+tracks: [no_ai]
+tools: [git]
+template: empty
+setup:
+  - op: exercise_stage
+    stage: base
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+steps: []

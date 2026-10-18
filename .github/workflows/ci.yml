@@ -48,6 +48,7 @@ jobs:
           sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
           .venv/bin/python -m pytest -q --tb=short
           tests/test_scenarios.py tests/test_setup.py tests/test_fingerprints.py
+          tests/test_exercise.py
 
       # AD-18 : les empreintes ne bougent pas sur un clone en core.autocrlf=true. Les fichiers
       # du dépôt sont réextraits avec ce réglage, puis les empreintes recomparées.

@@ -1,0 +1,38 @@
+[project]
+name = "inventory"
+version = "0.1.0"
+description = "Petit projet d'exercice : le stock d'un atelier, avec un assistant LLM."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["httpx==0.28.1"]
+
+# Outils de la chaîne DevSecOps, aux versions exactes de la table Stack (AD-12, AD-16).
+[dependency-groups]
+chain = [
+    "ruff==0.17.1",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "coverage==7.16.2",
+    "diff-cover==10.6.0",
+    "bandit==1.9.4",
+    "pip-audit==2.10.1",
+    "pre-commit==4.7.0",
+]
+
+[tool.uv]
+package = false
+default-groups = ["chain"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["inventory"]
