@@ -12,6 +12,7 @@ from wavedevsecops.config import Settings
 from wavedevsecops.engine import (
     OpContext,
     Operation,
+    OperationRefused,
     Projection,
     RunFileError,
     WorkspaceManager,
@@ -162,6 +163,59 @@ def test_changement_externe_propose_avec_l_epoch_courant(
         DISK["fingerprint"] = "f"
     change = [e for e in events if e.kind == Kind.EXTERNAL_CHANGE]
     assert len(change) == 1 and change[0].epoch == 7 and change[0].payload == {"fingerprint": "g"}
+
+
+def _hold(entered: threading.Event, gate: threading.Event) -> Operation:
+    def body(ctx: OpContext) -> int:
+        entered.set()
+        assert gate.wait(WAIT)
+        return 0
+
+    return Operation("long", body)
+
+
+def test_pas_de_reouverture_tant_que_l_ancienne_file_ecrit(tmp_path: Path) -> None:
+    """Un seul écrivain : un espace endormi pendant une opération ne se rouvre qu'après elle."""
+    settings = Settings(data_dir=tmp_path / "data", engine_stop_timeout_s=0.01)
+    _make(settings, "llm.s1.A")
+    manager = WorkspaceManager(settings, projector=_project, watch=False)
+    gate, entered = threading.Event(), threading.Event()
+    try:
+        old = manager.get("llm.s1.A")
+        running = old.submit(_hold(entered, gate))
+        assert entered.wait(WAIT)
+        manager.sleep("llm.s1.A")  # délai dépassé : la file tourne encore
+        assert old.alive
+        with pytest.raises(OperationRefused) as refused:
+            manager.get("llm.s1.A")
+        assert "veille" in refused.value.reason_text
+        gate.set()
+        assert running.result(WAIT).code == 0
+        old.join(WAIT)
+        assert manager.get("llm.s1.A") is not old
+    finally:
+        gate.set()
+        manager.close()
+
+
+def test_la_veille_prefere_un_espace_au_repos(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "data", max_active_workspaces=2)
+    for workspace_id in IDS[:3]:
+        _make(settings, workspace_id)
+    manager = WorkspaceManager(settings, projector=_project, watch=False)
+    gate, entered = threading.Event(), threading.Event()
+    try:
+        busy = manager.get(IDS[0])
+        running = busy.submit(_hold(entered, gate))
+        assert entered.wait(WAIT)
+        manager.get(IDS[1])
+        manager.get(IDS[2])  # le plus ancien travaille : c'est le deuxième qui s'endort
+        assert manager.active_ids() == [IDS[0], IDS[2]]
+        gate.set()
+        assert running.result(WAIT).code == 0
+    finally:
+        gate.set()
+        manager.close()
 
 
 def test_watcher_reel_detecte_une_modification(tmp_path: Path) -> None:

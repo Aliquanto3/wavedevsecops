@@ -12,6 +12,7 @@ import logging
 import re
 import secrets
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -43,6 +44,10 @@ from wavedevsecops.scenarios.model import KEBAB_PATTERN, Mode, Track
 from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger("wavedevsecops")
+STILL_STOPPING_TEXT = (
+    "Cet espace termine sa mise en veille : l'action en cours s'achève. Réessayez dans un "
+    "instant."
+)
 
 _ID = re.compile(
     r"^(?P<track>{tracks})\.(?P<scenario_id>{kebab})\.(?P<mode>{modes})$".format(
@@ -176,6 +181,8 @@ class WorkspaceManager:
         self._lock = threading.RLock()
         self._active: OrderedDict[str, _Active] = OrderedDict()
         self._logs: dict[str, EventLog] = {}
+        self._stopping: dict[str, WorkspaceEngine] = {}
+        """Files endormies dont le fil tourne encore : l'espace ne se rouvre pas avant (AD-1)."""
         self._closed = False
 
     # ------------------------------------------------------------ lecture
@@ -237,6 +244,12 @@ class WorkspaceManager:
     def _open(self, workspace_id: str, layout: Layout) -> tuple[WorkspaceEngine, list[_Active]]:
         if self._closed:
             raise OperationRefused("WaveDevSecOps s'arrête : l'espace ne peut plus être ouvert.")
+        stopping = self._stopping.get(workspace_id)
+        if stopping is not None:
+            if stopping.alive:
+                # Un seul écrivain : l'ancienne file finit son opération avant toute réouverture.
+                raise OperationRefused(STILL_STOPPING_TEXT)
+            del self._stopping[workspace_id]
         holder: dict[str, _Active] = {}
 
         def on_state(state: EngineStateName) -> None:
@@ -258,8 +271,10 @@ class WorkspaceManager:
         self._active[workspace_id] = active
         evicted = []
         while len(self._active) > self.settings.max_active_workspaces:
-            _, oldest = self._active.popitem(last=False)
-            evicted.append(oldest)
+            # Le moins récent au repos d'abord ; à défaut, le moins récent.
+            candidates = [key for key in self._active if key != workspace_id]
+            idle = [key for key in candidates if not self._active[key].engine.busy]
+            evicted.append(self._retire((idle or candidates)[0]))
         engine.start()
         return engine, evicted
 
@@ -287,27 +302,44 @@ class WorkspaceManager:
         except OperationRefused as refused:
             log.info("Changement externe ignoré : %s", refused.reason_text)
 
-    def _sleep_all(self, evicted: list[_Active]) -> None:
-        for active in evicted:
-            self._sleep(active)
+    def _retire(self, workspace_id: str) -> _Active:
+        """Retire un espace actif (sous le verrou) : il reste « en veille » jusqu'à son arrêt."""
+        active = self._active.pop(workspace_id)
+        self._stopping[workspace_id] = active.engine
+        return active
 
-    def _sleep(self, active: _Active) -> None:
-        if active.watcher is not None:
-            active.watcher.stop()
-        active.engine.close()
-        # Les runs du pipeline de l'espace s'arrêteront ici aussi (AD-10).
+    def _sleep_all(self, evicted: list[_Active]) -> None:
+        # D'abord refuser partout (sans attendre), puis attendre chaque file dans un délai commun.
+        for active in evicted:
+            active.engine.request_stop()
+        deadline = time.monotonic() + self.settings.engine_stop_timeout_s
+        for active in evicted:
+            active.engine.join(max(0.0, deadline - time.monotonic()))
+            # Après la file : un changement d'état tardif ne relance plus le surveillant.
+            if active.watcher is not None:
+                active.watcher.stop()
+            # Les runs du pipeline de l'espace s'arrêteront ici aussi (AD-10).
+            with self._lock:
+                engine = active.engine
+                if not engine.alive and self._stopping.get(engine.workspace_id) is engine:
+                    del self._stopping[engine.workspace_id]
+            if active.engine.alive:
+                log.warning(
+                    "L'espace %s ne s'est pas arrêté dans le délai : il ne se rouvrira qu'après "
+                    "la fin de son opération.",
+                    active.engine.workspace_id,
+                )
 
     def sleep(self, workspace_id: str) -> None:
         """Endort un espace actif (sans effet s'il dort déjà)."""
         with self._lock:
-            active = self._active.pop(workspace_id, None)
+            active = self._retire(workspace_id) if workspace_id in self._active else None
         if active is not None:
-            self._sleep(active)
+            self._sleep_all([active])
 
     def close(self) -> None:
         """Endort tous les espaces : fin du lancement."""
         with self._lock:
             self._closed = True
-            actives = list(self._active.values())
-            self._active.clear()
+            actives = [self._retire(key) for key in list(self._active)]
         self._sleep_all(actives)

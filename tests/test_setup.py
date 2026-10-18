@@ -206,6 +206,10 @@ def test_lien_de_l_apprenant_qui_sort_ou_vise_git(
     (layout.repo / "sortie").unlink()
     (layout.repo / "sortie").symlink_to(tmp_path / "ailleurs.txt")
     assert fingerprint(layout, git) != with_links  # la cible écrite compte
+    # Un lien dans hooks/ qui sort de l'espace ne fait pas échouer l'empreinte (revue 2.2).
+    layout.hooks.mkdir(parents=True, exist_ok=True)
+    (layout.hooks / "pre-commit-dehors").symlink_to(outside)
+    assert fingerprint(layout, git) != with_links
 
 
 def test_ops_branch_switch_et_alias(settings: Settings, git_path: Path) -> None:

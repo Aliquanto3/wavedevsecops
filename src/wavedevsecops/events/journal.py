@@ -110,7 +110,7 @@ class EventLog:
         if last_event_id is None or not last_event_id.strip():
             return []
         boot, sep, raw_seq = last_event_id.strip().rpartition(":")
-        if not sep or boot != self.boot_id or not raw_seq.isdigit():
+        if not sep or boot != self.boot_id or not (raw_seq.isascii() and raw_seq.isdigit()):
             return None
         seen = int(raw_seq)
         if seen > self._seq:

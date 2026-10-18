@@ -31,6 +31,7 @@ from wavedevsecops.engine import (
 from wavedevsecops.events import Envelope
 
 log = logging.getLogger("wavedevsecops")
+RESYNC_SLOW_TEXT = "Le flux a pris du retard : l'écran se recharge depuis l'état courant."
 WAIT_STEP_S = 1.0
 """Attente maximale d'un événement avant de revérifier l'arrêt et le maintien du flux."""
 
@@ -77,14 +78,22 @@ def install_workspace_routes(app: FastAPI, manager: WorkspaceManager) -> None:
             "last_event_id"
         )
         loop = asyncio.get_running_loop()
-        inbox: asyncio.Queue[Envelope] = asyncio.Queue()
+        # Bornée : un client trop lent reçoit `resync_required` au lieu de faire grossir la file.
+        inbox: asyncio.Queue[Envelope] = asyncio.Queue(maxsize=manager.settings.event_buffer)
+        overflow = asyncio.Event()
+
+        def enqueue(envelope: Envelope) -> None:
+            try:
+                inbox.put_nowait(envelope)
+            except asyncio.QueueFull:
+                overflow.set()
 
         def push(envelope: Envelope) -> None:
-            loop.call_soon_threadsafe(inbox.put_nowait, envelope)
-
-        missed, detach = journal.attach(last_event_id, push)
+            loop.call_soon_threadsafe(enqueue, envelope)
 
         async def stream() -> AsyncIterator[str]:
+            # Abonné dans le générateur : une réponse jamais démarrée ne laisse pas d'abonné.
+            missed, detach = journal.attach(last_event_id, push)
             try:
                 yield "retry: 2000\n\n"
                 if missed is None:
@@ -95,6 +104,9 @@ def install_workspace_routes(app: FastAPI, manager: WorkspaceManager) -> None:
                         yield envelope.to_sse()
                 beat = time.monotonic()
                 while not manager.closed:
+                    if overflow.is_set():
+                        yield journal.resync_envelope(RESYNC_SLOW_TEXT, epoch=engine.epoch).to_sse()
+                        return
                     try:
                         envelope = await asyncio.wait_for(inbox.get(), timeout=WAIT_STEP_S)
                     except TimeoutError:

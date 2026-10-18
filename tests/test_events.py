@@ -119,7 +119,9 @@ def test_premiere_connexion_et_reprise_a_jour() -> None:
     assert log.attach("boot1:1", lambda e: None)[0] == []
 
 
-@pytest.mark.parametrize("last", ["autre:1", "boot1:x", "n'importe", "boot1:99"])
+@pytest.mark.parametrize(
+    "last", ["autre:1", "boot1:x", "n'importe", "boot1:99", "boot1:²", "boot1:٣"]
+)
 def test_reprise_impossible(last: str) -> None:
     log = _log()
     _out(log, "a")

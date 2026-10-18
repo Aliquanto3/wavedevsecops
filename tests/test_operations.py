@@ -278,7 +278,8 @@ def test_veille_refuse_les_operations_en_attente(layout: Layout, disk: Disk) -> 
 
     running = h.engine.submit(_op(hold))
     assert entered.wait(WAIT)  # en cours : la veille l'attend au lieu de la refuser
-    pending = h.engine.submit(_op())
+    waiting = _op()
+    pending = h.engine.submit(waiting)
     closer = threading.Thread(target=h.engine.close)
     closer.start()
     with pytest.raises(OperationRefused):
@@ -286,6 +287,9 @@ def test_veille_refuse_les_operations_en_attente(layout: Layout, disk: Disk) -> 
     gate.set()
     closer.join(WAIT)
     assert running.result(WAIT).code == 0
+    h.engine.join(WAIT)
+    # L'apprenant avait reçu un 202 : la file seule publie pourquoi l'action n'a pas eu lieu.
+    assert h.kinds(waiting.op_id) == ["app_error"]
     with pytest.raises(OperationRefused):
         h.engine.submit(_op())
 

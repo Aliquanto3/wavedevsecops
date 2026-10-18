@@ -58,6 +58,8 @@ GENERIC_ACTION = (
     "Réessayez ; si l'erreur revient, ouvrez le diagnostic ou consultez le journal de "
     "WaveDevSecOps."
 )
+DROPPED_TEXT = "Cet espace s'est mis en veille avant d'exécuter l'action."
+DROPPED_ACTION = "Réessayez l'action : l'espace se rouvre à la demande."
 _STATE_TEXTS: dict[str, str] = {
     "idle": "",
     "command": "Une commande est en cours.",
@@ -312,8 +314,23 @@ class WorkspaceEngine:
                 "Ce résultat concerne un état de l'espace qui a été remplacé : il est ignoré."
             )
 
-    def close(self) -> None:
-        """Met l'espace en veille : refuse les opérations en attente, attend celle en cours."""
+    @property
+    def alive(self) -> bool:
+        """Vrai tant que le fil de la file tourne (une opération peut encore écrire)."""
+        return self._thread.is_alive()
+
+    @property
+    def busy(self) -> bool:
+        """Vrai si une opération tourne ou attend."""
+        with self._lock:
+            return bool(self._pending) or self._state not in REST_STATES
+
+    def request_stop(self) -> None:
+        """Met l'espace en veille sans attendre : refuse les opérations en attente.
+
+        Leur `app_error` est publié par le fil de la file (seul écrivain), après
+        l'opération en cours, que la veille n'interrompt pas.
+        """
         with self._lock:
             if self._closed:
                 return
@@ -322,17 +339,17 @@ class WorkspaceEngine:
             self._pending.clear()
         for _, future in dropped:
             if future.set_running_or_notify_cancel():
-                future.set_exception(
-                    OperationRefused(
-                        "Cet espace s'est mis en veille avant d'exécuter l'action. Réessayez."
-                    )
-                )
+                future.set_exception(OperationRefused(DROPPED_TEXT))
         self._queue.put(_STOP)
-        if self._thread.is_alive() and threading.current_thread() is not self._thread:
-            self._thread.join(timeout=self.settings.engine_stop_timeout_s)
+
+    def close(self) -> None:
+        """Met l'espace en veille : refuse les opérations en attente, attend celle en cours."""
+        self.request_stop()
+        self.join(self.settings.engine_stop_timeout_s)
 
     def join(self, timeout: float | None = None) -> None:
-        self._thread.join(timeout)
+        if self._thread.is_alive() and threading.current_thread() is not self._thread:
+            self._thread.join(timeout)
 
     def _run(self) -> None:
         self._initial_projection()
@@ -342,9 +359,17 @@ class WorkspaceEngine:
                 return
             op, future = item
             with self._lock:
-                if (op, future) not in self._pending:
-                    continue  # refusée à la mise en veille
-                self._pending.remove((op, future))
+                dropped = (op, future) not in self._pending
+                if not dropped:
+                    self._pending.remove((op, future))
+            if dropped:
+                # Refusée à la mise en veille : l'apprenant a reçu un 202, il voit pourquoi.
+                self.publish(
+                    Kind.APP_ERROR,
+                    AppErrorPayload(cause_text=DROPPED_TEXT, action_text=DROPPED_ACTION),
+                    op_id=op.op_id,
+                )
+                continue
             if not future.set_running_or_notify_cancel():
                 continue
             try:

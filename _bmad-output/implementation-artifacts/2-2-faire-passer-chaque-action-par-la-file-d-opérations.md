@@ -41,3 +41,17 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.2 ».
 - Empreinte de la dernière projection persistée dans `run.json` pour comparer à la reprise (AD-6 « un écart donne un changement externe ») : avec les instantanés.
 - Arrêt des runs du pipeline à la mise en veille : avec `ci` (AD-10).
 - Front : magasin de projection alimenté par le flux SSE : stories 2.3 et suivantes.
+- Interruption de l'opération en cours à la mise en veille (arrêt de l'arbre de processus par `procs`, AD-12) : avec 2.4. En attendant, un espace endormi pendant une opération refuse sa réouverture (409) tant que l'ancienne file tourne ; vérifier en 2.4 qu'une commande bloquée est bien tuée au-delà de `engine_stop_timeout_s`.
+
+## Revue
+
+Revue Opus (2026-10-18), après rebase sur `main` (221000e, sans conflit) et liste du second avis (Haiku).
+
+- high · second avis 1 · corrigé · Réouverture pendant l'arrêt de l'ancienne file : deux écrivains sur le même layout et le même journal (y compris sans dépassement du délai, entre le retrait de l'espace actif et la fin du `join`). `WorkspaceManager` garde les files en cours d'arrêt (`_stopping`) et refuse la réouverture en 409 tant que leur fil vit ; la veille LRU choisit d'abord un espace au repos. Tests `test_pas_de_reouverture_tant_que_l_ancienne_file_ecrit`, `test_la_veille_prefere_un_espace_au_repos`. Interruption de l'opération : reportée à 2.4 (voir Reports).
+- medium · second avis 2 · corrigé · `Last-Event-ID` avec un chiffre non ASCII (`²`, `٣`) : `int()` levait (500). Test paramétré dans `test_events`.
+- medium · second avis 3 · corrigé · Opérations en attente refusées à la veille sans événement alors que l'apprenant a reçu un 202 : la file publie elle-même (seul écrivain) un `app_error` par opération abandonnée, après celle en cours. Test étendu `test_veille_refuse_les_operations_en_attente`.
+- low · second avis 4 · corrigé · Surveillant arrêté avant la file : la file est désormais fermée d'abord (`closed` posé), le surveillant arrêté après son `join`, donc `_follow_state` ne le relance plus.
+- low · second avis 5 · corrigé · File d'abonné SSE non bornée : bornée à `Settings.event_buffer` ; au débordement, le flux envoie `resync_required` et se ferme.
+- low · second avis 6 · corrigé · Abonné qui fuit si la réponse ne démarre jamais : l'abonnement se fait dans le générateur du flux.
+- low · second avis 7 · corrigé · Arrêt en série jusqu'à 90 s : `request_stop` sur toutes les files, puis attente dans un délai commun (`engine_stop_timeout_s`).
+- low · second avis 8 · corrigé · Lien de `hooks/` hors de l'espace : l'empreinte lit `hooks/` par `read_entry` (lien = cible écrite). Assertion ajoutée au test des liens de `test_setup` (sautée sous Windows sans droit de lien, exécutée en CI Linux et macOS).

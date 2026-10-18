@@ -47,7 +47,7 @@ def canonical_records(layout: Layout, git: Git) -> list[str]:
     for position, sha in enumerate(gitio.stash_list(git, layout.repo)):
         records.append(f"repo stash {position} {sha}")
     for rel in wsfs.iter_files(layout.hooks):
-        records.append(f"hooks {rel} {_digest(wsfs.read_bytes(layout.hooks, rel))}")
+        records.append(f"hooks {rel} {_digest(wsfs.read_entry(layout.hooks, rel))}")
     return sorted(records)
 
 
