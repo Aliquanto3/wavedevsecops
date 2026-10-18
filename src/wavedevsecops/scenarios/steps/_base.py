@@ -40,6 +40,21 @@ class Verdict(BaseModel):
     """Ce que l'étape voit, avec les liens vers les éléments."""
 
 
+BLANK = "___"
+"""Blanc d'une commande partielle (palier 2 des indices)."""
+
+
+class Hints(BaseModel):
+    """Les trois paliers d'indice d'une étape (AD-7) : une piste, une commande partielle, la
+    solution. Les blancs de la commande partielle s'écrivent `___`."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    lead_text: str = Field(min_length=1)
+    partial_text: str = Field(min_length=1)
+    solution_text: str = Field(min_length=1)
+
+
 class StepArgs(BaseModel):
     """Champs communs des types d'étape ; chaque type ajoute les siens."""
 
@@ -55,6 +70,8 @@ class StepArgs(BaseModel):
     """Clé du catalogue d'explications liée à l'étape ; vide si aucune."""
     unexpected_text: str = ""
     """Explication d'un état inattendu propre à l'étape ; vide : texte général."""
+    hints: Hints | None = None
+    """Indices par paliers (FR-13) ; absents : l'étape n'en propose pas."""
 
     def references(self) -> list[tuple[tuple[str | int, ...], str]]:
         """`(chemin du champ, alias)` de chaque valeur `@alias` de l'étape, hors textes."""

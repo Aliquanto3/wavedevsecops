@@ -2,7 +2,9 @@
 // l'étape et encart « État inattendu ». Le serveur écrit tous les textes (AD-2) : ce module n'en
 // invente aucun hors des libellés fixes de l'interface, et ne calcule aucun verdict. Il ne garde
 // que des choix d'affichage : l'étape rouverte par un segment, l'encart écarté par « Continuer ».
+import { bindAction } from "./actions.js";
 import { el, richText } from "./dom.js";
+import { OPEN_HINT_LABEL, defaultTier, hintTabs, nextTier } from "./hints.js";
 import { alteredExplanation, quizChoices, restoreFailedNotice } from "./quiz.js";
 import { openNext, scoreSummary, summaryStatus } from "./summary.js";
 
@@ -42,6 +44,7 @@ export function statusFor(state) {
   } else if (verdict && verdict.status === "unexpected") parts.push(`${UNEXPECTED_TITLE}.`);
   if (current) parts.push(`${progressLabel(panel)} : ${current.title_text}.`);
   if (panel.summary) parts.push(summaryStatus(panel.summary));
+  if (state.hintNotice) parts.push(state.hintNotice);
   return parts.join(" ");
 }
 
@@ -53,6 +56,8 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
   let dismissed = null; // verdict dont l'encart a été écarté par « Continuer »
   let infoOpen = false;
   let chosen = null; // commande cochée du quiz en cours
+  let hintTier = null; // palier d'indice affiché ; null : le plus avancé des paliers ouverts
+  let hintStep = null; // étape à laquelle `hintTier` se rapporte
   let lastState = null;
   const uid = ++counter;
 
@@ -122,7 +127,17 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
     return block;
   }
 
-  function notice(verdict) {
+  /** Ouvre un palier : l'onglet s'affiche tout de suite, le serveur confirme (ou refuse). */
+  async function openHint(tier) {
+    hintTier = tier;
+    const ok = onIntent ? await onIntent("hint_open", { tier }) : false;
+    if (!ok) {
+      hintTier = null;
+      if (lastState) render(lastState);
+    }
+  }
+
+  function notice(verdict, current) {
     const id = `notice-${uid}`;
     const card = el("div", "notice-card notice-warning", {
       role: "group",
@@ -170,6 +185,15 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
       render(lastState);
     });
     actions.append(next);
+    // « Ouvrir un indice » : le premier palier non encore ouvert (le serveur dit s'il l'est).
+    const upcoming = current && current.hints ? nextTier(current.hints) : null;
+    if (upcoming) {
+      const hint = el("button", "btn", { type: "button", "data-action": "open-hint" });
+      hint.textContent = OPEN_HINT_LABEL;
+      hint.addEventListener("click", () => openHint(upcoming.tier));
+      actions.append(hint);
+      bindAction(hint, upcoming.state === "locked" ? upcoming.condition_text : null);
+    }
     card.append(actions);
     return card;
   }
@@ -213,6 +237,23 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
       );
     }
     children.push(instruction);
+    // Indices par paliers de l'étape courante (UX-DR28) ; aucun compteur.
+    if (shown === current && current.hints) {
+      if (hintStep !== current.step_id) {
+        hintStep = current.step_id;
+        hintTier = null;
+      }
+      children.push(
+        hintTabs(current.hints, {
+          selected: hintTier ?? defaultTier(current.hints),
+          onSelect(tier) {
+            hintTier = tier;
+            render(lastState);
+          },
+          onOpen: openHint,
+        }),
+      );
+    }
     // Quiz : les commandes proposées, puis l'explication de la mauvaise réponse et, si le
     // rétablissement échoue, l'encart d'erreur (UX-DR9, UX-DR11).
     if (shown === current && current.quiz && !panel.restore_failed) {
@@ -240,7 +281,7 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
     }
     const verdict = state.verdict;
     if (verdict && verdict.status === "unexpected" && verdict !== dismissed && shown === current) {
-      children.push(notice(verdict));
+      children.push(notice(verdict, current));
     }
     // L'explication suit la consigne : celle d'une étape terminée rouverte, ou celle de l'étape
     // qui vient d'être réussie (publiée par le serveur après la mise à jour des vues).
@@ -265,6 +306,7 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
     if (active.dataset && active.dataset.action && active.closest(".score-summary")) {
       return `.score-summary [data-action="${active.dataset.action}"]`;
     }
+    if (active.classList.contains("hint-tab")) return `.hint-tab[data-tier="${active.dataset.tier}"]`;
     if (active.classList.contains("quiz-radio")) return `.quiz-radio[value="${active.getAttribute("value")}"]`;
     if (active.classList.contains("quiz-run")) return ".quiz-run";
     if (active.dataset && active.dataset.elementId) {

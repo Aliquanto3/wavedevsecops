@@ -26,6 +26,7 @@ function initial() {
     announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
     projectedOp: null, // op_id de la dernière state_projected (seconde projection d'une op)
     restored: false, // vrai entre un rétablissement réussi et la commande suivante
+    hintNotice: "", // annonce du serveur quand la solution se débloque ; vidée à l'action suivante
   };
 }
 
@@ -82,6 +83,20 @@ function explainStep(panel, payload) {
   return { ...panel, steps };
 }
 
+/** Étape courante du panneau, ou null. */
+function currentStep(panel) {
+  return (panel && panel.steps.find((step) => step.step_id === panel.current_step_id)) || null;
+}
+
+/** Vrai si la solution de l'étape courante est passée de verrouillée à disponible. */
+function solutionUnlocked(before, after) {
+  const was = currentStep(before);
+  const now = currentStep(after);
+  if (!was || !now || was.step_id !== now.step_id || !was.hints || !now.hints) return false;
+  const tier = (step) => step.hints.tiers.find((t) => t.tier === 3);
+  return tier(was)?.state === "locked" && tier(now)?.state === "available";
+}
+
 export function createStore() {
   let state = initial();
   const externalOps = new Set();
@@ -123,10 +138,20 @@ export function createStore() {
         verdict: null,
         announce: null, // l'ouverture n'est pas une commande
         projectedOp: null,
+        hintNotice: "",
       });
     },
     fail(errorText) {
       set({ errorText });
+    },
+    /** Remplace le panneau Scénario relu auprès du serveur (indices ouverts ou débloqués). */
+    setStepPanel(panel) {
+      const unlocked = solutionUnlocked(state.stepPanel, panel);
+      const now = currentStep(panel);
+      set({
+        stepPanel: panel,
+        hintNotice: unlocked && now ? now.hints.unlocked_text || "" : state.hintNotice,
+      });
     },
     /** Entrée locale du terminal (ligne tapée, refus venu du serveur en 409) : même ordre que le flux. */
     terminalAppend(entry) {
@@ -147,7 +172,10 @@ export function createStore() {
       if (envelope.kind === "engine_state") {
         patch.engineState = payload.state;
         patch.reasonText = payload.reason_text || "";
-        if (payload.state === "command") patch.restored = false;
+        if (payload.state === "command") {
+          patch.restored = false;
+          patch.hintNotice = "";
+        }
       } else if (envelope.kind === "state_projected") {
         const problems = [];
         const fingerprint = payload.fingerprint || "";
@@ -213,6 +241,58 @@ export function connectWorkspace(store, workspaceId, options = {}) {
   const Source = options.EventSourceImpl || globalThis.EventSource;
   let source = null;
   let stopped = false;
+  let unlockTimer = null;
+
+  /** Relit le panneau auprès du serveur : lui seul décide de la disponibilité d'un indice. */
+  async function refreshPanel() {
+    for (let attempt = 0; attempt < 3 && !stopped; attempt += 1) {
+      let body;
+      try {
+        const response = await fetchImpl(`/api/ws/${encodeURIComponent(workspaceId)}/state`, {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!response.ok) return;
+        body = await response.json();
+      } catch (err) {
+        return;
+      }
+      // Un événement plus récent que cette lecture est arrivé entre-temps : on relit.
+      if (stopped || body.boot_id !== store.state.bootId) return;
+      if (body.seq >= store.state.seq) {
+        store.setStepPanel(body.step_panel || null);
+        scheduleUnlock();
+        return;
+      }
+    }
+  }
+
+  /** Programme la relecture du moment où la solution se débloque (aucun décompte affiché). */
+  function scheduleUnlock() {
+    if (unlockTimer) clearTimeout(unlockTimer);
+    unlockTimer = null;
+    const panel = store.state.stepPanel;
+    const step = panel && panel.steps.find((s) => s.step_id === panel.current_step_id);
+    const wait = step && step.hints ? step.hints.solution_unlock_ms : null;
+    if (typeof wait === "number" && wait > 0 && !stopped) {
+      unlockTimer = setTimeout(refreshPanel, wait + 50);
+    }
+  }
+
+  /** Indices en jeu : une relecture suit l'ouverture d'un palier, la réussite d'une étape (les
+   * indices de la suivante) et la fin d'une action (un essai peut débloquer la solution). */
+  function needsRefresh(envelope) {
+    const panel = store.state.stepPanel;
+    if (!panel || !panel.has_hints) return false;
+    if (envelope.kind === "hint_opened") return true;
+    if (envelope.kind === "step_verdict") return envelope.payload?.status === "passed";
+    if (envelope.kind === "engine_state") {
+      const step = panel.steps.find((s) => s.step_id === panel.current_step_id);
+      const waiting = step?.hints?.tiers.some((t) => t.tier === 3 && t.state === "locked");
+      return Boolean(waiting) && envelope.payload?.state !== "command";
+    }
+    return false;
+  }
 
   async function sync() {
     if (source) source.close();
@@ -235,6 +315,7 @@ export function connectWorkspace(store, workspaceId, options = {}) {
     }
     if (stopped) return;
     store.applySnapshot(snapshot);
+    scheduleUnlock();
     if (!Source) return;
     const last = encodeURIComponent(`${snapshot.boot_id}:${snapshot.seq}`);
     const current = new Source(
@@ -254,7 +335,9 @@ export function connectWorkspace(store, workspaceId, options = {}) {
       } catch (err) {
         return;
       }
-      if (store.applyEvent(envelope) === "resync") sync();
+      const result = store.applyEvent(envelope);
+      if (result === "resync") sync();
+      else if (result === "applied" && needsRefresh(envelope)) refreshPanel();
     };
   }
 
@@ -262,6 +345,7 @@ export function connectWorkspace(store, workspaceId, options = {}) {
   sync();
   return () => {
     stopped = true;
+    if (unlockTimer) clearTimeout(unlockTimer);
     if (source) source.close();
   };
 }
