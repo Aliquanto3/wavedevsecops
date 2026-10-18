@@ -26,7 +26,7 @@ from wavedevsecops.contracts import (
     Views,
     element_id,
 )
-from wavedevsecops.projections.graph import place
+from wavedevsecops.projections.graph import Cell, Layout, Route, place
 
 SHORT = 7
 HEAD_ID = element_id("ref", "HEAD")
@@ -179,11 +179,29 @@ def commit_a11y_name(
     return ", ".join(parts)
 
 
+def layout_of(graph: GraphView) -> Layout:
+    """Placement porté par un graphe déjà publié (mémoire du placement, AD-2)."""
+    shas = {node.element_id: node.sha for node in graph.nodes}
+    cells = {node.sha: Cell(node.column, node.row) for node in graph.nodes}
+    routes = [
+        Route(shas[edge.child], shas[edge.parent], edge.column, edge.kind == "first_parent")
+        for edge in graph.edges
+        if edge.child in shas and edge.parent in shas
+    ]
+    return Layout(cells, routes, [])
+
+
 def build_graph(
-    state: RepoState, previous: RepoState | None = None, restored: Iterable[str] = ()
+    state: RepoState,
+    previous: RepoState | None = None,
+    restored: Iterable[str] = (),
+    previous_graph: GraphView | None = None,
 ) -> GraphView:
-    """Graphe placé et annoté ; `previous` (état d'avant l'opération) fixe les marques `new`."""
-    layout = place(state.commits)
+    """Graphe placé et annoté ; `previous` (état d'avant l'opération) fixe les marques `new`.
+
+    `previous_graph` : graphe publié avant l'opération ; ses commits gardent leur case.
+    """
+    layout = place(state.commits, layout_of(previous_graph) if previous_graph else None)
     commits = {c.sha: c for c in state.commits}
     known = {c.sha for c in previous.commits} if previous is not None else None
     changed = _changed_refs(state, previous)
@@ -415,12 +433,15 @@ _IN_PROGRESS_TEXT = {
 
 
 def build_views(
-    state: RepoState, previous: RepoState | None = None, restored: Iterable[str] = ()
+    state: RepoState,
+    previous: RepoState | None = None,
+    restored: Iterable[str] = (),
+    previous_graph: GraphView | None = None,
 ) -> Views:
     """Toutes les vues de `state_projected` pour l'état `state`."""
     return Views(
         repo=state,
-        graph=build_graph(state, previous, restored),
+        graph=build_graph(state, previous, restored, previous_graph),
         staging=build_staging(state),
         prompt=build_prompt(state),
         announce_text=announce(state, previous),

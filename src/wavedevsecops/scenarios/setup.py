@@ -31,9 +31,11 @@ def run_setup(
     wsfs.make_dirs(layout.root)
     wsfs.make_dirs(layout.hooks)
     # `--template=` : aucun gabarit du poste (`info/exclude`, exemples de hooks), dont le
-    # contenu varie selon l'installation de git.
-    git.internal("init", "-q", "--template=", "--bare", layout.origin.name, cwd=layout.root)
-    git.internal("init", "-q", "--template=", layout.repo.name, cwd=layout.root)
+    # contenu varie selon l'installation de git. SHA-1 imposé : la grammaire `commit:<sha>`
+    # (AD-17) attend 40 caractères hexadécimaux, quel que soit le format par défaut de git.
+    init = ("init", "-q", "--template=", "--object-format=sha1")
+    git.internal(*init, "--bare", layout.origin.name, cwd=layout.root)
+    git.internal(*init, layout.repo.name, cwd=layout.root)
     git.internal("remote", "add", "origin", ORIGIN_URL, cwd=layout.repo)
     ctx = SetupContext(layout=layout, git=git)
     if exercise_root is not None:

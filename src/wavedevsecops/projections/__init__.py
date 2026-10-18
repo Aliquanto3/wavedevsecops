@@ -13,7 +13,14 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from wavedevsecops.contracts import REPO_STATE_VERSION, Actor, RepoState, Views
+from wavedevsecops.contracts import (
+    REPO_STATE_VERSION,
+    VIEWS_VERSION,
+    Actor,
+    GraphView,
+    RepoState,
+    Views,
+)
 from wavedevsecops.gitio import Git
 from wavedevsecops.projections.graph import Layout, place
 from wavedevsecops.projections.spans import Linker
@@ -55,6 +62,17 @@ def previous_state(views: Mapping[str, Any] | None) -> RepoState | None:
         return None
 
 
+def previous_graph(views: Mapping[str, Any] | None) -> GraphView | None:
+    """Graphe de la projection précédente, s'il est lisible et de même version."""
+    graph = (views or {}).get("graph")
+    if not isinstance(graph, Mapping) or (views or {}).get("schema_version") != VIEWS_VERSION:
+        return None
+    try:
+        return GraphView.model_validate(graph)
+    except ValidationError:
+        return None
+
+
 def project(
     git: Git,
     layout: WorkspaceLayout,
@@ -64,7 +82,9 @@ def project(
 ) -> Projected:
     """Relit le dépôt de l'espace et calcule ses vues ; `previous_views` fixe les marques."""
     state = read_repo_state(git, layout.repo, ACTORS)
-    views = build_views(state, previous_state(previous_views), restored)
+    views = build_views(
+        state, previous_state(previous_views), restored, previous_graph(previous_views)
+    )
     return Projected(views, Linker(state))
 
 
@@ -81,6 +101,7 @@ __all__ = [
     "build_views",
     "commit_a11y_name",
     "place",
+    "previous_graph",
     "previous_state",
     "project",
     "read_repo_state",

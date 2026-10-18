@@ -405,3 +405,39 @@ def test_la_file_publie_les_vues_et_les_passages_relies(
         element_id("commit", new_sha),
     }
     assert engine.snapshot()["views"]["prompt"]["text"] == "main"
+
+
+def test_ref_au_nom_unicode_et_stash(sandbox: Sandbox) -> None:
+    """Revue 2.6 : U+2028 ou U+0085 dans un nom de ref ne coupe pas la lecture."""
+    box = sandbox
+    box.commit("un")
+    box.run("branch", "a b")
+    box.run("branch", "c\u0085d")
+    box.write("f.txt", "x")
+    box.run("stash", "push", "-u", "-q", "-m", "essai suite")
+    state = box.state()
+    names = {r.short_name for r in state.refs}
+    assert {"a b", "c\u0085d"} <= names
+    assert len(state.stash) == 1
+    assert state.stash[0].sha == box.run("rev-parse", "refs/stash").strip()
+    assert state.stash[0].message.endswith("essai suite")
+
+
+def test_projection_garde_les_cases_malgre_une_date_ancienne(
+    sandbox: Sandbox, settings: Settings
+) -> None:
+    """Revue 2.6 : un commit daté avant les autres ne déplace aucun commit publié."""
+    box = sandbox
+    base = box.commit("base")
+    for i in range(3):
+        box.commit(f"main {i}")
+    box.run("switch", "-q", "-c", "feature", base)
+    box.commit("feature 1")
+    first = project(box.git, box.layout)
+    before = {n.sha: (n.column, n.row) for n in first.views.graph.nodes}
+    box.run("switch", "-q", "main")
+    box.clock = 1_700_000_000  # horloge reculée
+    box.commit("ancien")
+    second = project(box.git, box.layout, first.views.model_dump(mode="json"))
+    after = {n.sha: (n.column, n.row) for n in second.views.graph.nodes}
+    assert all(after[sha] == cell for sha, cell in before.items())

@@ -104,14 +104,17 @@ def repo_projector(settings: Settings, git_path: Path | None = None) -> Projecto
 def external_change(engine: WorkspaceEngine, projector: Projector) -> Operation:
     """Opération « changement externe » : porte l'`epoch` de sa création (AD-1).
 
-    La pré-vérification l'abandonne sans bruit si l'empreinte n'a pas changé depuis la
-    dernière projection.
+    La pré-vérification l'abandonne sans bruit si ni l'empreinte ni le `RepoState` relu
+    n'ont changé depuis la dernière projection : l'empreinte ignore la configuration, or
+    `git branch -u` ne change que l'amont, que le `RepoState` porte.
     """
 
     def precheck(ctx: OpContext) -> bool:
         projection = projector(ctx)
         ctx.data["fingerprint"] = projection.fingerprint
-        return projection.fingerprint != ctx.last_fingerprint
+        if projection.fingerprint != ctx.last_fingerprint:
+            return True
+        return projection.views.get("repo") != ctx.last_views.get("repo")
 
     def body(ctx: OpContext) -> int:
         ctx.emit(Kind.EXTERNAL_CHANGE, ExternalChange(fingerprint=ctx.data["fingerprint"]))

@@ -7,9 +7,15 @@ Colonne : les commits sont placés un par un, dans un ordre topologique où, par
 commits prêts, passe d'abord le plus ancien (date du committer, puis rang, puis SHA). Chaque
 commit prend la colonne de son premier parent si elle est libre jusqu'à son rang, sinon la
 plus petite colonne libre. Le choix ne regarde que les commits déjà placés, jamais les refs :
-un commit créé après les autres (commit, merge, rebase, cherry-pick) est placé en dernier et
-ne déplace personne. Une branche créée, supprimée ou déplacée, un HEAD détaché, un tag ou une
-ref distante ne bougent aucun commit ; un commit perdu reste à sa place.
+une branche créée, supprimée ou déplacée, un HEAD détaché, un tag ou une ref distante ne
+bougent aucun commit ; un commit perdu reste à sa place.
+
+Mémoire : la date d'un commit peut mentir (commit du collègue daté du setup, horloge
+reculée). Pour qu'un commit ajouté ne déplace jamais les autres, `place` reçoit le placement
+précédent (`previous`) : les commits déjà placés gardent leur case et leurs arêtes, seuls les
+nouveaux sont placés, autour d'eux. Le placement est repris de zéro seulement quand le passé
+change sous un commit déjà placé (rang différent, parent nouveau : dépôt approfondi) ; sans
+placement précédent (réouverture de l'espace), on retombe sur l'ordre par date.
 
 Garanties testées : une case (colonne, rang) porte au plus un nœud ; entre les deux rangs
 d'une arête, sa colonne ne croise ni nœud ni autre arête.
@@ -76,28 +82,56 @@ class _Grid:
         return column
 
 
-def place(commits: Iterable[Commit]) -> Layout:
-    """Place chaque commit ; un parent absent de `commits` (dépôt superficiel) est ignoré."""
+def _kept(
+    previous: Layout | None,
+    by_sha: dict[str, Commit],
+    parents: dict[str, list[str]],
+    rows: dict[str, int],
+) -> tuple[dict[str, Cell], list[Route]]:
+    """Cases et arêtes du placement précédent encore valides ; rien si le passé a changé."""
+    if previous is None:
+        return {}, []
+    cells = {sha: cell for sha, cell in previous.cells.items() if sha in by_sha}
+    for sha, cell in cells.items():
+        if rows[sha] != cell.row or any(p not in cells for p in parents[sha]):
+            return {}, []
+    routes = [r for r in previous.routes if r.child in cells and r.parent in cells]
+    wanted = {(sha, p) for sha in cells for p in parents[sha]}
+    if {(r.child, r.parent) for r in routes} != wanted:
+        return {}, []
+    return cells, routes
+
+
+def place(commits: Iterable[Commit], previous: Layout | None = None) -> Layout:
+    """Place chaque commit ; un parent absent de `commits` (dépôt superficiel) est ignoré.
+
+    `previous` : placement précédent ; ses commits encore présents gardent leur case.
+    """
     by_sha = {c.sha: c for c in commits}
     parents = {sha: [p for p in c.parents if p in by_sha] for sha, c in by_sha.items()}
     children: dict[str, list[str]] = {sha: [] for sha in by_sha}
-    waiting = {sha: len(set(ps)) for sha, ps in parents.items()}
     for sha, ps in parents.items():
         for parent in set(ps):
             children[parent].append(sha)
+    rows: dict[str, int] = {}
+    for sha in _topological(parents, children):
+        rows[sha] = 1 + max((rows[p] for p in parents[sha]), default=-1)
 
-    cells: dict[str, Cell] = {}
-    routes: list[Route] = []
-    order: list[str] = []
+    cells, routes = _kept(previous, by_sha, parents, rows)
     grid = _Grid()
+    for cell in cells.values():
+        grid.take(cell.column, cell.row, cell.row)
+    for route in routes:
+        grid.take(route.column, cells[route.parent].row + 1, cells[route.child].row - 1)
+    order = sorted(cells, key=lambda s: (cells[s].row, cells[s].column))
+    waiting = {sha: len({p for p in ps if p not in cells}) for sha, ps in parents.items()}
     ready: list[tuple[int, int, str]] = []
 
     def push(sha: str) -> None:
-        row = 1 + max((cells[p].row for p in parents[sha]), default=-1)
-        heapq.heappush(ready, (by_sha[sha].committer_ts, row, sha))
+        heapq.heappush(ready, (by_sha[sha].committer_ts, rows[sha], sha))
 
     for sha in sorted(by_sha):
-        if waiting[sha] == 0:
+        if sha not in cells and waiting[sha] == 0:
             push(sha)
     while ready:
         _, row, sha = heapq.heappop(ready)
@@ -128,3 +162,18 @@ def place(commits: Iterable[Commit]) -> Layout:
             if waiting[child] == 0:
                 push(child)
     return Layout(cells, routes, order)
+
+
+def _topological(parents: dict[str, list[str]], children: dict[str, list[str]]) -> list[str]:
+    """Les commits, chaque parent avant ses enfants."""
+    waiting = {sha: len(set(ps)) for sha, ps in parents.items()}
+    stack = sorted(sha for sha, count in waiting.items() if count == 0)
+    out: list[str] = []
+    while stack:
+        sha = stack.pop()
+        out.append(sha)
+        for child in children[sha]:
+            waiting[child] -= 1
+            if waiting[child] == 0:
+                stack.append(child)
+    return out

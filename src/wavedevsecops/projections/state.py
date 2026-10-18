@@ -3,7 +3,9 @@
 Commandes plumbing ou porcelain stables, en `LC_ALL=C`, jamais affichées : `for-each-ref`,
 `rev-list`, `status --porcelain=v2 -z`, `ls-files -s -z`, `ls-files -z`, `stash list` et
 `log -g` (reflog). Les tags annotés sont déréférencés par `for-each-ref` (`%(*objectname)`),
-ce qui évite un `cat-file` par tag.
+ce qui évite un `cat-file` par tag ; un tag de tag, qu'un git ancien ne déréférence que d'un
+niveau, l'est par `rev-parse`. Les sorties sont découpées sur `\n` ou NUL seulement :
+`splitlines()` couperait aussi sur U+0085, U+2028 ou U+2029, permis dans un nom de ref.
 
 Commits retenus : ceux qu'une ref (hors `refs/stash`) ou HEAD rend accessibles, comme
 `git log --all` sans le stash, puis ceux qu'un reflog cite encore sans qu'aucune ref n'y
@@ -65,12 +67,15 @@ def read_refs(git: Git, repo: Path) -> list[Ref]:
     """Refs du dépôt, triées par nom complet ; un tag annoté est déréférencé."""
     out = git.internal("for-each-ref", f"--format={_REF_FORMAT}", cwd=repo)
     found: list[Ref] = []
-    for line in out.splitlines():
+    for line in out.split("\n"):
         if not line:
             continue
         name, target, otype, peeled, ptype, symref, upstream = line.split("\0")
         kind, short = _ref_kind(name)
-        if peeled:
+        if ptype == "tag":
+            result = git.run("rev-parse", "--verify", "-q", f"{target}^{{commit}}", cwd=repo)
+            commit = result.stdout.strip() if result.ok else ""
+        elif peeled:
             commit = peeled if ptype == "commit" else ""
         else:
             commit = target if otype == "commit" else ""
@@ -170,22 +175,30 @@ def read_worktree(git: Git, repo: Path, status: Iterable[StatusEntry]) -> list[s
 
 def read_stash(git: Git, repo: Path) -> list[StashEntry]:
     """Entrées du stash, de `stash@{0}` à la plus ancienne."""
-    out = git.internal("stash", "list", "--format=%H%x1f%gs", cwd=repo)
+    out = git.internal("stash", "list", "--format=%H%x1f%gs%x00", cwd=repo)
     entries = []
-    for position, line in enumerate(line for line in out.splitlines() if line):
-        sha, _, message = line.partition("\x1f")
+    records = (record.lstrip("\n") for record in out.split("\0"))
+    for position, record in enumerate(record for record in records if record):
+        sha, _, message = record.partition("\x1f")
         entries.append(StashEntry(index=position, sha=sha, message=message))
     return entries
 
 
 def read_reflog(git: Git, repo: Path, names: Iterable[str]) -> list[str]:
-    """Commits cités par les reflogs de `names` (une ref sans reflog est ignorée)."""
-    shas: list[str] = []
-    for name in names:
-        result = git.run("log", "-g", "--format=%H", name, "--", cwd=repo)
-        if result.ok:
-            shas += [line for line in result.stdout.splitlines() if line]
-    return list(dict.fromkeys(shas))
+    """Commits cités par les reflogs de `names` (une ref sans reflog est ignorée).
+
+    Un seul `log -g` pour toutes les refs ; s'il échoue (un git qui refuserait une ref sans
+    reflog), une commande par ref.
+    """
+    names = list(names)
+    result = git.run("log", "-g", "--format=%H", *names, "--", cwd=repo)
+    outputs = [result.stdout] if result.ok else []
+    if not result.ok:
+        for name in names:
+            single = git.run("log", "-g", "--format=%H", name, "--", cwd=repo)
+            if single.ok:
+                outputs.append(single.stdout)
+    return list(dict.fromkeys(line for out in outputs for line in out.split("\n") if line))
 
 
 def read_commits(git: Git, repo: Path, *, empty: bool = False) -> dict[str, dict[str, str]]:

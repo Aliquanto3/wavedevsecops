@@ -141,3 +141,53 @@ def test_performance_quelques_centaines_de_commits() -> None:
     layout = place(commits)
     assert time.perf_counter() - started < 2.0
     check_invariants(layout, commits)
+
+
+def test_un_commit_ajoute_a_date_quelconque_ne_deplace_rien_avec_la_memoire() -> None:
+    """Revue 2.6 : la date du committer peut mentir ; la mémoire du placement l'absorbe."""
+    rng = random.Random(5)
+    moved_without_memory = 0
+    for trial in range(300):
+        commits = grow(rng, rng.randrange(2, 40))
+        parents = tuple(
+            rng.sample([c.subject for c in commits], k=min(len(commits), rng.choice((0, 1, 1, 2))))
+        )
+        added = commit(f"x{trial}", parents, rng.randrange(0, 1000 + 60 * len(commits)))
+        before = place(commits)
+        after = place([*commits, added], before)
+        check_invariants(after, [*commits, added])
+        for name, cell in before.cells.items():
+            assert after.cells[name] == cell, (trial, name)
+        assert {(r.child, r.parent, r.column) for r in before.routes} <= {
+            (r.child, r.parent, r.column) for r in after.routes
+        }
+        fresh = place([*commits, added])
+        moved_without_memory += any(fresh.cells[n] != c for n, c in before.cells.items())
+    assert moved_without_memory > 0  # le cas existe bien sans mémoire
+
+
+def test_memoire_ignoree_quand_le_passe_change() -> None:
+    commits = [commit("a", (), 1), commit("b", ("a",), 2)]
+    before = place([commits[1]])  # « a » absent : dépôt superficiel
+    after = place(commits, before)
+    check_invariants(after, commits)
+    assert after.cells == place(commits).cells
+
+
+def test_memoire_suite_de_commits_dates_au_hasard() -> None:
+    rng = random.Random(9)
+    commits = grow(rng, 120)
+    shuffled = [
+        commit(
+            c.subject,
+            [p for p in (x.subject for x in commits) if sha(p) in c.parents],
+            rng.randrange(0, 10_000),
+        )
+        for c in commits
+    ]
+    layout = place(shuffled[:1])
+    for size in range(2, len(shuffled) + 1):
+        grown = place(shuffled[:size], layout)
+        check_invariants(grown, shuffled[:size])
+        assert all(grown.cells[n] == c for n, c in layout.cells.items())
+        layout = grown
