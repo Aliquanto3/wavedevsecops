@@ -5,6 +5,7 @@ import { renderBadge, refreshBadge, renderDiagnosticPage } from "./diagnostic.js
 import { initDisplayMenu } from "./display.js";
 import { STOPPED_MESSAGE, watchHealth } from "./health.js";
 import { currentSurface, renderNav } from "./nav.js";
+import { renderReportEntry } from "./report.js";
 import { connectWorkspace, createStore } from "./store.js";
 import { getTrack, renderPathMenu, setTrack } from "./track.js";
 import "./views.js";
@@ -102,6 +103,7 @@ async function showCatalogue(container) {
         showCatalogue(container);
       },
     );
+    renderReportEntry(container);
   } catch (err) {
     message(container, (err && err.reasonText) || LOAD_FAILED);
   }

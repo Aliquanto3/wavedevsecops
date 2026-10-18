@@ -13,10 +13,12 @@ Contrat du catalogue (Story 6.1) : voir `6-1-choisir-son-parcours-et-parcourir-l
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import threading
 from concurrent.futures import Future
+from pathlib import Path
 from typing import Any, Literal
 
 import yaml
@@ -34,6 +36,7 @@ from wavedevsecops.engine import (
     parse_workspace_id,
     workspace_id_for,
 )
+from wavedevsecops.progress import report as progress_report
 from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
 from wavedevsecops.scenarios.order import SOCLE_SECTION, catalogue_rank
@@ -259,6 +262,43 @@ def tool_labels(settings: Settings) -> dict[str, str]:
     return {k: v.get("label", k) for k, v in tool_texts.items() if isinstance(v, dict)}
 
 
+REPORT_FONTS = (
+    ("atkinson-hyperlegible-400.woff2", "normal", 400),
+    ("atkinson-hyperlegible-700.woff2", "normal", 700),
+)
+"""Polices jointes au rapport HTML, en data URI : le fichier s'affiche hors ligne (AD-13)."""
+
+
+def report_font_css() -> str:
+    """`@font-face` des polices du rapport, intégrées au fichier ; vide si un fichier manque."""
+    fonts = Path(__file__).resolve().parent / "static" / "fonts"
+    rules = []
+    try:
+        for name, style, weight in REPORT_FONTS:
+            data = base64.b64encode((fonts / name).read_bytes()).decode("ascii")
+            rules.append(
+                '@font-face { font-family: "Atkinson Hyperlegible"; '
+                f"font-style: {style}; font-weight: {weight}; "
+                f'src: url("data:font/woff2;base64,{data}") format("woff2"); }}'
+            )
+    except OSError as error:
+        log.warning("Polices du rapport absentes (%s) : polices du système utilisées", error)
+        return ""
+    return "\n".join(rules)
+
+
+def report_data(settings: Settings) -> dict[str, Any]:
+    """Rapport de progression (Story 6.5) avec les titres des scénarios et les parcours.
+
+    Lit le disque : à appeler hors de la boucle d'événements.
+    """
+    titles = {
+        item.scenario.scenario_id: item.scenario.title_text for item in load_catalogue(settings)
+    }
+    tracks = {key: label for key, label, _ in TRACKS}
+    return progress_report.build_report(settings.resolved_data_dir(), titles=titles, tracks=tracks)
+
+
 
 def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, Any]:
     """Catalogue du `track` choisi ; sans parcours, seulement le choix du parcours.
@@ -354,6 +394,38 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         except AppError as error:  # progress.json illisible ou d'une version future
             return _refusal(500, f"{error.cause_text} {error.action_text}")
         return JSONResponse(body)
+
+    @app.get("/api/report")
+    async def report_preview() -> Response:
+        """`report-preview` : contenu du rapport et textes, calculés à la lecture."""
+        try:
+            body = await asyncio.to_thread(report_data, settings)
+        except AppError as error:  # progress.json illisible ou d'une version future
+            return _refusal(500, f"{error.cause_text} {error.action_text}")
+        return JSONResponse(body)
+
+    @app.get("/api/report/export")
+    async def report_export(format: str = "html") -> Response:
+        """Fichier du rapport (`html` ou `csv`) que l'apprenant enregistre : rien n'est envoyé."""
+        if format not in progress_report.EXPORT_NAMES:
+            return _refusal(422, "Ce format n'existe pas. Choisissez HTML ou CSV.")
+
+        def render() -> bytes:
+            data = report_data(settings)
+            if format == "csv":
+                return progress_report.render_csv(data)
+            return progress_report.render_html(data, report_font_css()).encode("utf-8")
+
+        try:
+            content = await asyncio.to_thread(render)
+        except AppError as error:
+            return _refusal(500, f"{error.cause_text} {error.action_text}")
+        name = progress_report.EXPORT_NAMES[format]
+        return Response(
+            content,
+            media_type=progress_report.EXPORT_TYPES[format],
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
 
     @app.post("/api/open")
     async def open_workspace(request: Request) -> Response:

@@ -233,6 +233,8 @@ def _run_window(url: str) -> bool:
         import webview
     except ImportError:
         return False
+    # Les exports du rapport (Story 6.5) passent par la boîte d'enregistrement du système.
+    webview.settings["ALLOW_DOWNLOADS"] = True
     webview.create_window("WaveDevSecOps", url)
     webview.start()
     return True
