@@ -16,6 +16,7 @@ from test_steps import WAIT, Box, _kinds
 from wavedevsecops import cli
 from wavedevsecops.config import Settings
 from wavedevsecops.engine import (
+    InvalidIntent,
     Operation,
     OperationRefused,
     WorkspaceManager,
@@ -287,7 +288,10 @@ def test_une_mauvaise_reponse_est_corrigee_une_seule_fois(make_box) -> None:
     kinds = [(f["kind"], f["step_id"], f.get("correct")) for f in _facts(box)]
     assert ("quiz_first_attempt", "qui_a_casse", False) in kinds
     assert ("step_validated", "qui_a_casse", None) in kinds
-    # Une seconde soumission sur la même étape est refusée (409), avec ou sans `step_id`.
+    # Sans `step_id`, le corps est invalide (422) : il viserait la désignation suivante.
+    with pytest.raises(InvalidIntent):
+        build_operation(box.engine, "answer_submit", {"slots": [culprit]})
+    # Une seconde soumission sur la même étape est refusée (409).
     with pytest.raises(OperationRefused) as again:
         build_operation(box.engine, "answer_submit", {"slots": [culprit], "step_id": "qui_a_casse"})
     assert again.value.reason_text == ALREADY_TEXT
@@ -340,7 +344,9 @@ def test_refus_connus_d_avance_sans_consommer_l_essai(make_box) -> None:
     # Étape 1 : ce n'est pas une désignation.
     with pytest.raises(OperationRefused) as none:
         build_operation(
-            box.engine, "answer_submit", {"slots": [_commit(box, "Ajoute l'application")]}
+            box.engine,
+            "answer_submit",
+            {"slots": [_commit(box, "Ajoute l'application")], "step_id": "creer_branche"},
         )
     assert none.value.reason_text == NOT_DESIGNATION_TEXT
     _to_first_designation(box)
@@ -348,7 +354,7 @@ def test_refus_connus_d_avance_sans_consommer_l_essai(make_box) -> None:
 
     def refused(**body) -> str:
         with pytest.raises(OperationRefused) as info:
-            build_operation(box.engine, "answer_submit", body)
+            build_operation(box.engine, "answer_submit", {"step_id": "qui_a_casse", **body})
         return info.value.reason_text
 
     assert "1 réponse" in refused(slots=[good, good])
@@ -404,13 +410,20 @@ def test_le_rejeu_apres_arret_brutal_rend_le_premier_essai(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
     _answer(box, [_commit(box, "Ajoute l'application")], step_id="qui_a_casse")
+    box.manager.sleep(box.engine.workspace_id)
     path = box.settings.resolved_data_dir() / "progress.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     data["facts"] = [f for f in data["facts"] if f["step_id"] != "qui_a_casse"]
     path.write_text(json.dumps(data), encoding="utf-8")
-    box.manager.sleep(box.engine.workspace_id)
     box.manager.get(box.engine.workspace_id)
-    kinds = [(f["kind"], f["step_id"], f.get("correct")) for f in _facts(box)]
+    # Le rejeu tourne dans le fil de l'espace, au réveil : on l'attend.
+    deadline = time.monotonic() + WAIT
+    kinds: list[tuple] = []
+    while time.monotonic() < deadline:
+        kinds = [(f["kind"], f["step_id"], f.get("correct")) for f in _facts(box)]
+        if ("step_validated", "qui_a_casse", None) in kinds:
+            break
+        time.sleep(0.05)
     assert ("quiz_first_attempt", "qui_a_casse", False) in kinds
     assert ("step_validated", "qui_a_casse", None) in kinds
 
@@ -505,11 +518,19 @@ def test_http_resolve_sha_et_seconde_soumission_en_409(
     assert status == 404 and "Aucun commit" in body["reason_text"]
     # Étape 1 (créer la branche) : pas de désignation attendue, 409 en français.
     status, body = _http(
-        instance, "POST", f"/api/ws/{ws}/answer_submit", cookie, {"slots": [f"commit:{sha}"]}
+        instance,
+        "POST",
+        f"/api/ws/{ws}/answer_submit",
+        cookie,
+        {"slots": [f"commit:{sha}"], "step_id": "creer_branche"},
     )
     assert status == 409 and body["reason_text"] == NOT_DESIGNATION_TEXT
-    # Corps invalide : 422.
+    # Corps invalide : 422 (`slots` vide, ou `step_id` absent).
     status, _ = _http(instance, "POST", f"/api/ws/{ws}/answer_submit", cookie, {"slots": []})
+    assert status == 422
+    status, _ = _http(
+        instance, "POST", f"/api/ws/{ws}/answer_submit", cookie, {"slots": [f"commit:{sha}"]}
+    )
     assert status == 422
     # Étape 2 atteinte par une vraie commande : une réponse (202), puis la seconde (409).
     line = {"line": "git switch -c feature"}

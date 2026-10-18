@@ -371,3 +371,28 @@ console.log(JSON.stringify({ transient, closed: store.state.errorText, expected:
     data = json.loads(out)
     assert data["transient"] == ""
     assert data["closed"] == data["expected"]
+
+
+def test_seconde_projection_d_une_operation_ne_relance_pas_l_annonce(tmp_path: Path) -> None:
+    """Story 5.2 : la file republie les vues re-marquées (même empreinte, même op_id) ; l'annonce
+    déjà lue reste le même objet, une commande suivante à la même empreinte est annoncée."""
+    out = _run(
+        tmp_path,
+        """
+import { createStore } from "@JS@/store.js";
+const store = createStore();
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 1, epoch: 1, state: "idle",
+  fingerprint: "f0", views: {} });
+const env = (seq, op_id, fingerprint) => ({ boot_id: "b", seq, epoch: 1, op_id, kind: "state_projected",
+  payload: { views: { announce_text: "Aucun changement." }, fingerprint } });
+store.applyEvent(env(2, "op1", "f1"));
+const first = store.state.announce;
+store.applyEvent(env(3, "op1", "f1"));
+const again = store.state.announce;
+store.applyEvent(env(4, "op2", "f1"));
+const next = store.state.announce;
+console.log(JSON.stringify({ kept: first === again, text: first && first.text,
+  renewed: next !== first && next.text === "Aucun changement." }));
+""",
+    )
+    assert json.loads(out) == {"kept": True, "text": "Aucun changement.", "renewed": True}

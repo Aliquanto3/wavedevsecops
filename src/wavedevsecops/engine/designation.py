@@ -1,6 +1,6 @@
 """Désignation côté serveur, en un seul essai (Story 5.2, AD-2, AD-14, AD-17).
 
-- `answer_submit{slots: [element_id], step_id?}` : corrige la désignation de l'étape courante
+- `answer_submit{slots: [element_id], step_id}` : corrige la désignation de l'étape courante
   (type `designate`) contre le `RepoState` courant, émet `answer_corrected`, consigne la
   réponse dans `run.json["answers"]` (le premier essai, jamais remplacé) ; la validation
   d'étape ferme alors l'étape et son fait `quiz_first_attempt` part avec `step_validated`.
@@ -181,8 +181,9 @@ class AnswerSubmit(BaseModel):
     """Corps de `answer_submit` : un `element_id` par case, dans l'ordre des cases."""
 
     slots: list[str] = Field(min_length=1, max_length=20)
-    step_id: str = Field(default="", max_length=100)
-    """Étape visée (facultatif) : permet de dire « déjà répondu » après la fermeture de l'étape."""
+    step_id: str = Field(min_length=1, max_length=100)
+    """Étape visée, obligatoire : sans elle, un second envoi parti après la fermeture de l'étape
+    serait corrigé contre la désignation suivante et y consommerait l'unique essai."""
 
 
 def _scenario(engine: WorkspaceEngine, run: dict[str, Any]) -> Scenario | None:
@@ -203,10 +204,8 @@ def _verify(
     step = _current_step(scenario, run)
     answers = run.get("answers") or {}
     if step is None or step.type != "designate":
-        validated = run.get("validated") or []
-        previous = body.step_id or (validated[-1] if validated else "")
-        raise OperationRefused(ALREADY_TEXT if previous in answers else NOT_DESIGNATION_TEXT)
-    if body.step_id and body.step_id != step.step_id:
+        raise OperationRefused(ALREADY_TEXT if body.step_id in answers else NOT_DESIGNATION_TEXT)
+    if body.step_id != step.step_id:
         raise OperationRefused(ALREADY_TEXT if body.step_id in answers else NOT_DESIGNATION_TEXT)
     if step.step_id in answers:
         return step  # arrêt entre l'écriture de la réponse et la fermeture : on termine
@@ -334,6 +333,5 @@ __all__ = [
     "describe",
     "mark_views",
     "register_intents",
-
     "resolve_sha",
 ]

@@ -24,6 +24,7 @@ function initial() {
     stepPanel: null, // panneau Scénario écrit par le serveur (étapes, étape courante)
     verdict: null, // dernier step_verdict de l'espace ; null après un rechargement
     announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
+    projectedOp: null, // op_id de la dernière state_projected (seconde projection d'une op)
     restored: false, // vrai entre un rétablissement réussi et la commande suivante
   };
 }
@@ -121,6 +122,7 @@ export function createStore() {
         stepPanel: snapshot.step_panel || null,
         verdict: null,
         announce: null, // l'ouverture n'est pas une commande
+        projectedOp: null,
       });
     },
     fail(errorText) {
@@ -148,14 +150,22 @@ export function createStore() {
         if (payload.state === "command") patch.restored = false;
       } else if (envelope.kind === "state_projected") {
         const problems = [];
+        const fingerprint = payload.fingerprint || "";
+        // Seconde projection d'une même opération, à la même empreinte (marques `designable` de
+        // l'étape suivante, story 5.2) : le dépôt n'a pas changé, l'annonce lue n'est pas relancée.
+        const same =
+          Boolean(envelope.op_id) &&
+          envelope.op_id === state.projectedOp &&
+          fingerprint === state.fingerprint;
+        patch.projectedOp = envelope.op_id || null;
         patch.views = acceptViews(payload.views, problems);
-        patch.fingerprint = payload.fingerprint || "";
+        patch.fingerprint = fingerprint;
         patch.problems = problems;
         const text = (payload.views && payload.views.announce_text) || "";
         // Une commande est une opération de l'apprenant : ni l'ouverture (sans op_id) ni un
         // changement venu de l'extérieur (annoncé juste avant par `external_change`).
         const command = Boolean(envelope.op_id) && !externalOps.delete(envelope.op_id);
-        patch.announce = text ? { text, command } : null;
+        patch.announce = same ? state.announce : text ? { text, command } : null;
       } else if (envelope.kind === "external_change") {
         if (envelope.op_id) externalOps.add(envelope.op_id);
       } else if (envelope.kind === "terminal_output") {
