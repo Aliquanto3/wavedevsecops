@@ -3,6 +3,7 @@
 // terminal) arrive avec leurs stories ; la disposition ne connaît aucune de ces vues.
 import { richText } from "./dom.js";
 import { registerPane } from "./panes.js";
+import { renderCode } from "./code.js";
 import { renderRepo } from "./repo.js";
 import { EMPTY, renderTerminal } from "./terminal.js";
 
@@ -60,7 +61,7 @@ registerPane({
   id: "code",
   title: "Code",
   subtitle: "Fichiers du bac à sable, diff et éditeur",
-  elementTypes: ["path", "commit", "pr"],
+  elementTypes: ["path", "commit", "pr", "diffline"],
   row: 2,
   rowShare: 33,
   scroll: "both",
@@ -69,7 +70,7 @@ registerPane({
     title: "Rien à afficher.",
     text: "Sélectionnez un fichier, un commit ou une PR pour voir son contenu.",
   },
-  render,
+  render: (body, ctx) => renderCode(body, ctx, renderEmpty),
 });
 
 registerPane({

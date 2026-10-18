@@ -237,6 +237,32 @@ def iter_files(root: Path) -> list[str]:
     return sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
 
 
+CODE_SKIP_DIRS = frozenset({".venv", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache"})
+"""Dossiers générés que la vue Code ne liste pas (jamais édités à la main)."""
+CODE_FILE_LIMIT = 2000
+CODE_READ_LIMIT = 512 * 1024
+"""Taille au-delà de laquelle la vue Code n'ouvre pas un fichier dans l'éditeur."""
+
+
+def code_files(root: Path, limit: int = CODE_FILE_LIMIT) -> tuple[list[str], bool]:
+    """Fichiers de l'arbre de travail pour la vue Code : chemins posix triés, hors `.git/` et
+    dossiers générés, liens non suivis ; et vrai si la liste a été coupée à `limit`."""
+    base = root.resolve()
+    found: list[str] = []
+    for directory, dirs, names in os.walk(base):
+        dirs[:] = [
+            d
+            for d in sorted(dirs)
+            if not _is_git_dir(d) and d not in CODE_SKIP_DIRS and not _is_link(Path(directory, d))
+        ]
+        for name in sorted(names):
+            if len(found) >= limit:
+                return sorted(found), True
+            if not _is_link(Path(directory, name)):
+                found.append(Path(directory, name).relative_to(base).as_posix())
+    return sorted(found), False
+
+
 def canonical_json(data: Any) -> str:
     """JSON trié, indenté, UTF-8 et LF, terminé par un saut de ligne (convention du spine)."""
     return json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2) + "\n"

@@ -25,8 +25,9 @@ from fastapi.staticfiles import StaticFiles
 from wavedevsecops import diagnostic, osv, terminal
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
-from wavedevsecops.engine import WorkspaceManager, designation, pr_intents
+from wavedevsecops.engine import WorkspaceManager, code_intents, designation, pr_intents
 from wavedevsecops.web.catalogue import install_catalogue_routes
+from wavedevsecops.web.code import install_code_routes
 from wavedevsecops.web.exercise import register_exercise_intent
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces, track_options
 from wavedevsecops.web.workspaces import install_workspace_routes
@@ -208,12 +209,14 @@ def create_app(
     terminal.register_intents()
     pr_intents.register_intents()
     designation.register_intents()
+    code_intents.register_intents()
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
     register_exercise_intent()
     workspaces = workspaces or WorkspaceManager(settings)
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)
+    install_code_routes(app, workspaces)
     install_catalogue_routes(app, workspaces, settings)
     app.add_api_route(
         "/espace/{workspace_id}", shell_page, methods=["GET"], include_in_schema=False

@@ -1,0 +1,456 @@
+// Vue « Code » (story 2.8) : fichiers du bac à sable, éditeur et diff.
+// Le serveur lit et projette (AD-2) : liste des fichiers, contenu avec son empreinte (`base_hash`),
+// diff avec les `element_id`, numéros et noms accessibles de chaque ligne. Le front met en forme et
+// garde l'état d'édition (tampons non enregistrés). Toute écriture est l'intention `save_file` : elle
+// passe par la file d'opérations, et un disque qui a changé la refuse (409), d'où le choix
+// « Garder ma version » / « Recharger ».
+import { el } from "./dom.js";
+import { conflictLines, createEditor, CONFLICT_MARK } from "./editor.js";
+import { selectionFor } from "./selection.js";
+
+export const MARKER = { added: "+", removed: "−", context: " " };
+export const KIND_CLASS = { added: "is-added", removed: "is-removed", context: "is-context" };
+export const UNSAVED_TEXT = "non enregistré";
+export const SAVED_TEXT = "Enregistré";
+export const CONFLICT_TEXT = "Le fichier a changé sur le disque depuis son ouverture.";
+export const KEEP_TEXT = "Garder ma version";
+export const RELOAD_TEXT = "Recharger";
+export const SAVE_TEXT = "Enregistrer";
+export const OPEN_EXTERNAL_TEXT = "Ouvrir dans mon éditeur";
+export const OFFLINE_TEXT = "WaveDevSecOps ne répond pas. Rechargez la page.";
+export const NO_FILE = {
+  title: "Aucun fichier ouvert.",
+  text: "Choisissez un fichier dans la liste pour le modifier.",
+};
+export const WORKTREE = "worktree";
+const SETTLE_TRIES = 20;
+
+function text(tag, className, value) {
+  const node = el(tag, className);
+  node.textContent = value;
+  return node;
+}
+
+function button(label, className, onClick) {
+  const node = el("button", className, { type: "button" });
+  node.textContent = label;
+  node.addEventListener("click", onClick);
+  return node;
+}
+
+/** « Commit a1b2c3d » pour une sélection `commit:<sha>`, sinon l'arbre de travail. */
+export function diffTarget(selected) {
+  return selected && selected.startsWith("commit:") ? selected.slice("commit:".length) : WORKTREE;
+}
+
+/** Corps d'un diff (en-têtes de fichier, blocs, lignes) : chacun focalisable, 24 px de haut. */
+export function buildDiff(diff) {
+  const wrap = el("div", "diff-view", { role: "group", "aria-label": diff.target_text });
+  if (!diff.files.length) {
+    wrap.append(text("p", "empty", diff.empty_text));
+    return wrap;
+  }
+  for (const file of diff.files) {
+    const group = el("div", "diff-file");
+    const head = el("div", "diff-file-header", {
+      tabindex: "-1",
+      "data-roving": true,
+      "data-element-id": file.element_id,
+      "aria-label": file.a11y_name_text,
+    });
+    head.append(text("code", "diff-path", file.path), text("span", "diff-meta", file.summary_text));
+    group.append(head);
+    for (const hunk of file.hunks) {
+      group.append(text("div", "diff-hunk", hunk.header_text));
+      for (const line of hunk.lines) {
+        const row = el("div", `diff-line ${KIND_CLASS[line.kind]}${line.conflict ? " is-conflict" : ""}`, {
+          tabindex: "-1",
+          "data-roving": true,
+          "data-element-id": line.element_id,
+          "aria-label": line.a11y_name_text,
+        });
+        const numbers = text("span", "diff-no", String(line.new_no ?? line.old_no ?? ""));
+        numbers.setAttribute("aria-hidden", "true");
+        const marker = text("span", "diff-marker", MARKER[line.kind]);
+        marker.setAttribute("aria-hidden", "true");
+        const body = text("span", "diff-text", line.text);
+        row.append(numbers, marker, body);
+        if (line.conflict) row.append(text("span", "diff-conflict-mark", `${CONFLICT_MARK} conflit`));
+        group.append(row);
+      }
+    }
+    wrap.append(group);
+  }
+  if (diff.truncated) wrap.append(text("p", "empty", diff.truncated_text));
+  return wrap;
+}
+
+export function renderCode(body, ctx, renderEmpty, options = {}) {
+  const { store } = ctx;
+  const selection = selectionFor(store);
+  const send = (...args) => (options.fetch || globalThis.fetch)(...args);
+  const settleMs = options.settleMs ?? 150;
+  const base = () => `/api/ws/${encodeURIComponent(store.state.workspaceId)}`;
+
+  // État d'édition : un tampon par fichier ouvert, gardé tant que la vue vit.
+  const buffers = new Map(); // chemin → { content, saved, hash, editable, note, conflict }
+  let files = [];
+  let truncated = false;
+  let current = null; // chemin ouvert
+  let mode = "file"; // « file » ou « diff »
+  let drawnViews;
+  let diffToken = 0;
+
+  const root = el("div", "code-view");
+  const nav = el("nav", "code-files", { "aria-label": "Fichiers du bac à sable" });
+  const main = el("div", "code-main");
+  root.append(nav, main);
+  body.replaceChildren(root);
+
+  const modes = el("div", "code-modes", { role: "group", "aria-label": "Affichage" });
+  const fileTab = button("Fichier", "code-mode", () => setMode("file"));
+  const diffTab = button("Diff", "code-mode", () => setMode("diff"));
+  modes.append(fileTab, diffTab);
+  const filePanel = el("div", "code-panel code-file-panel");
+  const diffPanel = el("div", "code-panel code-diff-panel");
+  const status = el("p", "code-status", { "aria-live": "polite" });
+  main.append(modes, status, filePanel, diffPanel);
+
+  const editor = createEditor({ onChange: onEdit, onSave: save });
+  const title = el("div", "code-file-title");
+  const pathLabel = el("code", "code-path");
+  const unsaved = text("span", "code-unsaved", "");
+  title.append(pathLabel, unsaved);
+  const saveButton = button(SAVE_TEXT, "code-save", () => save());
+  const externalButton = button(OPEN_EXTERNAL_TEXT, "code-external", () => openExternal());
+  const actions = el("div", "code-actions");
+  actions.append(saveButton, externalButton);
+  const conflictBar = el("div", "code-conflict", { role: "alert", hidden: true });
+  const conflictMsg = el("p", "code-conflict-text");
+  const keepButton = button(KEEP_TEXT, "code-keep", () => keepMine());
+  const reloadButton = button(RELOAD_TEXT, "code-reload", () => reloadTheirs());
+  conflictBar.append(conflictMsg, keepButton, reloadButton);
+  const markers = el("p", "code-markers", { hidden: true });
+  const note = el("p", "empty code-note", { hidden: true });
+  const empty = el("div", "code-empty");
+  renderEmpty(empty, NO_FILE);
+  filePanel.append(empty, title, actions, conflictBar, markers, note, editor.root);
+
+  function say(message) {
+    status.textContent = message || "";
+  }
+
+  async function failure(response, fallback) {
+    try {
+      return (await response.json()).reason_text || fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function isDirty(path) {
+    const buffer = buffers.get(path);
+    return Boolean(buffer && buffer.editable && buffer.content !== buffer.saved);
+  }
+
+  // --- liste des fichiers ----------------------------------------------------------------
+  function drawFiles() {
+    const focusedPath = document.activeElement?.getAttribute?.("data-path");
+    const list = el("ul", "code-file-list");
+    for (const path of files) {
+      const item = el("li", "code-file-item");
+      const open = el("button", `code-file${path === current ? " is-open" : ""}`, {
+        type: "button",
+        "data-path": path,
+        "aria-pressed": String(path === current),
+      });
+      open.append(text("code", "code-file-name", path));
+      if (isDirty(path)) {
+        const dot = text("span", "dirty-dot", "●");
+        dot.setAttribute("aria-hidden", "true");
+        open.append(dot, text("span", "visually-hidden", ` ${UNSAVED_TEXT}`));
+      }
+      item.append(open);
+      list.append(item);
+    }
+    nav.replaceChildren(list);
+    if (truncated) nav.append(text("p", "empty", "La liste est coupée : utilisez « ls » dans le terminal."));
+    settleRoving(focusedPath);
+  }
+
+  nav.addEventListener("click", (event) => {
+    const target = event.target.closest && event.target.closest("[data-path]");
+    if (target) openFile(target.getAttribute("data-path"));
+  });
+
+  /** Un seul arrêt de tabulation par vue (workspace.js) : les nôtres ne le sont que si nul autre ne l'est. */
+  function settleRoving(preferredPath) {
+    const mine = [...root.querySelectorAll("button, [data-roving]")];
+    for (const node of mine) node.setAttribute("tabindex", "-1");
+    const section = body.parentElement;
+    const others = section
+      ? [...section.querySelectorAll("button, [data-roving]")].filter((node) => !root.contains(node))
+      : [];
+    if (others.some((node) => node.getAttribute("tabindex") === "0") || mine.length === 0) return;
+    const chosen =
+      mine.find((node) => node.getAttribute("data-path") === preferredPath) ||
+      mine.find((node) => node.getAttribute("aria-pressed") === "true") ||
+      mine[0];
+    chosen.setAttribute("tabindex", "0");
+  }
+
+  async function loadTree() {
+    try {
+      const response = await send(`${base()}/code/tree`, { cache: "no-store", credentials: "same-origin" });
+      if (!response.ok) return;
+      const data = await response.json();
+      files = data.files;
+      truncated = Boolean(data.truncated);
+      drawFiles();
+    } catch (err) {
+      say(OFFLINE_TEXT);
+    }
+  }
+
+  // --- éditeur ---------------------------------------------------------------------------
+  function drawFile() {
+    const buffer = current && buffers.get(current);
+    empty.hidden = Boolean(buffer);
+    for (const node of [title, actions, editor.root]) node.hidden = !buffer;
+    if (!buffer) {
+      conflictBar.hidden = true;
+      markers.hidden = true;
+      note.hidden = true;
+      return;
+    }
+    pathLabel.textContent = current;
+    const dirty = isDirty(current);
+    unsaved.textContent = dirty ? `● ${UNSAVED_TEXT}` : "";
+    unsaved.className = dirty ? "code-unsaved is-dirty" : "code-unsaved";
+    saveButton.hidden = !buffer.editable;
+    editor.root.hidden = !buffer.editable;
+    note.hidden = buffer.editable;
+    note.textContent = buffer.note || "";
+    conflictBar.hidden = !buffer.conflict;
+    conflictMsg.textContent = buffer.conflict ? CONFLICT_TEXT : "";
+    const lines = buffer.editable ? conflictLines(buffer.content) : [];
+    markers.hidden = lines.length === 0;
+    markers.textContent = lines.length
+      ? `${CONFLICT_MARK} Marqueurs de conflit aux lignes ${lines.join(", ")} : modifiez le texte, puis enregistrez.`
+      : "";
+  }
+
+  function onEdit(value) {
+    const buffer = buffers.get(current);
+    if (!buffer) return;
+    buffer.content = value;
+    say("");
+    drawFile();
+    drawFiles();
+  }
+
+  async function fetchFile(path) {
+    const response = await send(`${base()}/code/file?path=${encodeURIComponent(path)}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error(await failure(response, "Ce fichier n'a pas pu être lu."));
+    return response.json();
+  }
+
+  async function openFile(path) {
+    setMode("file");
+    if (!buffers.has(path)) {
+      try {
+        const file = await fetchFile(path);
+        buffers.set(path, {
+          content: file.content,
+          saved: file.content,
+          hash: file.hash,
+          editable: file.editable,
+          note: file.note_text,
+          conflict: null,
+        });
+      } catch (err) {
+        say(err.message === "Failed to fetch" ? OFFLINE_TEXT : err.message);
+        return;
+      }
+    }
+    current = path;
+    editor.setValue(buffers.get(path).content);
+    editor.setReadOnly(!buffers.get(path).editable);
+    say("");
+    drawFile();
+    drawFiles();
+  }
+
+  async function post(intent, payload) {
+    return send(`${base()}/${intent}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** Attend que le disque porte `content` (la file écrit après le 202), puis aligne l'empreinte. */
+  async function settle(path, content) {
+    for (let attempt = 0; attempt < SETTLE_TRIES; attempt += 1) {
+      const file = await fetchFile(path);
+      if (file.content === content) return file;
+      await new Promise((resolve) => setTimeout(resolve, settleMs));
+    }
+    return null;
+  }
+
+  async function save() {
+    const path = current;
+    const buffer = path && buffers.get(path);
+    if (!buffer || !buffer.editable) return;
+    const sent = buffer.content;
+    say("");
+    try {
+      const response = await post("save_file", { path, content: sent, base_hash: buffer.hash });
+      if (response.status === 409) {
+        const reason = await failure(response, CONFLICT_TEXT);
+        const disk = await fetchFile(path).catch(() => null);
+        if (disk && disk.hash !== buffer.hash) {
+          buffer.conflict = { hash: disk.hash, content: disk.content };
+          say("");
+        } else {
+          say(reason);
+        }
+        drawFile();
+        return;
+      }
+      if (!response.ok) {
+        say(await failure(response, "L'enregistrement a échoué. Réessayez."));
+        return;
+      }
+      const written = await settle(path, sent.replace(/\r\n?/g, "\n"));
+      if (!written) {
+        // La file a refusé l'écriture (le disque a bougé entre-temps) : on relit l'état réel.
+        const disk = await fetchFile(path).catch(() => null);
+        if (disk && disk.hash !== buffer.hash) buffer.conflict = { hash: disk.hash, content: disk.content };
+        else say("L'enregistrement n'a pas abouti. Réessayez.");
+        drawFile();
+        return;
+      }
+      buffer.hash = written.hash;
+      buffer.saved = written.content;
+      buffer.conflict = null;
+      if (buffer.content === sent) buffer.content = written.content;
+      say(`${SAVED_TEXT} : ${path}.`);
+      drawFile();
+      drawFiles();
+    } catch (err) {
+      say(OFFLINE_TEXT);
+    }
+  }
+
+  function keepMine() {
+    const buffer = buffers.get(current);
+    if (!buffer || !buffer.conflict) return;
+    buffer.hash = buffer.conflict.hash; // j'écrase en connaissance de cause
+    buffer.conflict = null;
+    drawFile();
+    save();
+  }
+
+  function reloadTheirs() {
+    const buffer = buffers.get(current);
+    if (!buffer || !buffer.conflict) return;
+    buffer.hash = buffer.conflict.hash;
+    buffer.content = buffer.conflict.content;
+    buffer.saved = buffer.conflict.content;
+    buffer.conflict = null;
+    editor.setValue(buffer.content);
+    say(`Fichier rechargé depuis le disque : ${current}.`);
+    drawFile();
+    drawFiles();
+  }
+
+  async function openExternal() {
+    if (!current) return;
+    try {
+      const response = await post("open_external", { path: current });
+      if (!response.ok) say(await failure(response, "Le fichier n'a pas pu être ouvert."));
+    } catch (err) {
+      say(OFFLINE_TEXT);
+    }
+  }
+
+  /** Après une modification venue d'ailleurs (terminal, éditeur externe) : relit un fichier propre. */
+  async function refreshOpen() {
+    const path = current;
+    const buffer = path && buffers.get(path);
+    if (!buffer || isDirty(path)) return;
+    try {
+      const file = await fetchFile(path);
+      if (file.hash !== buffer.hash && current === path && !isDirty(path)) {
+        Object.assign(buffer, { content: file.content, saved: file.content, hash: file.hash });
+        editor.setValue(file.content);
+        drawFile();
+      }
+    } catch (err) {
+      // Fichier supprimé ou illisible : le tampon reste, l'enregistrement dira ce qui s'est passé.
+    }
+  }
+
+  // --- diff ------------------------------------------------------------------------------
+  async function loadDiff() {
+    const token = (diffToken += 1);
+    const target = diffTarget(selection.value);
+    try {
+      const response = await send(`${base()}/code/diff?target=${encodeURIComponent(target)}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (token !== diffToken) return;
+      if (!response.ok) {
+        diffPanel.replaceChildren(text("p", "empty", await failure(response, "Le diff n'a pas pu être lu.")));
+        return;
+      }
+      const diff = await response.json();
+      if (token !== diffToken) return;
+      const header = el("div", "diff-target");
+      header.append(text("span", "diff-target-text", diff.target_text));
+      if (target !== WORKTREE) {
+        header.append(button("Arbre de travail", "diff-worktree", () => selection.set(null)));
+      }
+      diffPanel.replaceChildren(header, buildDiff(diff));
+      settleRoving();
+    } catch (err) {
+      if (token === diffToken) say(OFFLINE_TEXT);
+    }
+  }
+
+  function setMode(next) {
+    mode = next;
+    filePanel.hidden = mode !== "file";
+    diffPanel.hidden = mode !== "diff";
+    fileTab.setAttribute("aria-pressed", String(mode === "file"));
+    diffTab.setAttribute("aria-pressed", String(mode === "diff"));
+    if (mode === "diff") loadDiff();
+    settleRoving();
+  }
+
+  // Sélectionner un commit (graphe, liste) montre son diff ; effacer la sélection, l'arbre de travail.
+  selection.subscribe((value) => {
+    if (value && value.startsWith("commit:")) setMode("diff");
+    else if (mode === "diff") loadDiff();
+  });
+
+  store.subscribe((state) => {
+    if (state.views === drawnViews) return;
+    drawnViews = state.views;
+    if (!state.workspaceId) return;
+    loadTree();
+    refreshOpen();
+    if (mode === "diff") loadDiff();
+  });
+
+  drawFile();
+  setMode("file");
+  return { openFile, save, setMode, buffers };
+}
