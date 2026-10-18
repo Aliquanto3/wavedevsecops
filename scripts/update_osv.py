@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 import tomllib
 import urllib.request
@@ -75,27 +76,38 @@ def write_json(path: Path, value: object) -> None:
 
 
 def update(packages: list[str], extracted_on: str, out: Path = OSV_DIR) -> dict:
-    vulns_dir = out / "vulns"
-    vulns_dir.mkdir(parents=True, exist_ok=True)
-    for old in vulns_dir.glob("*.json"):
-        old.unlink()
-    index: dict[str, list[str]] = {}
-    for name in packages:
-        ids: set[str] = set()
-        for record in query_package(name):
-            if record.get("withdrawn"):
-                continue
-            write_json(vulns_dir / f"{record['id']}.json", record)
-            ids.add(record["id"])
-        index[name] = sorted(ids)
-        print(f"{name}: {len(ids)} enregistrement(s)")
-    meta = {
-        "extracted_on": extracted_on,
-        "source": SOURCE,
-        "license": "CC-BY-4.0 (voir ATTRIBUTION.md)",
-        "packages": index,
-    }
-    write_json(out / "index.json", meta)
+    """Écrit le nouvel extrait à part, puis l'échange : une coupure laisse l'ancien intact."""
+    out.mkdir(parents=True, exist_ok=True)
+    staging = out / ".update"
+    shutil.rmtree(staging, ignore_errors=True)
+    (staging / "vulns").mkdir(parents=True)
+    try:
+        index: dict[str, list[str]] = {}
+        for name in packages:
+            ids: set[str] = set()
+            for record in query_package(name):
+                if record.get("withdrawn"):
+                    continue
+                write_json(staging / "vulns" / f"{record['id']}.json", record)
+                ids.add(record["id"])
+            index[name] = sorted(ids)
+            print(f"{name}: {len(ids)} enregistrement(s)")
+        meta = {
+            "extracted_on": extracted_on,
+            "source": SOURCE,
+            "license": "CC-BY-4.0 (voir ATTRIBUTION.md)",
+            "packages": index,
+        }
+        write_json(staging / "index.json", meta)
+        old = out / ".old-vulns"
+        shutil.rmtree(old, ignore_errors=True)
+        if (out / "vulns").exists():
+            (out / "vulns").replace(old)
+        (staging / "vulns").replace(out / "vulns")
+        (staging / "index.json").replace(out / "index.json")
+        shutil.rmtree(old, ignore_errors=True)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     return meta
 
 

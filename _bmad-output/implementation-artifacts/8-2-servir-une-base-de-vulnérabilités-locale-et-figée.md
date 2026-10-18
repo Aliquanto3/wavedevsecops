@@ -35,3 +35,13 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 8.2 ».
 - Licence : l'attribution est générale (CC-BY 4.0) ; les sources autres que GHSA et PYSEC, absentes de l'extrait actuel, n'y sont pas détaillées.
 
 ## Revue
+
+Revue unique (Opus), après rebase sur `main` (story 2.2 : conflit de cumul dans `web/app.py`, les deux ajouts gardés). Second avis : Haiku.
+
+- **medium** · second avis · corrigé — `await request.body()` lisait tout le corps avant la limite ; le point est public et une page web peut y poster (`text/plain`, sans preflight). Désormais : `Content-Length` annoncé au-delà de 64 Ko refusé (413) sans lecture, flux lu par morceaux et coupé à 64 Ko + 1 (cas `chunked`). En plus, une requête portant un `Origin` étranger est refusée (403) : pip-audit n'en envoie jamais, un navigateur toujours, ce qui ferme la voie « POST simple » d'une page web.
+- medium (sous-constat) · second avis · rejeté — exiger `Content-Type: application/json` : pip-audit 2.10.1 poste `data=json.dumps(...)` sans `Content-Type` (`pip_audit/_service/osv.py`), ce contrôle le casserait. Le refus d'un `Origin` étranger couvre le même risque.
+- low · second avis · corrigé — JSON très imbriqué : `RecursionError` donnait un 500 ; désormais 400.
+- low · second avis · corrigé — partie locale ignorée (`1.0+local` égal à `1.0`) : faux positif après `last_affected: 1.0`. La clé d'ordre porte maintenant la partie locale selon PEP 440 ; tests avec `packaging` comme oracle.
+- low · second avis · corrigé — évènement de plage illisible ignoré (faux négatif possible) : échec fermé, la version est jugée affectée ; version demandée illisible avec plages : affectée. La liste `versions` est aussi comparée en PEP 440 (`1.0` = `1.0.0`).
+- low · second avis · corrigé — `update_osv.py` effaçait `vulns/` avant les requêtes : le nouvel extrait s'écrit dans `.update/` puis est échangé ; une coupure réseau laisse l'ancien extrait entier (test avec réseau simulé).
+- info · revue · noté — le test `chunked` passe aussi sur l'ancien code (il prouve le 413, pas la borne mémoire) ; la borne tient à la lecture par `request.stream()`.

@@ -25,7 +25,7 @@ _VERSION = re.compile(
     (?:[-_.]?(?P<pre_l>alpha|a|beta|b|preview|pre|c|rc)[-_.]?(?P<pre_n>\d+)?)?
     (?:(?:-(?P<post_n1>\d+))|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>\d+)?))?
     (?:[-_.]?(?P<dev_l>dev)[-_.]?(?P<dev_n>\d+)?)?
-    (?:\+[a-z0-9]+(?:[-_.][a-z0-9]+)*)?\s*$""",
+    (?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?\s*$""",
     re.VERBOSE | re.IGNORECASE,
 )
 _PRE = {"alpha": "a", "a": "a", "beta": "b", "b": "b", "preview": "rc", "pre": "rc", "c": "rc"}
@@ -38,7 +38,7 @@ def normalize(name: str) -> str:
 
 
 def version_key(text: str) -> tuple | None:
-    """Clé d'ordre PEP 440 d'une version (sans la partie locale), ou `None` si illisible."""
+    """Clé d'ordre PEP 440 d'une version (partie locale comprise), ou `None` si illisible."""
     m = _VERSION.match(text)
     if m is None:
         return None
@@ -63,19 +63,33 @@ def version_key(text: str) -> tuple | None:
         pre_key,
         -1 if post is None else post,
         10**9 if dev is None else dev,
+        _local_key(m["local"]),
     )
 
 
+def _local_key(local: str | None) -> tuple:
+    """Partie locale : absente avant présente ; segment numérique après alphanumérique."""
+    if not local:
+        return ()
+    parts = re.split(r"[-_.]", local.lower())
+    return tuple((1, int(p), "") if p.isdigit() else (0, 0, p) for p in parts)
+
+
 def _in_range(key: tuple, events: list[dict]) -> bool:
-    """Évalue les évènements d'une plage OSV (`introduced`, `fixed`, `last_affected`)."""
+    """Évalue les évènements d'une plage OSV (`introduced`, `fixed`, `last_affected`).
+
+    Un évènement illisible rend la version affectée (échec fermé : un faux négatif est le
+    pire cas pour un outil de sécurité).
+    """
     parsed: list[tuple[tuple, str, str]] = []
     for event in events:
         for kind in ("introduced", "fixed", "last_affected"):
             if kind in event:
                 raw = str(event[kind])
-                ev_key = (0, (0,), _DEV_ONLY, -1, 0) if raw == "0" else version_key(raw)
-                if ev_key is not None:
-                    parsed.append((ev_key, kind, raw))
+                ev_key = (0, (0,), _DEV_ONLY, -1, 0, ()) if raw == "0" else version_key(raw)
+                if ev_key is None:
+                    return True
+                parsed.append((ev_key, kind, raw))
     parsed.sort(key=lambda item: item[0])
     affected = False
     for ev_key, kind, _raw in parsed:
@@ -99,7 +113,12 @@ def _is_affected(record: dict, name: str, version: str | None) -> bool:
         if version is None or version in entry.get("versions", []):
             return True
         if key is None:
+            # Version demandée illisible : affectée dès qu'une plage existe (échec fermé).
+            if entry.get("ranges"):
+                return True
             continue
+        if any(version_key(str(v)) == key for v in entry.get("versions", [])):
+            return True
         for rng in entry.get("ranges", []):
             if rng.get("type") in ("ECOSYSTEM", "SEMVER") and _in_range(key, rng["events"]):
                 return True
@@ -148,7 +167,7 @@ def answer(extract: Extract, body: bytes) -> tuple[int, dict]:
         return 503, {"code": 14, "message": "Base de vulnérabilités locale absente."}
     try:
         query = json.loads(body)
-    except ValueError:
+    except ValueError, RecursionError:
         return 400, {"code": 3, "message": "Corps de requête invalide : JSON attendu."}
     package = query.get("package") if isinstance(query, dict) else None
     version = query.get("version") if isinstance(query, dict) else None

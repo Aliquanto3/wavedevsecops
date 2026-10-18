@@ -91,9 +91,13 @@ def create_app(
             return refuse(403, _HOST_REFUSED)
         path = request.url.path
         if path.startswith(PUBLIC_PREFIX):
-            # Point public, en lecture seule : POST sans cookie ni contrôle d'origine.
+            # Point public, en lecture seule : POST sans cookie. pip-audit n'envoie pas
+            # d'`Origin` ; un navigateur en envoie un sur tout POST d'une autre page : refusé.
             if request.method != "POST":
                 return refuse(405, "Ce point n'accepte que la méthode POST.")
+            origin = request.headers.get("origin")
+            if origin is not None and origin != f"http://{host}":
+                return refuse(403, _ORIGIN_REFUSED)
             return await call_next(request)
         unsafe = request.method not in ("GET", "HEAD", "OPTIONS")
         if unsafe and request.headers.get("origin") != f"http://{host}":
@@ -207,10 +211,20 @@ def create_app(
     @app.post("/osv/v1/query")
     async def osv_query(request: Request) -> JSONResponse:
         """Point OSV local (AD-11) : en mémoire, sans verrou ni file, sans cookie (AD-19)."""
-        body = await request.body()
-        if len(body) > osv.MAX_BODY_BYTES:
-            return JSONResponse({"code": 3, "message": "Requête trop volumineuse."}, 413)
-        status, payload = osv.answer(osv_extract, body)
+        too_big = JSONResponse({"code": 3, "message": "Requête trop volumineuse."}, 413)
+        try:
+            announced = int(request.headers.get("content-length", "0"))
+        except ValueError:
+            announced = 0
+        if announced > osv.MAX_BODY_BYTES:
+            return too_big
+        # Lecture par morceaux, coupée au-delà de la limite (corps sans `Content-Length`).
+        body = bytearray()
+        async for chunk in request.stream():
+            body += chunk
+            if len(body) > osv.MAX_BODY_BYTES:
+                return too_big
+        status, payload = osv.answer(osv_extract, bytes(body))
         return JSONResponse(payload, status_code=status)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

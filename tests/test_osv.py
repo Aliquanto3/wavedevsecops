@@ -127,12 +127,50 @@ def test_ordre_des_versions_comme_packaging() -> None:
         ("0.9", "1.0"),
         ("2.0", "1!0.1"),
         ("1.0", "1.0.0.1"),
+        ("1.0", "1.0+local"),
+        ("1.0+abc", "1.0+1"),
+        ("1.0+1", "1.0+1.a"),
+        ("1.0+local", "1.0.post1"),
     ],
 )
 def test_cle_de_version(low: str, high: str) -> None:
+    assert Version(low) < Version(high)  # l'oracle est `packaging`, pas notre clé
     assert osv.version_key(low) < osv.version_key(high)
     assert osv.version_key("1.0") == osv.version_key("1.0.0")
     assert osv.version_key("pas une version") is None
+
+
+def _record(events: list[dict], versions: list[str] | None = None) -> dict:
+    return {
+        "id": "TEST-1",
+        "affected": [
+            {
+                "package": {"name": "x", "ecosystem": "PyPI"},
+                "ranges": [{"type": "ECOSYSTEM", "events": events}],
+                "versions": versions or [],
+            }
+        ],
+    }
+
+
+def test_partie_locale_apres_last_affected() -> None:
+    """`1.0+local` est postérieure à `1.0` (packaging) : hors d'une plage `last_affected: 1.0`."""
+    record = _record([{"introduced": "0"}, {"last_affected": "1.0"}])
+    assert osv._is_affected(record, "x", "1.0") is True
+    assert osv._is_affected(record, "x", "1.0+local") is False
+
+
+def test_evenement_illisible_echec_ferme() -> None:
+    """Un `introduced` illisible ne doit pas faire disparaître la vulnérabilité."""
+    record = _record([{"introduced": "n'importe quoi"}, {"fixed": "2.0"}])
+    assert osv._is_affected(record, "x", "1.0") is True
+    assert osv._is_affected(_record([{"introduced": "0"}]), "x", "pas une version") is True
+
+
+def test_liste_versions_comparee_en_pep440() -> None:
+    record = _record([], versions=["1.0.0"])
+    assert osv._is_affected(record, "x", "1.0") is True
+    assert osv._is_affected(record, "x", "1.0.1") is False
 
 
 # --- Le point HTTP ---------------------------------------------------------------------------
@@ -191,6 +229,32 @@ def test_corps_trop_gros(instance: cli.Instance) -> None:
     assert status == 413
 
 
+def test_corps_trop_gros_annonce_refuse_sans_le_lire(instance: cli.Instance) -> None:
+    conn = http.client.HTTPConnection(cli.HOST, instance.port, timeout=10)
+    conn.putrequest("POST", "/osv/v1/query")
+    conn.putheader("Content-Length", str(500 * 1024 * 1024))
+    conn.endheaders()
+    conn.send(b"{}")
+    assert conn.getresponse().status == 413
+
+
+def test_corps_trop_gros_sans_longueur_coupe_au_flux(instance: cli.Instance) -> None:
+    """Corps envoyé par morceaux (`chunked`, sans `Content-Length`) : coupé à la limite."""
+    chunk = b" " * 16 * 1024
+    conn = http.client.HTTPConnection(cli.HOST, instance.port, timeout=10)
+    conn.request("POST", "/osv/v1/query", body=iter([chunk] * 8), encode_chunked=True)
+    assert conn.getresponse().status == 413
+    status, raw = call(
+        instance, "POST", iter([b'{"package": {"name": "jinja2", ', b'"ecosystem": "PyPI"}}'])
+    )
+    assert status == 200 and json.loads(raw)["vulns"]
+
+
+def test_json_trop_imbrique_400(instance: cli.Instance) -> None:
+    status, _ = call(instance, "POST", b"[" * 50_000)
+    assert status == 400
+
+
 @pytest.mark.parametrize("method", ["GET", "PUT", "DELETE", "PATCH", "HEAD"])
 def test_autre_methode_refusee(instance: cli.Instance, method: str) -> None:
     status, _ = call(instance, method)
@@ -199,12 +263,16 @@ def test_autre_methode_refusee(instance: cli.Instance, method: str) -> None:
 
 
 def test_sans_cookie_ni_origine(instance: cli.Instance) -> None:
-    """Le point est public : aucun cookie, aucune origine, et ses réponses n'ouvrent pas CORS."""
+    """Le point est public : aucun cookie, aucune origine, et ses réponses n'ouvrent pas CORS.
+
+    Une page web d'une autre origine (le navigateur ajoute `Origin`) est refusée.
+    """
+    assert call(instance, "POST", "{}")[0] == 400  # corps invalide, mais pas 401 ni 403
     conn = http.client.HTTPConnection(cli.HOST, instance.port, timeout=10)
     conn.request("POST", "/osv/v1/query", body="{}", headers={"Origin": "http://autre.example"})
     resp = conn.getresponse()
     resp.read()
-    assert resp.status == 400  # corps invalide, mais pas 401 ni 403
+    assert resp.status == 403
     assert not [n for n, _ in resp.getheaders() if n.lower().startswith("access-control")]
     assert call(instance, "GET", path="/api/health")[0] == 401  # le reste exige le cookie
 
@@ -329,3 +397,16 @@ def test_script_de_maintenance_ecrit_extrait_et_date(
     assert osv.load_extract(tmp_path).extracted_on == "2030-01-02"
     assert "inventory" not in script.template_packages()
     assert "jinja2" in script.template_packages()
+
+    # Coupure réseau en cours de mise à jour : l'ancien extrait reste entier et lisible.
+    def cut(name: str) -> list[dict]:
+        if name == "y":
+            raise OSError("réseau coupé")
+        return [{"id": "GHSA-new", "affected": []}]
+
+    monkeypatch.setattr(script, "query_package", cut)
+    with pytest.raises(OSError):
+        script.update(["x", "y"], "2031-01-01", tmp_path)
+    assert osv.load_extract(tmp_path).extracted_on == "2030-01-02"
+    assert [p.name for p in (tmp_path / "vulns").glob("*.json")] == ["GHSA-test.json"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["index.json", "vulns"]
