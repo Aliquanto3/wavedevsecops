@@ -24,7 +24,7 @@ from wavedevsecops.engine.operations import (
 from wavedevsecops.engine.workspace import resolve_git
 from wavedevsecops.events import Kind
 from wavedevsecops.github_sim import GithubSimError
-from wavedevsecops.gitio import Git
+from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger(__name__)
@@ -59,6 +59,15 @@ def announce(ctx: OpContext, numbers: list[int]) -> None:
             )
 
 
+def _announce_all(ctx: OpContext) -> None:
+    """Annonce toutes les PR (recalculées ensemble) ; un état illisible ne fait pas échouer
+    une opération déjà faite."""
+    try:
+        announce(ctx, [p.number for p in github_sim.load(ctx.layout).pulls])
+    except GithubSimError:
+        log.exception("Annonce des PR de %s", ctx.workspace_id)
+
+
 def refresh_after_command(ctx: OpContext, command: object, code: int | None) -> None:
     """Crochet `terminal.AFTER_COMMAND_HOOKS` : push, pull ou fetch ont pu bouger `origin`."""
     if not (ctx.layout.repo / ".git").exists():
@@ -73,11 +82,16 @@ def _refuse(ctx: OpContext, error: GithubSimError) -> int:
 
 
 def _preflight(engine: WorkspaceEngine, work) -> None:  # noqa: ANN001
-    """Refus synchrone (409) : relit `origin`, hors file, pour répondre sans attendre."""
+    """Refus synchrone (409) : relit `origin`, hors file, pour répondre sans attendre.
+
+    Une lecture qui échoue (git, github.json en cours de remplacement) ne refuse rien : le
+    corps de l'opération revérifie dans la file."""
     try:
         work(_git(engine.git_path, engine.layout, engine.settings))
     except GithubSimError as error:
         raise OperationRefused(f"{error.cause_text} {error.action_text}") from None
+    except GitError:
+        log.warning("Pré-vérification illisible pour %s", engine.workspace_id, exc_info=True)
 
 
 def build_pr_open(engine: WorkspaceEngine, body: PrOpen) -> Operation:
@@ -113,7 +127,12 @@ def build_pr_merge(engine: WorkspaceEngine, body: PrMerge) -> Operation:
     layout = engine.layout
 
     def check(git: Git) -> None:
-        pr = github_sim.load(layout).pull(body.number)
+        try:
+            state = github_sim.load(layout)
+        except GithubSimError:
+            log.warning("État des PR illisible hors file pour %s", engine.workspace_id)
+            return
+        pr = state.pull(body.number)
         if pr is None or pr.state != "open":
             raise GithubSimError(
                 f"La PR n°{body.number} n'est pas ouverte.",
@@ -132,13 +151,12 @@ def build_pr_merge(engine: WorkspaceEngine, body: PrMerge) -> Operation:
         git = _git(ctx.git_path, ctx.layout, ctx.settings)
         try:
             pr = github_sim.merge_pr(git, ctx.layout, body.number)
-        except github_sim.MergeRaced as error:
-            announce(ctx, [p.number for p in github_sim.load(ctx.layout).pulls])
-            return _refuse(ctx, error)
         except GithubSimError as error:
+            # Le recalcul a pu changer la PR (bloquée, course) : la vue doit le voir.
+            _announce_all(ctx)
             return _refuse(ctx, error)
         ctx.output(f"PR n°{pr.number} mergée dans {pr.base}.", "app")
-        announce(ctx, [p.number for p in github_sim.load(ctx.layout).pulls])
+        _announce_all(ctx)
         return 0
 
     return Operation("pr_merge", run)

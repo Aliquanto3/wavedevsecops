@@ -471,9 +471,54 @@ def merge_message(pr: PullRequest) -> str:
     return f"Merge pull request #{pr.number} from {pr.head}"
 
 
-def _update_ref(git: Git, layout: Layout, ref: str, new: str, old: str) -> bool:
-    """`update-ref` avec l'ancienne valeur attendue ; faux si la ref a changé entre-temps."""
-    return git.run("update-ref", ref, new, old, cwd=layout.origin).ok
+def _update_ref(git: Git, layout: Layout, ref: str, new: str, old: str) -> gitio.procs.ProcResult:
+    """`update-ref` avec l'ancienne valeur attendue ; échoue si la ref a changé entre-temps."""
+    return git.run("update-ref", ref, new, old, cwd=layout.origin)
+
+
+def _already_merged(git: Git, layout: Layout, pr: PullRequest) -> str | None:
+    """SHA du merge de `pr` si la pointe de `base` l'est déjà (écriture de github.json perdue
+    après `update-ref`) ; `None` sinon."""
+    args = ("log", "-1", "--format=%P%n%s", pr.base_sha)
+    out = git.run(*args, cwd=layout.origin)
+    if not out.ok:
+        return None
+    parents, _, subject = out.stdout.strip().partition("\n")
+    parents_list = parents.split()
+    if len(parents_list) == 2 and parents_list[1] == pr.head_sha and subject == merge_message(pr):
+        return pr.base_sha
+    return None
+
+
+def _is_ancestor(git: Git, layout: Layout, ancestor: str, descendant: str) -> bool:
+    args = ("merge-base", "--is-ancestor", ancestor, descendant)
+    return git.run(*args, cwd=layout.origin).returncode == 0
+
+
+def _record_merged(
+    git: Git, layout: Layout, state: GithubState, pr: PullRequest, merge_sha: str
+) -> PullRequest:
+    """Écrit la PR `merged` et recalcule les autres, sans relire github.json."""
+    merged = pr.model_copy(
+        update={
+            "state": "merged",
+            "merge_sha": merge_sha,
+            "mergeable": False,
+            "blocking_reasons": [],
+        }
+    )
+    pulls = [merged if p.number == pr.number else p for p in state.pulls]
+    try:
+        written = _commit(git, layout, state.model_copy(update={"pulls": pulls}), force=True)
+    except OSError:
+        raise GithubSimError(
+            f"Le merge de la PR n°{pr.number} est écrit dans origin, mais l'état des PR "
+            "(github.json) n'a pas pu être enregistré.",
+            "Relancez le merge de cette PR : il sera constaté sans nouveau commit.",
+        ) from None
+    result = written.state.pull(pr.number)
+    assert result is not None
+    return result
 
 
 def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
@@ -481,7 +526,9 @@ def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
 
     `merge-tree --write-tree` calcule l'arbre, `commit-tree` écrit le commit de merge (message
     et identité fixes), `update-ref` avance la base en vérifiant sa valeur d'avant. Refusé si la
-    PR n'est pas mergeable après recalcul ; si la base a bougé, `MergeRaced` après un recalcul.
+    PR n'est pas mergeable après recalcul, ou si `head` est déjà contenue dans `base` (sauf
+    merge déjà écrit par le GitHub simulé : il est alors seulement constaté) ; si la base a
+    bougé, `MergeRaced` après un recalcul.
     """
     state = load(layout)
     pr = state.pull(number)
@@ -493,8 +540,19 @@ def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
         raise GithubSimError(
             f"La PR n°{number} n'est plus ouverte.", "Seule une PR ouverte peut être mergée."
         )
-    pr = _commit(git, layout, state).state.pull(number)
+    state = _commit(git, layout, state).state
+    pr = state.pull(number)
     assert pr is not None
+    if not any(r.kind == "head_missing" for r in pr.blocking_reasons):
+        done = _already_merged(git, layout, pr)
+        if done is not None:
+            return _record_merged(git, layout, state, pr, done)
+        if _is_ancestor(git, layout, pr.head_sha, pr.base_sha):
+            raise GithubSimError(
+                f"La branche « {pr.head} » est déjà contenue dans « {pr.base} » : "
+                "il n'y a rien à merger.",
+                "Poussez de nouveaux commits sur la branche, puis réessayez.",
+            )
     if not pr.mergeable:
         reasons = " ".join(r.text for r in pr.blocking_reasons)
         raise GithubSimError(
@@ -519,27 +577,19 @@ def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
     if not commit.ok:
         raise GitError(commit_args, commit)
     merge_sha = commit.stdout.strip()
-    if not _update_ref(git, layout, f"refs/heads/{pr.base}", merge_sha, pr.base_sha):
-        _commit(git, layout, load(layout))
+    ref = f"refs/heads/{pr.base}"
+    moved = _update_ref(git, layout, ref, merge_sha, pr.base_sha)
+    if not moved.ok:
+        if origin_branches(git, layout).get(pr.base) == pr.base_sha:
+            # La ref n'a pas bougé : l'échec vient de git, pas d'une course.
+            raise GitError(("update-ref", ref, merge_sha, pr.base_sha), moved)
+        _commit(git, layout, state)
         raise MergeRaced(
             f"La branche « {pr.base} » a bougé sur origin pendant le merge de la PR n°{number} : "
             "rien n'a été écrit.",
             "La PR a été recalculée ; relisez ses blocages, puis réessayez.",
         )
-    fresh = load(layout)
-    merged = pr.model_copy(
-        update={
-            "state": "merged",
-            "merge_sha": merge_sha,
-            "mergeable": False,
-            "blocking_reasons": [],
-        }
-    )
-    pulls = [merged if p.number == number else p for p in fresh.pulls]
-    written = _commit(git, layout, fresh.model_copy(update={"pulls": pulls}), force=True)
-    result = written.state.pull(number)
-    assert result is not None
-    return result
+    return _record_merged(git, layout, state, pr, merge_sha)
 
 
 __all__ = [

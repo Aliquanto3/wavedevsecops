@@ -12,7 +12,7 @@ from wavedevsecops import github_sim, terminal
 from wavedevsecops.config import Settings
 from wavedevsecops.engine import OperationRefused, build_operation, pr_intents
 from wavedevsecops.events import Kind
-from wavedevsecops.gitio import Git
+from wavedevsecops.gitio import Git, GitError
 
 
 @pytest.fixture
@@ -158,3 +158,104 @@ def test_intentions_enregistrees_et_corps_invalides() -> None:
     assert {"pr_open", "pr_merge"} <= set(INTENTS)
     with pytest.raises(InvalidIntent):
         build_operation(None, "pr_merge", {"number": 0})
+
+
+def test_merge_interrompu_constate_sans_nouveau_commit(
+    space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """github.json non écrit après `update-ref` : le merge relancé le constate, sans doublon."""
+    _sh(space, "git switch main")
+    _push_branch(space, "feat", "feat.txt", "x\n")
+    _intent(space, "pr_open", {"head": "feat"})
+    git, layout = _git(space, git_path), space.layout
+    real_save = github_sim._save
+
+    def locked(lay, state):
+        if any(p.state == "merged" for p in state.pulls):
+            raise PermissionError("github.json verrouillé")
+        real_save(lay, state)
+
+    monkeypatch.setattr(github_sim, "_save", locked)
+    with pytest.raises(github_sim.GithubSimError, match="écrit dans origin"):
+        github_sim.merge_pr(git, layout, 1)
+    merge_sha = _origin_sha(space, git_path, "main")
+    assert github_sim.load(layout).pull(1).state == "open"
+    monkeypatch.setattr(github_sim, "_save", real_save)
+    op, code = _intent(space, "pr_merge", {"number": 1})
+    assert code == 0
+    assert github_sim.load(layout).pull(1).merge_sha == merge_sha
+    assert _origin_sha(space, git_path, "main") == merge_sha
+    with pytest.raises(OperationRefused, match="n'est pas ouverte"):
+        build_operation(space.engine, "pr_merge", {"number": 1})
+    assert _origin_sha(space, git_path, "main") == merge_sha
+
+
+def test_head_deja_contenue_dans_base_refusee(space: Space, git_path: Path) -> None:
+    _sh(space, "git switch main")
+    _push_branch(space, "feat", "feat.txt", "x\n")
+    _intent(space, "pr_open", {"head": "feat"})
+    _sh(space, "git switch main", "git merge --ff-only feat", "git push origin main")
+    before = _origin_sha(space, git_path, "main")
+    with pytest.raises(github_sim.GithubSimError, match="rien à merger"):
+        github_sim.merge_pr(_git(space, git_path), space.layout, 1)
+    assert _origin_sha(space, git_path, "main") == before
+
+
+def test_update_ref_en_echec_sans_course(
+    space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sh(space, "git switch main")
+    _push_branch(space, "feat", "feat.txt", "x\n")
+    _intent(space, "pr_open", {"head": "feat"})
+    before = _origin_sha(space, git_path, "main")
+    failed = type(
+        "R", (), {"ok": False, "returncode": 128, "stderr": "", "error": None, "timed_out": False}
+    )()
+    monkeypatch.setattr(github_sim, "_update_ref", lambda *a: failed)
+    with pytest.raises(GitError):
+        github_sim.merge_pr(_git(space, git_path), space.layout, 1)
+    assert _origin_sha(space, git_path, "main") == before
+
+
+def test_course_par_l_intention_annonce_les_pr(
+    space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _sh(space, "git switch main")
+    _push_branch(space, "feat", "feat.txt", "x\n")
+    _intent(space, "pr_open", {"head": "feat"})
+    real = github_sim._update_ref
+
+    def moved(g, lay, ref, new, old):
+        sha = g.internal(
+            "commit-tree",
+            "-m",
+            "autre",
+            "-p",
+            old,
+            f"{old}^{{tree}}",
+            cwd=lay.origin,
+            extra_env=github_sim.MERGE_IDENTITY,
+        ).strip()
+        g.internal("update-ref", ref, sha, old, cwd=lay.origin)
+        return real(g, lay, ref, new, old)
+
+    monkeypatch.setattr(github_sim, "_update_ref", moved)
+    op, code = _intent(space, "pr_merge", {"number": 1})
+    assert code == 2, [e.payload for e in space.events if e.op_id == op.op_id]
+    assert any(e.kind == Kind.PR_UPDATED and e.op_id == op.op_id for e in space.events)
+    assert github_sim.load(space.layout).pull(1).state == "open"
+
+
+def test_create_app_branche_les_pr_une_seule_fois(settings: Settings) -> None:
+    from wavedevsecops.engine import INTENTS
+    from wavedevsecops.web.app import create_app
+
+    terminal.AFTER_COMMAND_HOOKS.clear()
+    try:
+        for _ in range(2):
+            app = create_app(port=1, token="t", settings=settings)
+            app.state.workspaces.close()
+        assert terminal.AFTER_COMMAND_HOOKS == [pr_intents.refresh_after_command]
+        assert {"pr_open", "pr_merge"} <= set(INTENTS)
+    finally:
+        terminal.AFTER_COMMAND_HOOKS.clear()

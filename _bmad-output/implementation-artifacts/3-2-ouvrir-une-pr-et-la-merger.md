@@ -30,3 +30,15 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.2 » ; F
 - Vue Distant + PR (3.3), collègue et hook `pre-receive` (3.4, 3.5), run du pipeline simulé à la remise en file des checks (ci, AD-10).
 - Pas de fermeture de PR (`closed`) ni de merge squash/rebase : hors périmètre.
 - Le drapeau `required` d'un check n'est pas distingué du déclaré (reporté de 3.1).
+
+## Revue
+
+- medium, second avis 1 : après `update-ref`, une écriture de `github.json` en échec laissait la PR `open` et mergeable, d'où un second commit de merge possible. Corrigé : l'état recalculé en mémoire est réutilisé (plus de relecture), l'`OSError` devient un refus qui dit que le merge est écrit dans origin, et un merge relancé constate le commit déjà écrit (parents et message) sans en créer un autre.
+- low, second avis 2 : refus du merge après recalcul sans `pr_updated`. Corrigé : toutes les PR sont annoncées sur tout refus du merge, et une annonce en échec ne fait plus échouer un merge réussi.
+- low, second avis 3 : le 409 lit hors file et ignore un push encore en file. Rejeté : décision de la story (le critère exige un 409 synchrone) ; le corps revérifie dans la file.
+- low, second avis 4 : tout échec d'`update-ref` passait pour une course. Corrigé : si la base n'a pas bougé, c'est une `GitError` (avec la sortie du premier appel, sans rejouer l'écriture).
+- low, second avis 5 : `head` déjà contenue dans `base` donnait un merge vide. Corrigé : refus « rien à merger ».
+- low, second avis 6 : câblage de `create_app` et chemins d'erreur non testés. Corrigé : tests du câblage (sans doublon), course par l'intention, merge interrompu puis constaté, re-merge refusé, `head` déjà contenue, échec git d'`update-ref`. Le 409 HTTP passe par la route générique déjà testée.
+- low, second avis 7 : `github.json` lu pendant un `os.replace` donnait un faux 409 « illisible ». Corrigé : une lecture en échec (github.json ou git) ne refuse plus rien hors file.
+- low, revue : la pré-vérification lance git (`for-each-ref`) dans la boucle asyncio de la route d'intention. Reporté : quelques ms par `pr_open` ; à déplacer dans `asyncio.to_thread` si d'autres intentions font de même.
+- Complexité : 0 constat (`pr_updated` annonce toutes les PR à chaque merge, O(n) par opération, n petit).
