@@ -1,14 +1,20 @@
 // Registre des volets : une vue = un module qui s'enregistre ici (convention Front du spine).
-// La disposition lit ce registre et ne connaît aucune vue en particulier ; ajouter une vue
-// (la carte, en v0.2) ne touche donc pas la disposition.
+// La disposition (layout.js, workspace.js) lit ce registre et ne connaît aucune vue en
+// particulier ; ajouter une vue (la carte, en v0.2) ne touche donc pas la disposition.
 //
 //   registerPane({
 //     id: "repo",                  // identifiant stable
-//     step: 1,                     // numéro de lecture (pane-step)
+//     step: 1,                     // numéro de lecture (pane-step) ; par défaut, l'ordre d'enregistrement
 //     title: "Dépôt local",
 //     subtitle: "Ce que dit git du dépôt",
 //     elementTypes: ["commit"],    // types d'element_id que la vue émet (liaison entre vues)
-//     render(body) { ... },        // remplit le corps de la vue
+//     row: 1, rowShare: 40,        // rangée (1 = haute) et sa part de hauteur (premier volet de la rangée)
+//     share: 55,                   // part de largeur dans la rangée
+//     foldRank: 2,                 // ordre de repli sous la taille nominale (absent : jamais replié)
+//     scroll: "both",             // défilement dans les deux sens (graphe, diff, terminal) ; sinon vertical
+//     terminal: false,           // vrai : Échap y rend le focus au titre
+//     empty: { title, text },      // état vide titré (jamais un spinner muet)
+//     render(body, ctx) { ... },   // remplit le corps ; ctx.store donne la projection (store.js)
 //   });
 
 const panes = new Map();
@@ -18,45 +24,37 @@ export function registerPane(pane) {
     if (!pane[field]) throw new Error(`Volet invalide : « ${field} » manquant.`);
   }
   if (panes.has(pane.id)) throw new Error(`Volet déjà enregistré : ${pane.id}.`);
-  panes.set(pane.id, { step: panes.size + 1, subtitle: "", elementTypes: [], ...pane });
+  const types = pane.elementTypes ?? [];
+  if (!Array.isArray(types) || types.some((type) => typeof type !== "string" || !type)) {
+    throw new Error(`Volet invalide : « elementTypes » de ${pane.id} doit lister des textes.`);
+  }
+  panes.set(pane.id, {
+    step: panes.size + 1,
+    subtitle: "",
+    row: 1,
+    empty: null,
+    terminal: false,
+    ...pane,
+    elementTypes: [...types],
+  });
 }
 
 export function listPanes() {
   return [...panes.values()].sort((a, b) => a.step - b.step);
 }
 
-/** Dessine les volets enregistrés dans `container`. */
-export function renderPanes(container, emptyText) {
-  container.replaceChildren();
-  const registered = listPanes();
-  if (registered.length === 0) {
-    const empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = emptyText;
-    container.append(empty);
-    return;
-  }
-  for (const pane of registered) {
-    const section = document.createElement("section");
-    section.className = "pane";
-    section.setAttribute("aria-labelledby", `pane-${pane.id}-title`);
-    section.dataset.pane = pane.id;
+export function getPane(id) {
+  return panes.get(id) || null;
+}
 
-    const header = document.createElement("header");
-    header.className = "pane-header";
-    const step = document.createElement("span");
-    step.className = "pane-step";
-    step.textContent = String(pane.step);
-    const title = document.createElement("h2");
-    title.className = "pane-title";
-    title.id = `pane-${pane.id}-title`;
-    title.textContent = pane.title;
-    header.append(step, title);
-
-    const body = document.createElement("div");
-    body.className = "pane-body";
-    section.append(header, body);
-    container.append(section);
-    pane.render(body);
+/**
+ * Vérifie qu'un type d'`element_id` émis par une vue est bien déclaré à son enregistrement.
+ * Lève une erreur sinon : une liaison entre vues ne repose jamais sur un type non déclaré.
+ */
+export function assertElementType(paneId, type) {
+  const pane = panes.get(paneId);
+  if (!pane) throw new Error(`Volet inconnu : ${paneId}.`);
+  if (!pane.elementTypes.includes(type)) {
+    throw new Error(`Le volet ${paneId} émet le type « ${type} » sans l'avoir déclaré.`);
   }
 }

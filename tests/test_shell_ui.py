@@ -298,6 +298,9 @@ CONTRAST_PAIRS = (
     ("muted", "surface-raised", 3),
     ("danger", "surface-raised", 3),
     ("discipline-context", "discipline-context-soft", 3),
+    ("primary", "primary-soft", 4.5),
+    ("primary", "surface", 3),
+    ("ink", "primary-soft", 4.5),
 )
 
 

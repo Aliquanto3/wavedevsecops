@@ -26,6 +26,7 @@ from wavedevsecops import diagnostic, osv
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
 from wavedevsecops.engine import WorkspaceManager
+from wavedevsecops.web.catalogue import install_catalogue_routes
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces
 from wavedevsecops.web.workspaces import install_workspace_routes
 
@@ -205,6 +206,10 @@ def create_app(
     workspaces = workspaces or WorkspaceManager(settings)
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)
+    install_catalogue_routes(app, workspaces, settings)
+    app.add_api_route(
+        "/espace/{workspace_id}", shell_page, methods=["GET"], include_in_schema=False
+    )
 
     osv_extract = osv.load_extract(settings.osv_path())
 

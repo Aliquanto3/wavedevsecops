@@ -1,12 +1,18 @@
 // Point d'entrée : coquille d'interface. Le front ne calcule rien (AD-2) : il affiche ce que dit le serveur.
 import { setOffline } from "./actions.js";
+import { loadCatalogue, openMode, renderCatalogue, workspacePath } from "./catalogue.js";
 import { renderBadge, refreshBadge, renderDiagnosticPage } from "./diagnostic.js";
 import { initDisplayMenu } from "./display.js";
 import { STOPPED_MESSAGE, watchHealth } from "./health.js";
 import { currentSurface, renderNav } from "./nav.js";
-import { renderPanes } from "./panes.js";
+import { connectWorkspace, createStore } from "./store.js";
+import "./views.js";
+import { mountWorkspace } from "./workspace.js";
 
-const EMPTY_TEXT = "Aucune vue n'est encore disponible dans cette version.";
+const WORKSPACE_PATH = /^\/espace\/([^/]+)$/;
+const TRACKS = { no_ai: "Parcours sans IA", llm: "Parcours LLM" };
+const LOAD_FAILED = "Le catalogue n'a pas pu être lu. Rechargez la page.";
+const WORKSPACE_MISSING = "Cet espace n'existe pas. Revenez au catalogue.";
 
 async function loadShell() {
   const response = await fetch("/api/shell", { cache: "no-store", credentials: "same-origin" });
@@ -17,6 +23,49 @@ async function loadShell() {
 function showAlive(alive) {
   document.getElementById("app-alert").textContent = alive ? "" : STOPPED_MESSAGE;
   setOffline(!alive);
+}
+
+function message(container, text) {
+  const paragraph = document.createElement("p");
+  paragraph.className = "empty";
+  paragraph.setAttribute("role", "alert");
+  paragraph.textContent = text;
+  container.replaceChildren(paragraph);
+}
+
+async function showWorkspace(container, workspaceId) {
+  document.querySelector("main").classList.add("is-workspace");
+  let info;
+  try {
+    const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    const body = await response.json();
+    if (!response.ok) return message(container, body.reason_text || WORKSPACE_MISSING);
+    info = body;
+  } catch (err) {
+    return message(container, WORKSPACE_MISSING);
+  }
+  document.getElementById("page-title").textContent = info.title;
+  document.getElementById("page-subtitle").textContent =
+    `${TRACKS[info.track] || info.track} · Mode ${info.mode}`;
+  document.title = `${info.title} · WaveDevSecOps`;
+  const store = createStore();
+  mountWorkspace(container, { title: info.title, store });
+  connectWorkspace(store, workspaceId);
+}
+
+async function showCatalogue(container) {
+  try {
+    const catalogue = await loadCatalogue();
+    renderCatalogue(container, catalogue, async (scenario, mode) => {
+      const opened = await openMode(scenario, mode);
+      window.location.assign(workspacePath(opened.workspace_id));
+    });
+  } catch (err) {
+    message(container, LOAD_FAILED);
+  }
 }
 
 async function start() {
@@ -35,15 +84,19 @@ async function start() {
   } catch (err) {
     // Le point de vie signale l'arrêt du serveur ; l'en-tête reste vide en attendant.
   }
-  const panes = document.getElementById("panes");
+  const container = document.getElementById("panes");
   const badgeLink = document.querySelector('#surfaces a[href="/diagnostic"]');
-  if (current && current.key === "diagnostic") {
-    await renderDiagnosticPage(panes, {
+  const workspace = WORKSPACE_PATH.exec(window.location.pathname);
+  if (workspace) {
+    if (badgeLink) refreshBadge(badgeLink);
+    await showWorkspace(container, decodeURIComponent(workspace[1]));
+  } else if (current && current.key === "diagnostic") {
+    await renderDiagnosticPage(container, {
       onReport: (report) => badgeLink && renderBadge(badgeLink, report),
     });
   } else {
     if (badgeLink) refreshBadge(badgeLink);
-    renderPanes(panes, EMPTY_TEXT);
+    await showCatalogue(container);
   }
 }
 
