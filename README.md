@@ -21,6 +21,25 @@ doivent comprendre ce que l'agent fait sur leur dépôt. Pédagogie inspirée de
   Jenkins, GitHub Actions, GitLab CI et Sonar sont montrés comme équivalents.
 - **Savoir en parler à un RSSI** : scénario d'entretien et fiche barrière → risque → preuve.
 
+## Installer sous Windows (sans droits administrateur)
+
+Dans PowerShell (Windows 10 ou 11), un compte standard suffit :
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; iex ([Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1')).TrimStart([char]0xFEFF))
+```
+
+L'installeur place uv dans votre profil, récupère l'application dans
+`%LOCALAPPDATA%\WaveDevSecOps\app` (clone avec `core.autocrlf=false`), installe PortableGit
+seulement si git est absent ou antérieur à 2.38, lance `uv sync`, puis écrit `install.json`.
+Relancez la même commande pour mettre à jour : `progress.json` est conservé, et une
+installation interrompue reprend là où elle s'est arrêtée.
+
+- **Derrière un proxy** : posez `HTTPS_PROXY` (et `NO_PROXY=127.0.0.1,localhost`) avant la commande ;
+  l'installeur passe par lui et pose `UV_SYSTEM_CERTS=true`.
+- **Sans git ou si le clone échoue** : `$env:WDS_INSTALL_METHOD = 'zip'` avant la commande.
+- **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche : `$env:WDS_INSTALL_REF`.
+
 ## Jalons
 
 `v0.1` socle git → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
