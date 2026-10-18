@@ -323,6 +323,73 @@ def test_rm_r_ne_suit_pas_un_lien_dans_un_dossier(tmp_path: Path) -> None:
     assert (outside / "x.txt").read_text(encoding="utf-8") == "CONTENU-INTERDIT"
 
 
+@pytest.mark.skipif(os.name != "nt", reason="jonctions propres à Windows")
+def test_jonction_windows_traitee_comme_un_lien(tmp_path: Path) -> None:
+    import _winapi  # type: ignore[import-not-found]  # noqa: PLC0415
+
+    root = tmp_path / "repo"
+    (root / "d").mkdir(parents=True)
+    outside = tmp_path / "dehors"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("CONTENU-INTERDIT", encoding="utf-8")
+    # Une jonction ne demande aucun droit d'administrateur, contrairement à un lien.
+    _winapi.CreateJunction(str(outside), str(root / "j"))
+    _winapi.CreateJunction(str(outside), str(root / "d" / "j"))
+    assert wsfs.kind_of(root, "j") == "symlink"
+    assert text(sh(root, "ls")) == "d/\nj\n"
+    for line in ("cp -r j copie", "cp -r d copie", "cat j/secret.txt", "cat d/j/secret.txt"):
+        result = sh(root, line)
+        assert result.code != 0, line
+        assert "CONTENU-INTERDIT" not in text(result)
+    assert not os.path.lexists(root / "copie")
+    assert sh(root, "rm j").code == 0 and not os.path.lexists(root / "j")
+    assert sh(root, "rm -r d").code == 0
+    assert (outside / "secret.txt").read_text(encoding="utf-8") == "CONTENU-INTERDIT"
+
+
+def test_cp_r_garde_un_lien_sortant_comme_lien(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    (root / "d").mkdir(parents=True)
+    outside = tmp_path / "dehors"
+    outside.mkdir()
+    (outside / "secret.txt").write_text("CONTENU-INTERDIT", encoding="utf-8")
+    symlink_or_skip(root / "d" / "lien", outside / "secret.txt")
+    assert sh(root, "cp -r d e").code == 0
+    assert (root / "e" / "lien").is_symlink()  # copié comme lien, jamais par son contenu
+    result = sh(root, "cat e/lien")
+    assert result.code != 0 and "CONTENU-INTERDIT" not in text(result)
+
+
+def test_cp_r_ne_copie_pas_un_git_imbrique(root: Path) -> None:
+    (root / "sub" / ".git").mkdir(parents=True)
+    (root / "sub" / "a.txt").write_text("a", encoding="utf-8")
+    assert sh(root, "cp -r sub copie").code == 0
+    assert (root / "copie" / "a.txt").exists() and not (root / "copie" / ".git").exists()
+
+
+def test_ecriture_sans_dossier_parent_refusee(root: Path) -> None:
+    for line in ("echo x > a/b.txt", "echo x >> a/b.txt", "touch a/b.txt"):
+        result = sh(root, line)
+        assert result.code == 1 and "n'existe pas" in text(result), line
+    assert not (root / "a").exists()
+
+
+def test_cat_tronque_un_gros_fichier(root: Path) -> None:
+    (root / "gros.txt").write_bytes(b"x" * (wsfs.READ_LIMIT + 10))
+    result = sh(root, "cat gros.txt")
+    assert result.code == 0
+    assert len(text(result, "stdout")) == wsfs.READ_LIMIT
+    assert "Kio" in text(result, "app")
+    assert wsfs.read_text(root, "gros.txt", limit=4) == ("xxxx", True)
+
+
+@pytest.mark.parametrize("name", ["CONIN$", "conout$.txt", "COM¹", "a|b", 'a"b', "a<b", "a\tb"])
+def test_noms_non_portables_refuses_a_l_ecriture(root: Path, name: str) -> None:
+    assert sh(root, f"touch '{name}'").code == 2
+    assert sh(root, f"echo x > '{name}'").code == 2
+    assert list(root.iterdir()) == [root / ".git"]
+
+
 def test_lien_vers_git_refuse(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     (root / ".git").mkdir(parents=True)

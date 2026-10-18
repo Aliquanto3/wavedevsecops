@@ -40,3 +40,19 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.5 » ; s
 ## À vérifier dans un vrai navigateur
 
 - Saisie de `echo texte > fichier` puis `cat fichier` dans le volet ; `clear` ; affichage du refus (`role="alert"`) pour `cat ../x`.
+
+## Revue
+
+Revue Opus du 2026-10-18, après rebase sur `origin/main` (6860667, stories 4.1 et 4.3 ; conflit de fin de `wsfs` résolu en gardant les deux ajouts).
+
+- HIGH, second avis n° 1 (élargi) : une jonction Windows (`mklink /J`, sans droit d'administrateur) était vue comme un dossier ; `cp -r d e` (jonction dans `d`) et même `cp -r j k` (la jonction elle-même) recopiaient le contenu de sa cible hors de l'espace, ensuite lisible par `cat`. Prouvé avec `_winapi.CreateJunction`. Corrigé : `kind_of` et `ls` traitent une jonction comme un lien (`rm`/`mv` agissent sur elle, `cp` la refuse par `confine`), `cp -r` refuse un dossier qui contient une jonction (`shutil.copytree` la copie comme un dossier réel même avec `symlinks=True`). Test Windows ajouté (il tourne en local et en CI Windows).
+- MEDIUM, second avis n° 2 : écarté. `cp -r` recopie un lien sortant comme lien, comme `cp -R` d'un shell ; aucun contenu hors de l'espace n'est copié et le lien copié reste refusé à la lecture. La phrase « `cp` d'un lien sortant est refusé » vise `cp lien x`. Test POSIX ajouté (`test_cp_r_garde_un_lien_sortant_comme_lien`, CI Linux et macOS).
+- MEDIUM, second avis n° 3 (Complexité) : corrigé. `cat` ne lit plus que 256 Kio (`wsfs.READ_LIMIT`) et signale la troncature ; `echo >>` ajoute en fin de fichier au lieu de relire et réécrire tout le fichier (coût linéaire en la taille du fichier à chaque ajout, quadratique sur une série).
+- MEDIUM, second avis n° 4 (décision) : comportement gardé. `rm -rf *` vide le dépôt sauf `.git` et les noms à point, comme un shell. AD-4 retient comme modèle de menace l'erreur de l'apprenant, et le bac à sable plus « Recommencer » (AD-6) la réparent ; une garde ajoutée rendrait le terminal moins réaliste. Décision à confirmer par Anaël s'il veut une confirmation ou un refus de `rm -r *` à la racine.
+- LOW, second avis n° 5 : corrigé. Écriture refusée pour `CONIN$`, `CONOUT$`, `COM¹²³`, `LPT¹²³` et les caractères `"<>|` et de contrôle (même refus sur les trois OS). `*` et `?` restent admis par la garde (motifs des globs).
+- LOW, second avis n° 6 : corrigé. `echo > a/b`, `echo >> a/b` et `touch a/b` refusent un dossier parent absent (« Créez-le avec mkdir »), comme un shell. `wsfs.write_text` garde la création des parents pour le setup.
+- LOW, second avis n° 7 : écarté. `cp` et `mv` copient des octets : normaliser fins de ligne ou BOM corromprait un fichier binaire ; la règle UTF-8 sans BOM et LF vise les écritures de texte (`echo`, vue Code).
+- LOW, second avis n° 8 : corrigé. `cp -r` ne recopie pas de `.git` imbriqué.
+- LOW, second avis n° 9 : corrigé. Une `OSError` de `ls`, du développement d'un glob ou du test de destination de `mv`/`cp` donne « opération impossible » au lieu de remonter.
+- Tests, second avis n° 10 : corrigé (jonction sous Windows, lien sortant copié sous POSIX, gros fichier, parent absent, noms non portables, `.git` imbriqué).
+- Complexité : 1 constat (n° 3), corrigé ; `expand_glob` et `list_dir` restent linéaires par appel.

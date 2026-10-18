@@ -79,6 +79,10 @@ def _expand(
         except wsfs.SandboxPathError as exc:
             result.fail(f"{exc.cause_text} {exc.action_text}", refused=True)
             continue
+        except OSError as exc:
+            cause = f"opération impossible ({type(exc).__name__})."
+            result.fail(allow.message("file_error", command=command.name, cause=cause))
+            continue
         if not matches:
             if "-f" not in command.options:
                 result.fail(allow.message("file_no_match", command=command.name, pattern=pattern))
@@ -101,12 +105,18 @@ def _ls(root: Path, command: FileCommand, result: FileResult, allow: Allowlist) 
         result.fail(f"{exc.cause_text} {exc.action_text}", refused=True)
     except AppError as exc:
         result.fail(allow.message("file_error", command="ls", cause=exc.cause_text))
+    except OSError as exc:
+        cause = f"opération impossible ({type(exc).__name__})."
+        result.fail(allow.message("file_error", command="ls", cause=cause))
 
 
 def _cat(root: Path, command: FileCommand, result: FileResult, allow: Allowlist) -> None:
     def show(path: str) -> None:
-        text = wsfs.read_text(root, path)
+        text, truncated = wsfs.read_text(root, path)
         result.lines.append((text, "stdout"))
+        if truncated:
+            note = allow.message("file_truncated", path=path, kib=wsfs.READ_LIMIT // 1024)
+            result.lines.append(("\n" + note + "\n", "app"))
 
     _each(result, allow, "cat", list(command.args), show)
 
@@ -123,6 +133,7 @@ def _echo(root: Path, command: FileCommand, result: FileResult, allow: Allowlist
         else:
             if wsfs.kind_of(root, path) == "dir":
                 raise wsfs.SandboxFileError(f"« {path} » est un dossier.")
+            wsfs.require_parent(root, path)
             wsfs.write_text(root, path, text)
 
     _each(result, allow, "echo", [command.target or ""], write)
@@ -138,6 +149,10 @@ def _mv_cp(root: Path, command: FileCommand, result: FileResult, allow: Allowlis
         dest_is_dir = wsfs.kind_of(root, dest) == "dir"
     except wsfs.SandboxPathError as exc:
         result.fail(f"{exc.cause_text} {exc.action_text}", refused=True)
+        return
+    except OSError as exc:
+        cause = f"opération impossible ({type(exc).__name__})."
+        result.fail(allow.message("file_error", command=command.name, cause=cause))
         return
     if len(sources) > 1 and not dest_is_dir:
         result.fail(allow.message("file_multi_dest", command=command.name))

@@ -41,6 +41,7 @@ messages:
   redirect_target: "Il manque le nom du fichier après « {operator} »."
   file_error: "{command} : {cause}"
   file_no_match: "{command} : aucun fichier ne correspond à « {pattern} »."
+  file_truncated: "cat : « {path} » dépasse {kib} Kio, la suite n'est pas affichée."
   file_multi_dest: "{command} : avec plusieurs sources, la destination doit être un dossier existant."
   pwd_output: "/repo"
   hint: "Tapez une commande git, par exemple « git status »."

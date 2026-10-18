@@ -23,8 +23,10 @@ from wavedevsecops.contracts import AppError
 GIT_DIR_NAMES = frozenset({".git"})
 _SHORT_GIT = re.compile(r"^git~\d+$")
 """Nom court 8.3 de `.git` sous Windows (`GIT~1`)."""
-_RESERVED = re.compile(r"^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$")
+_RESERVED = re.compile(r"^(con|prn|aux|nul|conin\$|conout\$|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$")
 """Noms de périphérique réservés par Windows, avec ou sans extension."""
+_NOT_PORTABLE = re.compile(r'[\x00-\x1f"<>|]')
+"""Caractères interdits dans un nom sous Windows (hors `*` et `?`, motifs des globs)."""
 
 
 def _is_git_dir(part: str) -> bool:
@@ -113,6 +115,8 @@ def check_relative(path: str, *, portable: bool = True) -> PurePosixPath:
         raise SandboxPathError(path, "il contient un caractère nul")
     if portable and ("\\" in path or ":" in path):
         raise SandboxPathError(path, "il contient « \\ » ou « : »")
+    if portable and _NOT_PORTABLE.search(path):
+        raise SandboxPathError(path, "il contient un caractère interdit sous Windows")
     pure = PurePosixPath(path)
     if pure.is_absolute():
         raise SandboxPathError(path, "il est absolu")
@@ -323,6 +327,7 @@ def move(
                 raise
             sleep(pause_s * attempt)
 
+
 # --- Commandes de fichiers du terminal (story 2.5) -------------------------------------------
 # Toutes passent par `confine` : aucun chemin du terminal n'atteint le disque sans lui.
 
@@ -332,6 +337,11 @@ class SandboxFileError(AppError):
 
     def __init__(self, cause: str, action: str = "Vérifiez le nom avec « ls ».") -> None:
         super().__init__(cause, action)
+
+
+def _is_link(entry: Path) -> bool:
+    """Lien symbolique ou jonction Windows : jamais suivi par une commande de fichier."""
+    return entry.is_symlink() or entry.is_junction()
 
 
 def _entry(root: Path, path: str, *, portable: bool = True) -> Path:
@@ -353,41 +363,63 @@ def list_dir(root: Path, path: str = ".", *, hidden: bool = False) -> list[tuple
     for child in sorted(base.iterdir(), key=lambda p: p.name.lower()):
         if _is_git_dir(child.name) or (not hidden and child.name.startswith(".")):
             continue
-        entries.append((child.name, child.is_dir() and not child.is_symlink()))
+        entries.append((child.name, child.is_dir() and not _is_link(child)))
     return entries
 
 
 def kind_of(root: Path, path: str) -> str:
     """`file`, `dir`, `symlink` ou `missing` pour l'entrée `path` (sans suivre un lien final)."""
     entry = _entry(root, path, portable=False)
-    if entry.is_symlink():
+    # Une jonction Windows compte comme un lien : `rm`/`mv` agissent sur elle, `cp` la refuse.
+    if _is_link(entry):
         return "symlink"
     if entry.is_dir():
         return "dir"
     return "file" if entry.exists() else "missing"
 
 
-def read_text(root: Path, path: str) -> str:
-    """Texte (UTF-8, erreurs remplacées) d'un fichier de l'espace."""
+READ_LIMIT = 256 * 1024
+"""Octets au plus lus par `cat` : au-delà, la sortie du terminal est tronquée."""
+
+
+def read_text(root: Path, path: str, *, limit: int = READ_LIMIT) -> tuple[str, bool]:
+    """Texte (UTF-8, erreurs remplacées) des `limit` premiers octets d'un fichier de l'espace,
+    et vrai s'il en reste au-delà."""
     kind = kind_of(root, path)
     if kind == "missing":
         raise SandboxFileError(f"« {path} » n'existe pas.")
     if kind == "dir":
         raise SandboxFileError(f"« {path} » est un dossier, pas un fichier.")
-    data = read_bytes(root, path)
-    if data is None:
+    target = confine(root, path, portable=False)
+    if not target.is_file():
         raise SandboxFileError(f"« {path} » n'a pas pu être lu.")
-    return data.decode("utf-8", errors="replace")
+    with target.open("rb") as handle:
+        data = handle.read(limit + 1)
+    return data[:limit].decode("utf-8", errors="replace"), len(data) > limit
 
 
 def append_text(root: Path, path: str, text: str) -> Path:
-    """Ajoute `text` (UTF-8, LF) à la fin de `path`, créé au besoin."""
+    """Ajoute `text` (UTF-8, LF) à la fin de `path`, créé au besoin, sans relire le fichier."""
     target = confine(root, path)
     if target.is_dir():
         raise SandboxFileError(f"« {path} » est un dossier.")
-    existing = target.read_bytes() if target.is_file() else b""
-    _atomic_write(target, existing + to_lf(text).encode("utf-8"))
+    data = to_lf(text).encode("utf-8")
+    if target.exists():
+        with target.open("ab") as handle:
+            handle.write(data)
+    else:
+        require_parent(root, path)
+        _atomic_write(target, data)
     return target
+
+
+def require_parent(root: Path, path: str) -> None:
+    """Refuse d'écrire dans un dossier absent, comme un shell (pas de création en silence)."""
+    parent = PurePosixPath(path).parent
+    if parent.parts and kind_of(root, parent.as_posix()) != "dir":
+        raise SandboxFileError(
+            f"Le dossier « {parent.as_posix()} » n'existe pas.", "Créez-le avec « mkdir »."
+        )
 
 
 def touch(root: Path, path: str) -> Path:
@@ -396,6 +428,7 @@ def touch(root: Path, path: str) -> Path:
     if target.exists():
         os.utime(target)
     else:
+        require_parent(root, path)
         _atomic_write(target, b"")
     return target
 
@@ -476,7 +509,13 @@ def copy_path(root: Path, source: str, dest: str, *, recursive: bool = False) ->
             raise SandboxFileError(f"« {source} » ne peut pas être copié dans lui-même.")
         if target.exists():
             raise SandboxFileError(f"« {dest} » existe déjà.")
-        shutil.copytree(src, target, symlinks=True)
+        junction = _find_junction(src)
+        if junction is not None:
+            raise SandboxFileError(
+                f"« {source} » contient une jonction Windows ({junction}), qui ne se copie pas.",
+                "Supprimez la jonction avec « rm », ou copiez les fichiers un par un.",
+            )
+        shutil.copytree(src, target, symlinks=True, ignore=_skip_git_dirs)
         return
     if kind == "symlink":
         # Un lien est copié par sa cible, qui doit rester dans l'espace.
@@ -486,6 +525,21 @@ def copy_path(root: Path, source: str, dest: str, *, recursive: bool = False) ->
     if target.is_dir():
         raise SandboxFileError(f"« {dest} » est un dossier existant.")
     _atomic_write(target, src.read_bytes())
+
+
+def _find_junction(src: Path) -> str | None:
+    """Première jonction sous `src` : `copytree` la copierait comme un dossier réel, donc avec
+    le contenu de sa cible, peut-être hors de l'espace (`os.walk` ne la suit pas)."""
+    for directory, dirs, _files in os.walk(src):
+        for name in dirs:
+            if os.path.isjunction(os.path.join(directory, name)):
+                return Path(directory, name).relative_to(src).as_posix()
+    return None
+
+
+def _skip_git_dirs(_directory: str, names: list[str]) -> set[str]:
+    """`cp -r` ne recopie pas de dossier interne de git (dépôt imbriqué)."""
+    return {name for name in names if _is_git_dir(name)}
 
 
 def _glob_regex(part: str) -> re.Pattern[str]:
