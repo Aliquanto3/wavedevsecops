@@ -15,7 +15,26 @@ from wavedevsecops.contracts import element_id, parse_element_id
 
 @pytest.mark.parametrize(
     "path",
-    ["", "/etc/passwd", "../dehors.txt", "a/../../b", ".git/config", "src/.GIT/x", "C:/x", "a\\b"],
+    [
+        "",
+        "/etc/passwd",
+        "../dehors.txt",
+        "a/../../b",
+        ".git/config",
+        "src/.GIT/x",
+        "C:/x",
+        "a\\b",
+        # Alias Windows de `.git` : points ou espaces finaux, nom court 8.3.
+        ".git./config",
+        ".git /config",
+        "GIT~1/config",
+        # Noms réservés ou non portables sous Windows.
+        "NUL",
+        "src/con.txt",
+        "lpt1",
+        "x.",
+        "dossier /a.txt",
+    ],
 )
 def test_chemins_refuses(tmp_path: Path, path: str) -> None:
     with pytest.raises(wsfs.SandboxPathError) as info:
@@ -43,6 +62,24 @@ def test_lien_qui_sort_refuse(tmp_path: Path) -> None:
         pytest.skip("liens symboliques indisponibles sur ce poste")
     with pytest.raises(wsfs.SandboxPathError):
         wsfs.write_text(root, "lien/x.txt", "x")
+
+
+def test_lien_vers_git_refuse(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    (root / ".git").mkdir(parents=True)
+    try:
+        (root / "lien").symlink_to(root / ".git", target_is_directory=True)
+    except OSError:
+        pytest.skip("liens symboliques indisponibles sur ce poste")
+    with pytest.raises(wsfs.SandboxPathError):
+        wsfs.write_text(root, "lien/config", "x")
+    assert not (root / ".git" / "config").exists()
+
+
+def test_noms_ordinaires_admis(tmp_path: Path) -> None:
+    for path in (".github/workflows/ci.yml", ".gitignore", "console.py", "src/nullable.txt"):
+        wsfs.write_text(tmp_path, path, "x")
+    assert wsfs.read_bytes(tmp_path, ".gitignore") == b"x"
 
 
 def test_json_canonique(tmp_path: Path) -> None:

@@ -67,18 +67,26 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(to_lf(text).encode("utf-8")).hexdigest()
 
 
-def _record_lines(node: yaml.Node, path: tuple, lines: dict[tuple, int]) -> None:
+def _record_lines(
+    node: yaml.Node, path: tuple, lines: dict[tuple, int], duplicates: list[FieldError]
+) -> None:
     lines.setdefault(path, node.start_mark.line + 1)
     if isinstance(node, yaml.MappingNode):
+        seen: set[str] = set()
         for key_node, value_node in node.value:
             key = key_node.value if isinstance(key_node, yaml.ScalarNode) else None
             if key is None:
                 continue
+            if key in seen:  # PyYAML garderait la dernière valeur sans rien dire
+                duplicates.append(
+                    FieldError(_label([*path, key]), key_node.start_mark.line + 1, "clé en double")
+                )
+            seen.add(key)
             lines.setdefault((*path, key), key_node.start_mark.line + 1)
-            _record_lines(value_node, (*path, key), lines)
+            _record_lines(value_node, (*path, key), lines, duplicates)
     elif isinstance(node, yaml.SequenceNode):
         for index, item in enumerate(node.value):
-            _record_lines(item, (*path, index), lines)
+            _record_lines(item, (*path, index), lines, duplicates)
 
 
 def _parse(text: str, source: str) -> tuple[Any, dict[tuple, int]]:
@@ -100,8 +108,11 @@ def _parse(text: str, source: str) -> tuple[Any, dict[tuple, int]]:
     finally:
         loader.dispose()
     lines: dict[tuple, int] = {}
+    duplicates: list[FieldError] = []
     if node is not None:
-        _record_lines(node, (), lines)
+        _record_lines(node, (), lines, duplicates)
+    if duplicates:
+        raise ScenarioError(source, duplicates)
     return data, lines
 
 

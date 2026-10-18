@@ -44,3 +44,20 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 2.1 ».
 - `github.json` dans l'empreinte : avec `github_sim`.
 - Les steps CI `unshare -n` et `autocrlf=true` n'ont pas pu être exécutés localement (poste Windows) : à confirmer sur le premier run de la branche.
 - `ruff format` signale trois fichiers antérieurs (`cli`, `procs`, `web/app.py`) : hors périmètre, non modifiés.
+
+## Revue
+
+Revue Opus (rebase sur `main` beb2992 sans conflit), avec la liste du second avis (Haiku).
+
+- medium · second avis 1 · corrigé · `core.excludesFile` et `core.attributesFile` par défaut (`$XDG_CONFIG_HOME/git/…`, `~/.config/git/…`) échappaient à `GIT_CONFIG_GLOBAL` : un `*.py` dans l'ignore global faisait échouer le setup (prouvé). Les deux clés sont forcées à `os.devnull` dans `FORCED_CONFIG` ; `git init --template=` écarte les gabarits du poste (`info/exclude`). Test hostile étendu (XDG, `HOME`, `USERPROFILE`) ; il échoue sans le correctif. Empreintes inchangées.
+- medium · second avis 2 · corrigé · `.git./config`, `.git /config`, `GIT~1/config` écrivaient dans `.git/config` sous Windows (prouvé). `wsfs` reconnaît `.git` après casse, points/espaces finaux et nom court 8.3, et revérifie après résolution (liens vers `.git`). Tests ajoutés.
+- medium · revue · corrigé · étape CI `autocrlf=true` vide de sens : `.gitattributes` (`* text=auto eol=lf`) prime sur `core.autocrlf`, les fichiers restaient en LF (`git ls-files --eol` : `w/lf`). L'étape lève `eol` par `.git/info/attributes` et vérifie `w/crlf` avant de comparer ; vérifié en local sur un clone CRLF (17 tests verts).
+- low · second avis 3 · corrigé · noms réservés Windows (`NUL`, `con.txt`, `lpt1`) et noms finis par `.` ou espace refusés à l'écriture sur tous les OS.
+- low · second avis 4 · rejeté · le script affiche chaque empreinte changée ; le diff de `fingerprints.json` est relu au commit et la CI recompare sur trois OS.
+- low · second avis 5 · rejeté · déjà couvert : `GIT_CONFIG_GLOBAL` remplacé et `core.autocrlf=false` forcé ; le test hostile pose `autocrlf = true` en config globale.
+- low · second avis 6 · rejeté · le test de lien tourne sous Linux et macOS en CI ; seul Windows sans privilège le saute.
+- low · second avis 7 · corrigé · `start` de `branch` et `switch` refusé s'il est vide ou commence par `-`.
+- low · second avis 8 · corrigé · la sonde de langue retire aussi les `GIT_*` hérités (`GIT_DIR` faisait réussir la sonde, donc conclure à l'anglais).
+- low · second avis 9 · corrigé · clé YAML en double refusée, avec champ et ligne.
+- low · revue · reporté (2.2) · `wsfs.read_bytes` lève `SandboxPathError` sur un lien de l'apprenant qui sort de l'espace ou vise `.git` : l'empreinte échouerait. À traiter avec le terminal et les instantanés (lire le lien comme un fichier, ou l'ignorer).
+- low · revue · noté · les fichiers écrits par `_atomic_write` (`mkstemp`) sont en `0600` sous Linux/macOS ; sans effet sur l'index (`core.filemode=false`, mode `100644`), à revoir si un outil tiers lit l'arbre.

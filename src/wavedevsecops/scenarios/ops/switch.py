@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 from pydantic import field_validator, model_validator
 
 from wavedevsecops.contracts import element_id
-from wavedevsecops.scenarios.ops._base import OpArgs, check_branch
+from wavedevsecops.scenarios.ops._base import OpArgs, check_branch, check_revision
 
 if TYPE_CHECKING:
     from wavedevsecops.scenarios.context import SetupContext
@@ -27,6 +27,11 @@ class Args(OpArgs):
     @classmethod
     def _branch(cls, value: str) -> str:
         return check_branch(value)
+
+    @field_validator("start")
+    @classmethod
+    def _start(cls, value: str | None) -> str | None:
+        return None if value is None else check_revision(value)
 
     @model_validator(mode="after")
     def _coherent(self) -> Args:

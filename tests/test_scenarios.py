@@ -157,3 +157,14 @@ def test_content_hash_independant_des_fins_de_ligne(tmp_path: Path) -> None:
     lf = load_scenario(folder / "essai.A.yaml", Settings()).content_hash
     (folder / "essai.A.yaml").write_bytes(VALID.replace("\n", "\r\n").encode())
     assert load_scenario(folder / "essai.A.yaml", Settings()).content_hash == lf
+
+
+def test_cle_en_double_refusee() -> None:
+    text = VALID.replace("mode: A\n", "mode: A\nmode: B\n")
+    errors = _errors(text)
+    assert [(e.field, e.line, e.message) for e in errors] == [("mode", 4, "clé en double")]
+
+
+def test_revision_de_depart_qui_ressemble_a_une_option() -> None:
+    errors = _errors(VALID.replace('start: "@premier"', 'start: "--orphan"'))
+    assert errors[0].field == "setup[2].start" and "révision invalide" in errors[0].message

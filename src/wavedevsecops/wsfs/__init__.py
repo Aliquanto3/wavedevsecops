@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import tempfile
@@ -19,6 +20,16 @@ from typing import Any
 from wavedevsecops.contracts import AppError
 
 GIT_DIR_NAMES = frozenset({".git"})
+_SHORT_GIT = re.compile(r"^git~\d+$")
+"""Nom court 8.3 de `.git` sous Windows (`GIT~1`)."""
+_RESERVED = re.compile(r"^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$")
+"""Noms de périphérique réservés par Windows, avec ou sans extension."""
+
+
+def _is_git_dir(part: str) -> bool:
+    """`.git` tel que Windows le comprend : casse, points et espaces finaux, nom court."""
+    name = part.rstrip(". ").lower()
+    return name in GIT_DIR_NAMES or bool(_SHORT_GIT.match(name))
 
 
 class SandboxPathError(AppError):
@@ -78,8 +89,9 @@ class Layout:
 def check_relative(path: str, *, portable: bool = True) -> PurePosixPath:
     """Valide un chemin relatif posix sans `..`, hors de `.git/`.
 
-    `portable` (écritures) refuse aussi `\\` et `:`, interdits sous Windows. Une lecture
-    les admet : un fichier créé ainsi sous Linux doit rester lisible pour l'empreinte.
+    `portable` (écritures) refuse aussi `\\` et `:`, les noms réservés de Windows (`NUL`,
+    `con.txt`) et les noms finis par un point ou une espace. Une lecture les admet : un
+    fichier créé ainsi sous Linux doit rester lisible pour l'empreinte.
     """
     if not path or not path.strip():
         raise SandboxPathError(path, "il est vide")
@@ -92,10 +104,14 @@ def check_relative(path: str, *, portable: bool = True) -> PurePosixPath:
         raise SandboxPathError(path, "il est absolu")
     if any(part == ".." for part in pure.parts):
         raise SandboxPathError(path, "il remonte hors du dépôt (« .. »)")
-    if any(part.lower() in GIT_DIR_NAMES for part in pure.parts):
+    if any(_is_git_dir(part) for part in pure.parts):
         raise SandboxPathError(path, "il désigne le dossier interne de git")
     if not pure.parts or pure.parts == (".",):
         raise SandboxPathError(path, "il ne désigne aucun fichier")
+    if portable and any(
+        _RESERVED.match(part.lower()) or part.endswith((".", " ")) for part in pure.parts
+    ):
+        raise SandboxPathError(path, "il contient un nom réservé ou non portable sous Windows")
     return pure
 
 
@@ -106,6 +122,9 @@ def confine(root: Path, path: str, *, portable: bool = True) -> Path:
     target = (base / Path(*pure.parts)).resolve()
     if target != base and not target.is_relative_to(base):
         raise SandboxPathError(path, "il sort de l'espace de travail")
+    # Après résolution (liens, noms courts, points finaux) : jamais dans `.git/`.
+    if any(_is_git_dir(part) for part in target.relative_to(base).parts):
+        raise SandboxPathError(path, "il désigne le dossier interne de git")
     return target
 
 

@@ -35,6 +35,13 @@ class OpArgs(BaseModel):
         return found
 
 
+def check_revision(value: str) -> str:
+    """Révision de départ : refus d'une valeur vide ou commençant par `-` (option de git)."""
+    if not value.strip() or value.startswith("-"):
+        raise ValueError(f"révision invalide : « {value} »")
+    return value
+
+
 def check_branch(value: str) -> str:
     """Nom de branche simple, ou `@alias` : refus des espaces, `..`, `/` final, `.lock`."""
     if value.startswith("@"):

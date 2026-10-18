@@ -24,8 +24,10 @@ def run_setup(scenario: Scenario, layout: Layout, git: Git) -> dict[str, str]:
         raise SetupError(f"Le gabarit « {scenario.template} » n'est pas disponible.")
     wsfs.make_dirs(layout.root)
     wsfs.make_dirs(layout.hooks)
-    git.internal("init", "-q", "--bare", layout.origin.name, cwd=layout.root)
-    git.internal("init", "-q", layout.repo.name, cwd=layout.root)
+    # `--template=` : aucun gabarit du poste (`info/exclude`, exemples de hooks), dont le
+    # contenu varie selon l'installation de git.
+    git.internal("init", "-q", "--template=", "--bare", layout.origin.name, cwd=layout.root)
+    git.internal("init", "-q", "--template=", layout.repo.name, cwd=layout.root)
     git.internal("remote", "add", "origin", ORIGIN_URL, cwd=layout.repo)
     ctx = SetupContext(layout=layout, git=git)
     for op in scenario.setup:

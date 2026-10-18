@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal
 from pydantic import field_validator
 
 from wavedevsecops.contracts import element_id
-from wavedevsecops.scenarios.ops._base import OpArgs, check_branch
+from wavedevsecops.scenarios.ops._base import OpArgs, check_branch, check_revision
 
 if TYPE_CHECKING:
     from wavedevsecops.scenarios.context import SetupContext
@@ -27,6 +27,11 @@ class Args(OpArgs):
         if value.startswith("@"):
             raise ValueError("le nom d'une nouvelle branche ne peut pas être un alias")
         return check_branch(value)
+
+    @field_validator("start")
+    @classmethod
+    def _start(cls, value: str) -> str:
+        return check_revision(value)
 
 
 def apply(args: Args, ctx: SetupContext) -> str:

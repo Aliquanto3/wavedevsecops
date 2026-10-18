@@ -51,11 +51,16 @@ jobs:
 
       # AD-18 : les empreintes ne bougent pas sur un clone en core.autocrlf=true. Les fichiers
       # du dépôt sont réextraits avec ce réglage, puis les empreintes recomparées.
+      # `.gitattributes` impose `eol=lf`, qui primerait sur core.autocrlf : on le lève par
+      # `.git/info/attributes`, puis on vérifie que le scénario est bien extrait en CRLF.
       - name: Empreintes sur un clone core.autocrlf=true
         if: runner.os == 'Windows'
         shell: bash
         run: |
           git config core.autocrlf true
+          mkdir -p .git/info
+          printf '* text=auto !eol\n' > .git/info/attributes
           git rm -r --cached --quiet .
           git reset --hard --quiet
+          git ls-files --eol content/scenarios/bac-a-sable-libre.A.yaml | grep -q 'w/crlf'
           uv run pytest -q --tb=short tests/test_scenarios.py tests/test_fingerprints.py

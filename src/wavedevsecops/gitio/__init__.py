@@ -10,6 +10,7 @@ forcés par `GIT_CONFIG_COUNT`, aucun prompt, aucun éditeur, aucun proxy, entr�
 
 from __future__ import annotations
 
+import os
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ def _env(locale: str) -> dict[str, str]:
     env = {
         k: v
         for k, v in inherited_environment().items()
-        if not k.lower().endswith("_proxy") and not k.upper().startswith(("LC_", "LANG"))
+        if not _dropped(k)  # GIT_DIR hérité : la sonde réussirait sans message à comparer
     }
     env.update(
         LC_ALL=locale,
@@ -96,8 +97,15 @@ FORCED_CONFIG: tuple[tuple[str, str], ...] = (
     ("gc.auto", "0"),
     ("maintenance.auto", "false"),
     ("credential.helper", ""),
+    ("core.excludesFile", os.devnull),
+    ("core.attributesFile", os.devnull),
 )
-"""Réglages qui priment sur toute config de dépôt (AD-3) ; `core.hooksPath` s'y ajoute."""
+"""Réglages qui priment sur toute config de dépôt (AD-3) ; `core.hooksPath` s'y ajoute.
+
+`core.excludesFile` et `core.attributesFile` valent par défaut `$XDG_CONFIG_HOME/git/ignore`
+et `.../attributes` (ou `~/.config/git/...`), lus même avec `GIT_CONFIG_GLOBAL` : on les
+neutralise, sinon un ignore global du poste change l'index, les commits et l'empreinte.
+"""
 
 
 def _dropped(name: str) -> bool:

@@ -133,6 +133,15 @@ def test_meme_empreinte_quel_que_soit_le_poste(
         "[core]\n\tautocrlf = true\n[user]\n\tname = Intrus\n[init]\n\tdefaultBranch = trunk\n",
         encoding="utf-8",
     )
+    # Ignore et attributs globaux par défaut ($XDG_CONFIG_HOME/git/…, ~/.config/git/…) :
+    # lus par git même avec GIT_CONFIG_GLOBAL, ils doivent rester sans effet.
+    for base in (tmp_path / "xdg" / "git", tmp_path / "home" / ".config" / "git"):
+        base.mkdir(parents=True)
+        (base / "ignore").write_text("*.py\nREADME.md\n", encoding="utf-8")
+        (base / "attributes").write_text("* text eol=crlf\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(hostile))
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Intrus")
     monkeypatch.setenv("GIT_COMMITTER_DATE", "2001-01-01T00:00:00+00:00")
