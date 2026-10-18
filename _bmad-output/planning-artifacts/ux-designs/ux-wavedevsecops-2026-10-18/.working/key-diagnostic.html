@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostic - WaveDevSecOps</title>
+<style>
+/*
+  Maquette : page Diagnostic (FR-19), cas de Camille derriere un proxy. Illustre les spines, sans les remplacer.
+  EXPERIENCE.md : Information Architecture (en-tete site-nav, pages annexes 960 px sans pois) ;
+    Component Patterns (site-nav, diagnostic-row, diagnostic-badge) ; State Patterns > Outil manquant ;
+    Accessibility Floor > Champs (pastille nommee, tableaux avec th, jamais la couleur seule) ;
+    Diagnostic (tableau groupe par jalon, etats en mots + icone, « Que faire ? » depliable, section Proxy,
+    « Continuer vers le catalogue ») ; Flow 3 (etapes 4 et 5).
+  DESIGN.md : Colors (etats, deux jaunes), Typography, Layout & Spacing, Elevation & Depth ;
+    Components > Catalogue, diagnostic, exports (diagnostic-badge) ; diagnostic-row ; button-primary ; button-secondary.
+  Theme : variables sur :root ; sombre par prefers-color-scheme ET case « Theme sombre » (:has, sans JS).
+*/
+:root{
+  --primary:#451DC7;--primary-deep:#250F6B;--primary-soft:#EDE7FE;--accent:#04F06A;--accent-soft:#CAFEE0;
+  --ink:#0A0A14;--ink-soft:#4A4A5E;--muted:#8A8A9E;--line:#E6E6EC;--surface:#F6F5FA;--surface-raised:#FFFFFF;
+  --warning:#FFCA4A;--danger:#FF2A49;--on-primary:#FFFFFF;--relief:#D9D0F6;--relief-active:#C9BCF5;
+  --on-vivid:#0A0A14;--warning-soft:#FFF4D6;--danger-soft:#FDE8EB;--ink-fill:#0A0A14;--ink-fill-edge:#0A0A14;--on-ink:#FFFFFF;
+  --neutral-soft:#EFEFF4;--harness:#B8327A;--harness-soft:#FBE7F1;--context:#0F7B6C;
+}
+@media (prefers-color-scheme:dark){:root{
+  --primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent-soft:#0F3A24;
+  --ink:#ECEBF5;--ink-soft:#B4B3C7;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;
+  --danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;
+  --warning-soft:#3A3010;--danger-soft:#3A1820;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;
+  --neutral-soft:#26252F;--harness:#E8639F;--harness-soft:#3A1A2B;--context:#2FB8A3;
+}}
+:root:has(#dark-toggle:checked){
+  --primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent-soft:#0F3A24;
+  --ink:#ECEBF5;--ink-soft:#B4B3C7;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;
+  --danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;
+  --warning-soft:#3A3010;--danger-soft:#3A1820;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;
+  --neutral-soft:#26252F;--harness:#E8639F;--harness-soft:#3A1A2B;--context:#2FB8A3;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--surface);color:var(--ink);font:400 14px/1.5 "Atkinson Hyperlegible",system-ui,"Segoe UI",sans-serif}
+h1,h2,h3,.fred{font-family:Fredoka,system-ui,"Segoe UI",sans-serif;margin:0}
+code,.mono{font:400 13px/1.5 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace}
+code{background:var(--surface);border:2px solid var(--muted);border-radius:12px;padding:0 6px}
+a{color:var(--primary)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.frame{width:1920px;height:1080px;border:2px solid var(--muted);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;background:var(--surface)}
+.chrome{display:flex;align-items:center;gap:16px;height:48px;padding:0 16px;background:var(--surface-raised);border-bottom:2px solid var(--line);flex:none}
+.url{flex:1;max-width:720px;border:2px solid var(--muted);border-radius:9999px;padding:2px 16px;font:400 13px/1.5 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;background:var(--surface)}
+.toggle{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:32px;font:500 12px/1.2 Fredoka,system-ui,sans-serif;cursor:pointer}
+.toggle input{width:20px;height:20px;accent-color:var(--primary)}
+.viewport{flex:1;overflow:auto;padding:16px 24px 32px}
+.site-nav{display:flex;align-items:center;gap:24px;height:56px;padding:0 24px;background:var(--surface-raised);border:2px solid var(--line);border-radius:26px;max-width:1440px;margin:0 auto 24px}
+.brand{font:600 18px/1.15 Fredoka,system-ui,sans-serif;color:var(--primary-deep);margin-right:8px}
+.site-nav a,.site-nav .btn-lite{display:inline-flex;align-items:center;gap:8px;min-height:32px;color:var(--ink);text-decoration:none;font:500 14px/1.2 Fredoka,system-ui,sans-serif;padding:0 4px}
+.site-nav a[aria-current="page"]{border-bottom:3px solid var(--primary)}
+.site-nav .right{margin-left:auto}
+.btn-lite{background:none;border:2px solid var(--muted);border-radius:18px;padding:0 12px!important;color:var(--ink)}
+.badge-diag{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 8px;border-radius:9999px;background:var(--danger);color:var(--on-vivid);font:600 14px/1.2 Fredoka,system-ui,sans-serif}
+.pane-title{font:600 18px/1.15 Fredoka,system-ui,sans-serif}
+.pane-subtitle{font:400 13px/1.3 "Atkinson Hyperlegible",system-ui,sans-serif;color:var(--ink-soft);margin:4px 0 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 16px;border-radius:18px;font:500 14px/1.2 Fredoka,system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn-primary{background:var(--primary);color:var(--on-primary);border:2px solid var(--primary);box-shadow:0 4px 0 var(--primary-deep)}
+.btn-secondary{background:var(--surface-raised);color:var(--primary);border:2px solid var(--primary);box-shadow:0 4px 0 var(--relief-active)}
+.pill{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 10px;border-radius:9999px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:500 12px/1.2 Fredoka,system-ui,sans-serif;white-space:nowrap}
+.pill.ok{background:var(--accent);color:var(--on-vivid);border-color:var(--accent)}
+.pill.warn{background:var(--warning);color:var(--on-vivid);border-color:var(--warning)}
+.pill.fail{background:var(--danger);color:var(--on-vivid);border-color:var(--danger)}
+.annex{max-width:960px;margin:0 auto}
+.annex>header{margin-bottom:16px;display:flex;align-items:flex-start;gap:16px}
+.annex>header .grow{flex:1}
+.annex h1{font-size:20px;line-height:1.1}
+.summary{margin:0 0 16px;padding:8px 16px;border-left:4px solid var(--primary);background:var(--surface-raised);border-radius:0 18px 18px 0;font-size:14px}
+.pane{background:var(--surface-raised);border-radius:26px;box-shadow:0 4px 0 var(--relief);padding:12px;margin-bottom:24px}
+.pane>h2{font:600 18px/1.15 Fredoka,system-ui,sans-serif;padding:8px 12px 0}
+.pane>.pane-subtitle{padding:0 12px 8px}
+table{width:100%;border-collapse:separate;border-spacing:0 4px;table-layout:fixed}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;font-size:13px;line-height:1.4}
+thead th{font:500 12px/1.2 Fredoka,system-ui,sans-serif;color:var(--ink-soft);padding-bottom:4px}
+th.grp{font:600 14px/1.2 Fredoka,system-ui,sans-serif;color:var(--ink);padding:12px 10px 4px;border-bottom:2px solid var(--ink-soft)}
+tr.ok td,tr.ok th{background:var(--accent-soft)}
+tr.warn td,tr.warn th{background:var(--warning-soft)}
+tr.fail td,tr.fail th{background:var(--danger-soft)}
+tbody tr.ok>:first-child,tbody tr.warn>:first-child,tbody tr.fail>:first-child{border-radius:18px 0 0 18px}
+tbody tr.ok>:last-child,tbody tr.warn>:last-child,tbody tr.fail>:last-child{border-radius:0 18px 18px 0}
+tbody th[scope=row]{font:600 14px/1.3 Fredoka,system-ui,sans-serif}
+td .sub{display:block;color:var(--ink-soft);font-size:12px;font-weight:400}
+td.num{font:600 14px/1.2 Fredoka,system-ui,sans-serif}
+summary{cursor:pointer;min-height:24px;font:500 13px/1.4 Fredoka,system-ui,sans-serif;color:var(--primary-deep)}
+details ol{margin:6px 0 0;padding-left:18px}
+details li{margin-bottom:4px}
+details p{margin:6px 0 0}
+.foot{display:flex;align-items:center;gap:16px;margin-top:8px}
+.foot p{margin:0;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="chrome">
+    <span class="url">http://127.0.0.1:8742/diagnostic</span>
+    <label class="toggle"><input type="checkbox" id="dark-toggle"> Thème sombre</label>
+  </div>
+  <div class="viewport">
+    <header class="site-nav">
+      <span class="brand">WaveDevSecOps</span>
+      <a href="#">Catalogue</a>
+      <a href="#">Vocabulaire</a>
+      <a href="#" aria-current="page" aria-label="Diagnostic, 2 outils absents ou trop anciens">Diagnostic <span class="badge-diag" aria-hidden="true">2</span></a>
+      <span class="right btn-lite">Affichage ▾</span>
+    </header>
+
+    <main class="annex">
+      <header>
+        <div class="grow">
+          <h1 class="pane-title">Diagnostic</h1>
+          <p class="pane-subtitle">Outils, versions et réglages du poste, tels que WaveDevSecOps les voit</p>
+        </div>
+        <a class="btn btn-secondary" href="#">Relancer le diagnostic</a>
+      </header>
+      <p class="summary" role="status">Recherche terminée : 2 outils sur 7 demandent une action, et NO_PROXY demande un réglage. Les scénarios qui dépendent d'un outil manquant restent visibles et grisés.</p>
+
+      <section class="pane" aria-labelledby="h-outils">
+        <h2 id="h-outils">Outils</h2>
+        <p class="pane-subtitle">Version trouvée sur ce poste, version requise et marche à suivre</p>
+        <table>
+          <colgroup><col style="width:84px"><col style="width:132px"><col style="width:84px"><col style="width:84px"><col style="width:112px"><col style="width:270px"><col style="width:104px"></colgroup>
+          <thead><tr><th scope="col">Outil</th><th scope="col">Usage</th><th scope="col">Version trouvée</th><th scope="col">Version requise</th><th scope="col">État</th><th scope="col">Que faire ?</th><th scope="col">Scénarios indisponibles</th></tr></thead>
+          <tbody>
+            <tr><th scope="colgroup" colspan="7" class="grp">Outils requis (v0.1)</th></tr>
+            <tr class="ok"><th scope="row">git</th><td>Tous les scénarios</td><td class="mono">2.47.0</td><td class="mono">≥ 2.x</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>—</td><td class="num">0</td></tr>
+            <tr class="ok"><th scope="row">uv</th><td>Installation et lancement</td><td class="mono">0.8.4</td><td class="mono">≥ 0.5</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>—</td><td class="num">0</td></tr>
+            <tr><th scope="colgroup" colspan="7" class="grp">Outils de la chaîne (v0.2+)</th></tr>
+            <tr class="fail"><th scope="row">gitleaks</th><td>Hook pre-commit, Stations 1 et 3</td><td class="mono">absent</td><td class="mono">≥ 8.18</td><td><span class="pill fail"><span aria-hidden="true">✗</span> Absent</span></td>
+              <td><details open><summary>Que faire ?</summary>
+                <ol>
+                  <li>Téléchargez l'archive Windows de gitleaks depuis la page de ses versions (aucun installateur).</li>
+                  <li>Extrayez <code>gitleaks.exe</code> dans <code>%USERPROFILE%\.wavedevsecops\bin</code>. Aucun droit administrateur n'est nécessaire.</li>
+                  <li>Ajoutez ce dossier à la variable <code>PATH</code> de votre compte, puis ouvrez une nouvelle console.</li>
+                  <li>Cliquez « Relancer le diagnostic ».</li>
+                </ol></details></td>
+              <td class="num">2<span class="sub">Hook pre-commit ; clé d'API en dur</span></td></tr>
+            <tr class="warn"><th scope="row">bandit</th><td>Check SAST, Station 3</td><td class="mono">1.6.2</td><td class="mono">≥ 1.7</td><td><span class="pill warn"><span aria-hidden="true">⚠</span> Trop ancien</span></td>
+              <td><details><summary>Que faire ?</summary><p>Mettez bandit à jour : <code>uv tool upgrade bandit</code>.</p></details></td>
+              <td class="num">1<span class="sub">Code vulnérable</span></td></tr>
+            <tr class="ok"><th scope="row">ruff</th><td>Lint, Station 1</td><td class="mono">0.7.1</td><td class="mono">≥ 0.6</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>—</td><td class="num">0</td></tr>
+            <tr class="ok"><th scope="row">pytest</th><td>Tests, Station 1</td><td class="mono">8.3.3</td><td class="mono">≥ 8.0</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>—</td><td class="num">0</td></tr>
+            <tr class="ok"><th scope="row">pip-audit</th><td>Check SCA et SBOM, Station 3</td><td class="mono">2.7.3</td><td class="mono">≥ 2.7</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>—</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="pane" aria-labelledby="h-proxy">
+        <h2 id="h-proxy">Proxy</h2>
+        <p class="pane-subtitle">Ce que le poste déclare, et ce qui manque pour atteindre l'application en local</p>
+        <table>
+          <colgroup><col style="width:140px"><col style="width:216px"><col style="width:130px"><col></colgroup>
+          <thead><tr><th scope="col">Réglage</th><th scope="col">Valeur détectée</th><th scope="col">État</th><th scope="col">Que faire ?</th></tr></thead>
+          <tbody>
+            <tr class="ok"><th scope="row" class="mono">HTTPS_PROXY</th><td class="mono">http://proxy.****.fr:8080</td><td><span class="pill ok"><span aria-hidden="true">✓</span> Détecté</span></td><td>Rien à faire. L'installation et les mises à jour passent par ce proxy.</td></tr>
+            <tr class="warn"><th scope="row" class="mono">NO_PROXY</th><td class="mono">*.intra.exemple.fr</td><td><span class="pill warn"><span aria-hidden="true">⚠</span> À compléter</span></td>
+              <td><details open><summary>Que faire ?</summary>
+                <p>Le navigateur envoie <code>127.0.0.1</code> au proxy et n'atteint pas l'application. Ajoutez <code>localhost</code> et <code>127.0.0.1</code> :</p>
+                <p><code>setx NO_PROXY "*.intra.exemple.fr,localhost,127.0.0.1"</code></p>
+                <p>Ouvrez ensuite une nouvelle console et relancez le diagnostic.</p></details></td></tr>
+            <tr class="ok"><th scope="row" class="mono">UV_SYSTEM_CERTS</th><td class="mono">true</td><td><span class="pill ok"><span aria-hidden="true">✓</span> OK</span></td><td>uv utilise les certificats du système, donc ceux de votre proxy.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div class="foot">
+        <a class="btn btn-primary" href="#">Continuer vers le catalogue</a>
+        <p>gitleaks et bandit n'empêchent pas d'ouvrir le catalogue : seuls leurs 3 scénarios sont grisés.</p>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

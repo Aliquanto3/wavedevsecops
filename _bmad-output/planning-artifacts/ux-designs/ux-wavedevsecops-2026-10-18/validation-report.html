@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<!--
+  UX Design Validation Report — skeleton template.
+
+  This file is a starter the synthesis pass fills in directly. There is no
+  substitution engine. The LLM:
+    1. Reads {doc_workspace}/review-rubric.md and every review-{slug}.md from
+       additional reviewers.
+    2. Copies this skeleton.
+    3. Replaces the placeholder content (everything between TEMPLATE markers)
+       with the consolidated review, preserving the structure and CSS.
+    4. Writes the result to {doc_workspace}/validation-report.html.
+    5. Writes a markdown twin to {doc_workspace}/validation-report.md.
+
+  Visual rules the LLM must preserve:
+    - The container width, the color tokens, the typography.
+    - One dimension = one collapsible <section class="dimension">.
+    - Verdict pill uses the verdict-* class matching its judgment.
+    - Severity badge uses the badge-sev-* class matching its level.
+    - Each extra reviewer (accessibility, adversarial, etc.) gets its own
+      collapsible section below the rubric dimensions.
+    - The footer always shows the artifact paths and timestamp.
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: WaveDevSecOps</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <div class="title">
+        <h1>WaveDevSecOps — UX Design Validation Report</h1>
+        <div class="subtitle">_bmad-output\planning-artifacts\ux-designs\ux-wavedevsecops-2026-10-18\DESIGN.md · EXPERIENCE.md</div>
+      </div>
+    </header>
+    <div class="synthesis">
+      <p>La paire est solide et utilisable comme contrat : tous les jetons de couleur sont en hex avec leur jumeau sombre, les quatre UJ ont un flux avec protagoniste, étapes numérotées et climax, les 21 décisions du memlog sont reflétées sans contradiction, et aucun point du PRD n&#x27;est contredit sur le fond. Aucun constat critique. Trois constats high à corriger avant l&#x27;architecture : la règle de correction d&#x27;une désignation entre types différents (ligne de diff contre commit), le contraste du focus clavier sur le terminal en thème clair, et plusieurs composants utilisés dans EXPERIENCE sans spec visuelle ni comportement. Les maquettes HTML sont à venir et ne sont pas comptées comme critiques.</p>
+      <p>La relecture d&#x27;accessibilité (WCAG 2.2 AA) déplace l&#x27;image : elle ajoute un constat critical (parcours clavier du mode désignation incomplet, A-01) et cinq high (estompage à 0,35, annonces lecteur d&#x27;écran, nom accessible du graphe, cibles trop petites, anneau de focus). Ces constats sont à traiter avant l&#x27;architecture, avec les trois high du rubric.</p>
+      <p>Décisions d&#x27;Anaël du 2026-10-18 : ensemble de bonnes réponses équivalentes pour la désignation ; désignation au clavier par parcours des vues et par liste filtrable. Une passe de correction des constats critical, high et medium est en cours.</p>
+      <p>Comptes : rubric critical 0 · high 3 · medium 12 · low 24 ; accessibilité critical 1 · high 5 · medium 10 · low 8 ; total critical 1 · high 8 · medium 22 · low 32.</p>
+    </div>
+    <div class="dimension-summary">
+      <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Visual reference coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+    </div>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Flow coverage</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : UJ-1 à UJ-4 du PRD (§2.3) ont chacun leur flux (Flows 1, 2, 4, 5), plus un flux de cas limite (Flow 3, proxy, cas limite de UJ-2). Tous ont un protagoniste nommé, des étapes numérotées et un climax. Les noms sont repris mot pour mot du PRD. Les flux couvrent v0.1 à v1.0 sauf la station 4.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">Flow 2, étapes 6 à 8 </h3>
+              <span class="finding-location">EXPERIENCE &gt; Désignation, Flow 2 ; PRD FR-12</span>
+            </header>
+            <div class="finding-note">Flow 2, étapes 6 à 8 : Camille désigne une ligne de diff (<code>API_KEY=…</code>), mais la vue entoure « le commit attendu ». La règle de correction n&#x27;est écrite nulle part : une ligne du bon commit est-elle une réponse juste ? Une branche qui contient le commit ? Le tableau « Éléments désignables par type de question » dit seulement que tous les éléments des types listés sont désignables. FR-12 exige une correction automatique contre le dépôt réel, donc l&#x27;architecture a besoin de cette règle d&#x27;équivalence (EXPERIENCE &gt; Désignation, Flow 2 ; PRD FR-12).</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter à Désignation une règle explicite : l&#x27;élément attendu est déclaré par le scénario avec ses éléments équivalents (ligne de diff → commit qui l&#x27;introduit, ref → commit pointé). Dire si une réponse équivalente est « ✓ Votre choix » ou « ✗ ». Compléter l&#x27;étape 8 du Flow 2 en conséquence.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Station 4 (FR-29 à FR-31, v0.3) </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Station 4 (FR-29 à FR-31, v0.3) : aucun flux, aucune surface dans l&#x27;IA, aucun composant (tag annoté avec refus non SemVer, artefact construit, staging et prod simulée, promotion avec approbation, rollback). Seuls « Tag (v0.3) » dans Correspondances et le bandeau « 4 Livraison » existent. Le PRD renvoie le parcours de la station 4 au découpage en stories, donc ce n&#x27;est pas une contradiction, mais l&#x27;UX est incomplète pour v0.3.</div>
+            <div class="finding-fix"><strong>Fix :</strong> l&#x27;écrire comme question non bloquante et prévoir une mise à jour de l&#x27;UX avant les stories v0.3.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Catalogue et parcours (FR-16, FR-9) </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Catalogue et parcours (FR-16, FR-9) : le memlog décide « sections Socle git / Stations / Savoir en parler » et « choix du parcours ». EXPERIENCE ne mentionne que « Savoir en parler ». Le choix initial du parcours (Flow 1 le suppose fait), le changement de parcours et la progression propre à chaque parcours n&#x27;ont ni composant ni règle. La mise en page du catalogue n&#x27;a pas de section dédiée, contrairement au Diagnostic.</div>
+            <div class="finding-fix"><strong>Fix :</strong> section « Catalogue » : sections, sélecteur de parcours (composant, comportement, état au premier lancement), lecture de l&#x27;état A/B par parcours.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Flow 3 n&#x27;a pas de chemin d&#x27;échec explicite (le flux est lui-même un échec ; étape 5 couvre l&#x27;outil manquant).</h3>
+              <span class="finding-location">le flux est lui-même un échec ; étape 5 couvre l&#x27;outil manquant</span>
+            </header>
+            <div class="finding-note">Flow 3 n&#x27;a pas de chemin d&#x27;échec explicite (le flux est lui-même un échec ; étape 5 couvre l&#x27;outil manquant).</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter une ligne « Échec : le navigateur n&#x27;atteint toujours pas 127.0.0.1 » avec repli pywebview.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Flow 1, étape 7 </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Flow 1, étape 7 : « 2 sur 3 du premier coup » alors que le flux ne montre qu&#x27;un quiz et que SM-1 vise ≥ 80 %. Un lecteur peut y voir un conflit.</div>
+            <div class="finding-fix"><strong>Fix :</strong> préciser que le choix était volontaire et que le scénario compte trois quiz.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Token completeness</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : toutes les couleurs sont en hex (aucune valeur manquante) ; chaque jeton clair a un jumeau <code>-dark</code> (60 paires environ, aucun oubli) ; tous les <code>{chemin.jeton}</code> de la prose et de <code>components</code> se résolvent ; les trois chiffres de contraste annoncés (1,5:1, 3,7:1, 6,8 et 7,2:1) recalculés et justes ; les composants décrits en prose ont tous une entrée YAML.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">Focus </h3>
+              <span class="finding-location">Tab ou F6</span>
+            </header>
+            <div class="finding-note">Focus : l&#x27;Accessibility Floor impose partout « focus visible <code>{colors.primary}</code> 2 px ». Le terminal est sombre dans les deux thèmes ; en thème clair, <code>#451DC7</code> sur <code>#0A0A14</code> donne environ 2,1:1, sous les 3:1 des traits porteurs de sens. Même problème sur <code>graph-head</code>, <code>pane-step</code>, <code>new-mark</code>, <code>tool-output</code> (étiquette) et <code>terminal-*</code>. Le digest WaveStack prévoit <code>on-ink</code> 2 px sur fond encre. Le terminal est une zone à focus clavier central (Tab ou F6).</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter un jeton <code>focus-on-ink</code> (= <code>on-ink</code> / <code>ink-dark</code>) et le règle dans Accessibility Floor et dans <code>terminal</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title"><code>{colors.warning}</code> et <code>{colors.hosting-network}</code> ont la même valeur <code>#FFCA4A</code> mais deux sens </h3>
+              <span class="finding-location"><code>state-pill</code></span>
+            </header>
+            <div class="finding-note"><code>{colors.warning}</code> et <code>{colors.hosting-network}</code> ont la même valeur <code>#FFCA4A</code> mais deux sens : « état provisoire » (bandeau du quiz, diagnostic) et « sort du poste » (FR-17). Le tableau Colors annonce « une couleur = un sens » ; le Do dit « Jaune réservé à l&#x27;état provisoire et à la sortie du poste » ; le digest WaveStack dit « jamais jaune pour un état » (<code>state-pill</code>).</div>
+            <div class="finding-fix"><strong>Fix :</strong> soit un seul sens par teinte (réseau en <code>discipline-network</code> <code>#D9A400</code> + icône), soit assumer l&#x27;exception dans la table avec son motif.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Terminal </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Terminal : <code>terminal-prompt</code>, <code>terminal-exit-error</code>, <code>terminal-app-message</code> et <code>terminal-refused</code> utilisent <code>primary-dark</code>, <code>danger-dark</code>, <code>surface-dark</code> dans le thème clair. Cela rompt la règle « chaque couleur par un jeton, avec son jumeau sombre » et la lecture du suffixe <code>-dark</code> comme thème. Un développeur peut les basculer avec le thème.</div>
+            <div class="finding-fix"><strong>Fix :</strong> jetons dédiés (<code>terminal-bg</code>, <code>terminal-fg</code>, <code>terminal-accent</code>, <code>terminal-danger</code>, valeurs identiques dans les deux thèmes).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Contrastes des ajouts non énoncés </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Contrastes des ajouts non énoncés : <code>on-vivid</code> sur <code>danger</code> (badge, environ 5,4:1), <code>ink-soft</code> sur <code>discipline-neutral-soft</code>, <code>primary-deep</code> sur <code>primary-soft</code> en sombre, <code>on-ink-soft</code> sur terminal. Seuls les contrastes du terminal sont estimés. La question 11 parle du « thème clair » alors que les estimations 6,8 et 7,2:1 sont déjà fournies pour le fond <code>ink-fill</code>.</div>
+            <div class="finding-fix"><strong>Fix :</strong> tableau des combinaisons porteuses nouvelles avec ratio ; reformuler la question 11.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Valeurs brutes hors jetons </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Valeurs brutes hors jetons : <code>420px</code> (<code>explain-popover</code>), <code>2px discipline color</code> (<code>link-state</code>), disque de 14 px et pas de 16 px en prose.</div>
+            <div class="finding-fix"><strong>Fix :</strong> jetons de spacing pour <code>popover-max-width</code> et <code>graph-node-size</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title"><code>state-active</code> = <code>state-ok</code> = <code>accent</code> (<code>#04F06A</code>) </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note"><code>state-active</code> = <code>state-ok</code> = <code>accent</code> (<code>#04F06A</code>) : « en cours » et « réussi » partagent la même teinte, distingués par la forme et le texte. À noter dans les Do&#x27;s.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>Component coverage</h2>
+          <span class="verdict-pill verdict-thin">thin</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : les noms de composants de DESIGN.Components (YAML et prose), de EXPERIENCE.Component Patterns et de tous les autres sections de EXPERIENCE. Le cœur (terminal, graphe, index, diff, PR, checks, chaîne, désignation, indices) a une ligne dans les deux fichiers avec de vraies règles. Les manques sont dans le périphérique, mais il est porteur.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">Éléments utilisés dans EXPERIENCE sans ligne DESIGN ni, le plus souvent, sans ligne Component Patterns </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Éléments utilisés dans EXPERIENCE sans ligne DESIGN ni, le plus souvent, sans ligne Component Patterns : liste de choix du quiz (boutons radio + « Exécuter ma réponse », FR-15) ; bouton « Désigner dans les vues » (états inactif, armé, « Désignation active ») ; encart « État inattendu » (FR-11) ; encart d&#x27;échec de restauration ; fil de revue et approbations dans <code>pr-card</code> (journal de revue, FR-6 et FR-22) ; vue SBOM (désignable en FR-34) ; badges mode A/B et parcours du <code>scenario-panel</code> ; marque « Rétabli » (variante de <code>new-mark</code>) ; mention « Modifié hors de l&#x27;application » et choix « Garder ma version / Recharger » ; bouton « Exécuter le code (réseau possible) » ; carte et question de l&#x27;entretien RSSI ; aperçu du rapport. Sans spec, chaque story les invente.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter une ligne DESIGN (jetons) et une ligne Component Patterns (comportement) pour chacun, ou les rattacher explicitement à un composant existant (ex. encarts = <code>diagnostic-row</code> + <code>state-pill</code>).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Component Patterns n&#x27;a pas de ligne pour <code>designable</code> (décrit dans Désignation seulement) ni pour…</h3>
+              <span class="finding-location">décrit dans l&#x27;IA</span>
+            </header>
+            <div class="finding-note">Component Patterns n&#x27;a pas de ligne pour <code>designable</code> (décrit dans Désignation seulement) ni pour <code>site-nav</code> (décrit dans l&#x27;IA).</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title"><code>explain-popover</code> </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note"><code>explain-popover</code> : le déclencheur « i » (disque cerclé du <code>scenario-info</code> WaveStack) n&#x27;est décrit que par renvoi au digest ; le memlog note qu&#x27;il n&#x27;existe pas de bulle dédiée chez WaveStack.</div>
+            <div class="finding-fix"><strong>Fix :</strong> une ligne sur l&#x27;anatomie du déclencheur.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title"><code>terminal</code> </h3>
+              <span class="finding-location">NFR-7 : jamais de plantage</span>
+            </header>
+            <div class="finding-note"><code>terminal</code> : « Pas de pager » et « sortie complète » sans plafond. Prévoir une borne de sortie ou de mémoire du log (NFR-7 : jamais de plantage).</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>State coverage</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : surfaces de l&#x27;IA parcourues contre les états vide, chargement, erreur, hors ligne, refus, focus, indisponible. Le workspace est très bien couvert (21 états). Les pages annexes et les cas d&#x27;infrastructure le sont moins.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Échecs d&#x27;infrastructure sans traitement </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Échecs d&#x27;infrastructure sans traitement : bac à sable impossible à créer (dossier non inscriptible, disque plein), serveur local arrêté pendant que l&#x27;onglet est ouvert (console fermée), port occupé au lancement. NFR-7 exige un message plutôt qu&#x27;un plantage.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter deux lignes à State Patterns (« Bac à sable indisponible », « Application arrêtée »).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">« Reprendre » (catalogue) et redémarrage en cours de scénario </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">« Reprendre » (catalogue) et redémarrage en cours de scénario : le bac à sable est-il conservé, ramené à l&#x27;étape, ou le scénario recommencé ? FR-20 ne garde que score et indices. Non spécifié, alors que « Reprendre » est un élément du memlog.</div>
+            <div class="finding-fix"><strong>Fix :</strong> règle explicite (par exemple : reprise = scénario rouvert à son état initial, ou état restauré).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Barrières en échec en v0.2 </h3>
+              <span class="finding-location">affiché ou non ?</span>
+            </header>
+            <div class="finding-note">Barrières en échec en v0.2 : refus du hook pre-commit gitleaks (FR-21), test cassé ou lint prévu, sont présents en exemple de ton mais n&#x27;ont ni état ni flux (où apparaît le refus ? lié au <code>graph-commit</code> absent ? explication ?). Quiz : une bonne réponse qui modifie l&#x27;état (ex. <code>reset --soft</code>) n&#x27;a pas de règle pour le bandeau (affiché ou non ?).</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">États vides absents pour le catalogue au premier lancement, pour la vue Code sans fichier sélectionné et…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">États vides absents pour le catalogue au premier lancement, pour la vue Code sans fichier sélectionné et pour l&#x27;export du rapport sans progression. Échec d&#x27;écriture du fichier exporté non traité.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Pipeline </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Pipeline : check qui échoue par expiration ou outil qui plante (distinct d&#x27;un défaut prévu) non distingué.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>Visual reference coverage</h2>
+          <span class="verdict-pill verdict-thin">thin</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : <code>imports/</code> contient <code>wavestack-digest.md</code> ; <code>mockups/</code> et <code>wireframes/</code> n&#x27;existent pas encore (prévus : espace de travail, désignation mode B, diagnostic, catalogue). Non compté comme critique.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">DESIGN.md annonce « Maquettes HTML des écrans clés </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">DESIGN.md annonce « Maquettes HTML des écrans clés : à venir dans <code>mockups/</code> » sans les nommer. Plusieurs hypothèses (proportions de la disposition A, <code>scenario-panel-width</code>, <code>chain-band-height</code>, ordre de repli) dépendent de ces maquettes.</div>
+            <div class="finding-fix"><strong>Fix :</strong> lister les quatre maquettes prévues dans les deux spines, avec la section qu&#x27;elles illustrent, dès leur création ; garder la phrase « les spines priment » une seule fois.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title"><code>wavestack-digest.md</code> est cité en blockquote de DESIGN.md et en frontmatter de EXPERIENCE.md, mais pas lié…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note"><code>wavestack-digest.md</code> est cité en blockquote de DESIGN.md et en frontmatter de EXPERIENCE.md, mais pas lié dans les sections qui en dépendent (« digest §2 », « digest §3 » sans lien). Le digest est le seul accès aux spécifications WaveStack reprises : à lier à chaque renvoi.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">La règle « les spines priment » est écrite deux fois (une par fichier) ; acceptable, à n&#x27;écrire qu&#x27;une…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">La règle « les spines priment » est écrite deux fois (une par fichier) ; acceptable, à n&#x27;écrire qu&#x27;une fois si une rubrique commune est ajoutée.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Bloat &amp; overspecification</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : sections sans lecteur aval, restitution des sources, pixels hors jetons. Les sections ajoutées (Correspondances, Désignation, Indices, Quiz, Diagnostic, Pipeline, Vocabulaire, Exports) portent des décisions et des FR précis.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">DESIGN.md Components décrit chaque composant deux fois (YAML puis prose) ; les deux concordent aujourd&#x27;hui…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">DESIGN.md Components décrit chaque composant deux fois (YAML puis prose) ; les deux concordent aujourd&#x27;hui (aucune dérive trouvée), mais le risque de dérive est réel avec une cinquantaine de composants.</div>
+            <div class="finding-fix"><strong>Fix :</strong> garder la prose pour les règles qui ne sont pas des jetons (formes, tirets, contenus).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">EXPERIENCE cite des « Décisions d&#x27;Anaël (memlog) » dans le texte (Désignation, Indices, Quiz) </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">EXPERIENCE cite des « Décisions d&#x27;Anaël (memlog) » dans le texte (Désignation, Indices, Quiz) : une provenance de processus qui ne sert pas au développeur, et le memlog n&#x27;est pas dans <code>sources</code>. À retirer ou à remplacer par un renvoi au FR.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Les 8 questions non bloquantes répètent des <code>[ASSUMPTION]</code> en ligne (proportions, ordre de repli,…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Les 8 questions non bloquantes répètent des <code>[ASSUMPTION]</code> en ligne (proportions, ordre de repli, désignation armée, approbations). À conserver, mais indiquer l&#x27;emplacement de l&#x27;hypothèse pour éviter une double mise à jour.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Foundation reformule NFR-1, NFR-8, NFR-9, NFR-12 ; acceptable car résumé de contexte, à garder à une ligne…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Foundation reformule NFR-1, NFR-8, NFR-9, NFR-12 ; acceptable car résumé de contexte, à garder à une ligne chacun.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Inheritance discipline</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : chemins <code>sources</code> de EXPERIENCE (prd.md, addendum.md, digest) tous résolus ; UJ-1 à UJ-4 repris mot pour mot ; glossaire (bac à sable, barrière, station, quiz, preuve, score du premier coup, pipeline simulé…) respecté ; noms de composants identiques dans les deux fichiers ; tous les <code>{colors.*}</code>, <code>{spacing.*}</code> et <code>{typography.*}</code> de EXPERIENCE existent dans DESIGN.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Numérotation en collision </h3>
+              <span class="finding-location"><code>pane-step</code> contre numéro de station</span>
+            </header>
+            <div class="finding-note">Numérotation en collision : les vues sont numérotées 1 à 4 (<code>pane-step</code>) et les stations du bandeau aussi 1 à 4 (« 1 Poste local » … « 4 Livraison »), affichées ensemble à l&#x27;écran en v0.2. Les tableaux (Correspondances : « Dépôt local (1) » et « Station 2 ») et les flux mélangent les deux. Risque de confusion pour l&#x27;apprenant et pour le code (<code>pane-step</code> contre numéro de station).</div>
+            <div class="finding-fix"><strong>Fix :</strong> nommer les stations par lettre ou par nom seulement, ou préfixer « Étape » / « Station » partout, et le dire dans DESIGN.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Terme « score du premier passage » (Recommencer, FR-10) contre « score du premier coup » (glossaire,…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Terme « score du premier passage » (Recommencer, FR-10) contre « score du premier coup » (glossaire, restauration échouée, bilan) dans le même fichier.</div>
+            <div class="finding-fix"><strong>Fix :</strong> un seul terme, le glossaire du PRD.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">« Fil de revue (journal de revue) » dans <code>pr-card</code> </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">« Fil de revue (journal de revue) » dans <code>pr-card</code> : deux noms pour un objet, le glossaire dit « journal de revue ».</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Fiche </h3>
+              <span class="finding-location">FR-35 : au plus tard v1.0, v0.3 au plus tôt</span>
+            </header>
+            <div class="finding-note">Fiche : l&#x27;en-tête annonce « Fiche (v1.0) », l&#x27;IA « v0.3 à v1.0 » (FR-35 : au plus tard v1.0, v0.3 au plus tôt).</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">DESIGN.md n&#x27;a pas de <code>sources</code> en frontmatter (EXPERIENCE.md en a).</h3>
+              <span class="finding-location">EXPERIENCE.md en a</span>
+            </header>
+            <div class="finding-note">DESIGN.md n&#x27;a pas de <code>sources</code> en frontmatter (EXPERIENCE.md en a).</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">FR-36 dit « un fichier » ; l&#x27;UX et le memlog décident deux fichiers (HTML + CSV)</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">FR-36 dit « un fichier » ; l&#x27;UX et le memlog décident deux fichiers (HTML + CSV). Pas une contradiction (décision d&#x27;Anaël, hypothèse confirmée), à noter pour la traçabilité.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Glossaire </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Glossaire : la carte de la chaîne est une « vue » ; l&#x27;UX en fait un bandeau et une carte dépliée hors des vues numérotées et du menu « Volets ». Décision du memlog (donc conforme), mais FR-32 « vue supplémentaire » s&#x27;en lit autrement.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>Shape fit</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Vérifié : ordre des sections de DESIGN.md (Brand &amp; Style, Colors, Typography, Layout &amp; Spacing, Elevation &amp; Depth, Shapes, Components, Do&#x27;s and Don&#x27;ts) respecté. EXPERIENCE.md a Foundation, IA, Voice and Tone, Component Patterns, State Patterns, Interaction Primitives, Accessibility Floor, Key Flows et Responsive &amp; Platform (applicable, présent).</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">« Inspiration &amp; Anti-patterns » est absent alors que les sources montrent des produits de référence et des…</h3>
+              <span class="finding-location">aucun compteur d&#x27;indices, solution non copiable, désignation à un essai</span>
+            </header>
+            <div class="finding-note">« Inspiration &amp; Anti-patterns » est absent alors que les sources montrent des produits de référence et des rejets : Learn Git Branching, Oh My Git!, Git-it, Githug, GitHub Skills (addendum), help avoidance et menus contournés par essais (addendum, pédagogie). Une section courte donnerait aux stories le « pourquoi » des choix (aucun compteur d&#x27;indices, solution non copiable, désignation à un essai).</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Capacité à 1920×1080 (hypothèse déjà marquée) </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Capacité à 1920×1080 (hypothèse déjà marquée) : rangée haute de 40 % (≈ 380 px) pour la vue 2 qui doit tenir refs, <code>pr-card</code>, six <code>pr-check</code>, approbations, <code>merge-blocked</code> et ses raisons ; vue Code de 33 % (≈ 310 px) pour l&#x27;éditeur de conflit et <code>pipeline-tabs</code>. Le contenu déborde probablement. Le mode focus ⛶ atténue, mais Flow 2 et Flow 4 s&#x27;y déroulent.</div>
+            <div class="finding-fix"><strong>Fix :</strong> tester sur la maquette « espace de travail » ; sinon prévoir un défilement interne et un ordre de contenu prioritaire par vue.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Accessibility Floor suit les sections inventées au lieu d&#x27;être groupé avec Interaction Primitives ;…</h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Accessibility Floor suit les sections inventées au lieu d&#x27;être groupé avec Interaction Primitives ; l&#x27;ordre des sections par défaut n&#x27;est pas imposé, mais les défauts requis sont dispersés.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Responsive </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Responsive : « &lt; 1280 px = mode focus seul » alors que le panneau Scénario ne se masque pas : indiquer comment panneau et vue focus se partagent l&#x27;écran.</div>
+            
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Mode projection </h3>
+              <span class="finding-location"></span>
+            </header>
+            <div class="finding-note">Mode projection : décision de ne pas le reprendre avant le mode formateur, alors que UJ-3 se déroule en atelier. Question 12 ouverte, cohérente avec le PRD.</div>
+            
+          </article>
+        </div>
+      </details>
+    </section>
+    <section class="reviewer-section">
+      <details>
+        <summary>
+          <h2>Relecture d'accessibilité</h2>
+          <span class="reviewer-source">review-accessibilite.md</span>
+        </summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Date : 2026-10-18. Périmètre : <code>DESIGN.md</code>, <code>EXPERIENCE.md</code>, <code>.memlog.md</code> (statut draft). Relecture en lecture seule ; aucune maquette n&#x27;existe encore (« à venir dans <code>mockups/</code> »), donc tout ce qui suit porte sur la spécification. Les ratios sont calculés avec la formule WCAG de luminance relative (script Python, valeurs hexadécimales des jetons de <code>DESIGN.md</code>). Seuils : 4,5:1 texte, 3:1 composants et contours non textuels.</p><p>Temps (2.2.1) : conforme, aucune limite de temps imposée. Cibles (2.5.8) : exceptions réelles en A-05.</p></div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-critical">critical</span>
+              <h3 class="finding-title">A-01 — Mode désignation : parcours clavier incomplet (2.1.1, A)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« Désignation au clavier ») ; &gt; Désignation, points 2 à 4 ; &gt; Flow 5 étape 4.</span>
+            </header>
+            <div class="finding-note">(a) « Tab ne parcourt alors que les éléments désignables » : pendant que le mode est armé, la case de réponse (✕ de retrait), le champ SHA, « Valider ma réponse » et le bouton « Désignation active » ne sont pas atteignables par Tab. Le seul moyen de sortie est Échap, qui désarme, et la spec ne dit pas si la sélection placée survit. Le parcours « armer, parcourir, choisir, retirer, valider » n&#x27;est donc pas faisable de bout en bout. (b) Les lignes de diff (« chaque ligne est un élément liable et désignable ») et les blocs de sortie du terminal ne sont pas déclarés focalisables ; parcourir des centaines de lignes une à une par Tab est de plus impraticable. (c) Le Flow 5 fait désigner la sortie de gitleaks « dans le terminal » : or le terminal est une région <code>role=&quot;log&quot;</code> et capte le clavier ; aucune façon de désigner une ligne ou un bloc au clavier n&#x27;est décrite. (d) « Le champ SHA reste l&#x27;alternative complète » est faux pour la preuve RSSI : il ne couvre que les commits, pas une sortie d&#x27;outil, un check, un SBOM ou un tag.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ne pas restreindre Tab. Le mode armé ajoute seulement un état (<code>aria-pressed</code>, annonce) et garde l&#x27;ordre normal ; chaque vue expose un seul arrêt de tabulation (focus itinérant) avec flèches pour parcourir ses éléments désignables, Entrée pour placer. Ajouter une commande « Aller à la case de réponse » (raccourci F6 étendu ou lien d&#x27;évitement). Faire de chaque bloc de sortie d&#x27;outil et de chaque ligne de diff un élément focalisable dans le focus itinérant de sa vue. Prévoir pour les preuves non-commit une alternative saisie ou liste : sélecteur « Choisir une preuve dans la liste » (liste plate des éléments désignables du type attendu, avec nom accessible), équivalent complet du clic. Préciser que Échap désarme sans effacer la case, et que le focus revient sur le bouton « Désigner ».</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">A-02 — Estompage à 0,35 : texte illisible pendant la mise en correspondance (1.4.3)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>link-state</code> (<code>dimmed-opacity: 0.35</code>) ; EXPERIENCE.md &gt; Interaction Primitives, State Patterns (Restauration en cours).</span>
+            </header>
+            <div class="finding-note">survol ou focus estompe tous les éléments non liés à 0,35. Ratios obtenus : texte <code>ink</code> sur surface-raised 2,34:1 (clair) et 2,90:1 (sombre) ; <code>ink-soft</code> 1,81:1 et 2,16:1. Le texte estompé reste du contenu actif (pas un composant inactif exempté), et le focus clavier peut y rester longtemps.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ne pas utiliser <code>opacity</code> sur le texte. Estomper les décors (remplissages, traits) et garder le texte à ≥ 4,5:1 : opacité minimale 0,56 (<code>ink</code>, clair) / 0,51 (sombre) ; 0,76 / 0,69 pour <code>ink-soft</code>. En pratique prendre 0,8 et ajouter un signal non coloré pour les éléments liés (déjà l&#x27;anneau). Même règle pour l&#x27;état « Restauration en cours » (composants inactifs : exemptés, mais lisibles à 0,6 minimum pour que le message reste lu).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">A-03 — Annonces lecteur d&#x27;écran absentes pour les changements d&#x27;état centraux (4.1.3, 1.3.1)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; State Patterns (Synchro après commande), Component Patterns (<code>verdict-mark</code>, <code>new-mark</code>, <code>scenario-panel</code>), Accessibility Floor.</span>
+            </header>
+            <div class="finding-note">seule l&#x27;explication attachée (<code>explain-popover</code>) est dite <code>aria-live=&quot;polite&quot;</code>. Rien n&#x27;annonce : la mise à jour des vues après une commande (« Nouveau » posé), la validation d&#x27;étape et l&#x27;apparition de l&#x27;explication dans le panneau, la correction (« Attendu » / « Votre choix » posés dans d&#x27;autres vues, alors que le focus reste sur « Valider »), le passage de <code>step-progress</code>, le refus « SHA inconnu », le bilan. Un utilisateur de lecteur d&#x27;écran ne sait pas que la commande a eu un effet visuel.</div>
+            <div class="finding-fix"><strong>Fix :</strong> une région <code>role=&quot;status&quot;</code> (polite) unique, alimentée dans l&#x27;ordre FR-4 : « Commande terminée, code 0. Vues mises à jour : 1 commit et 1 branche nouveaux. Étape 3 validée. » ; l&#x27;explication d&#x27;étape et le verdict en <code>role=&quot;status&quot;</code> dans le panneau (l&#x27;explication reste après les vues). Les <code>verdict-mark</code> entrent dans le nom accessible de l&#x27;élément (« Commit a1b2c3d, attendu » ; « votre choix, incorrect »). Refus de commande et échec de restauration en <code>role=&quot;alert&quot;</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">A-04 — Graphe git : nom accessible incomplet et relations non exposées (1.3.1, 4.1.2)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« Noms accessibles ») ; Component Patterns (<code>graph-*</code>).</span>
+            </header>
+            <div class="finding-note">l&#x27;exemple de nom (« Commit a1b2c3d, Add config, par l&#x27;agent, pointé par feature et HEAD ») ne couvre ni les parents/enfants (la topologie est ce qu&#x27;on apprend : divergence, fusion, commit perdu), ni les états « Nouveau », « perdu · visible par reflog », « origin/… » (distant), « détachée », « sélectionné », « lié », « désignable ». Les arêtes (<code>graph-edge</code>) n&#x27;ont aucun équivalent texte.</div>
+            <div class="finding-fix"><strong>Fix :</strong> donner à chaque nœud un nom construit par gabarit (SHA, message, auteur, parents « parent : 9f8e7d6 », refs locales, refs distantes, tags, états) et exposer la relation parent par <code>aria-describedby</code>/liste. Fournir pour la vue 1 une alternative textuelle équivalente : tableau ou liste « Commits » (SHA, message, parents, refs, état) basculable ou toujours présent en rôle <code>table</code> caché visuellement, équivalent de <code>git log --all --graph</code>. Les refs (branches, tags, distantes) ont rôle et nom : « branche locale feature », « référence distante origin/main », « tag v0.1.0 ».</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">A-05 — Cibles trop petites : lignes de diff et disques du graphe (2.5.8)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>graph-commit</code> (disque de 14 px), <code>diff-view</code> (13 px × 1,5 = 19,5 px de hauteur de ligne) ; EXPERIENCE.md &gt; <code>diff-view</code>, Désignation.</span>
+            </header>
+            <div class="finding-note">les lignes de diff sont cliquables et désignables, empilées sans espace : 19,5 px de haut, sous 24 px, sans exception d&#x27;espacement possible (cibles contiguës). Le disque de commit fait 14 px ; l&#x27;exception d&#x27;espacement ne tient que si aucun autre cible n&#x27;est dans un cercle de 24 px. Contredit <code>hit-target-min</code> de 32 px posé par la spec.</div>
+            <div class="finding-fix"><strong>Fix :</strong> hauteur de ligne de diff interactive ≥ 24 px (idéalement 28 px) ; zone cliquable du nœud de graphe = disque + SHA + message, ≥ 24 × 24 px, avec espacement vertical ≥ 28 px entre commits ; l&#x27;indication visuelle reste de 14 px mais la zone de clic est étendue. Vérifier de même la pastille d&#x27;étape, les puces de référence, « i » (≥ 24 px).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-high">high</span>
+              <h3 class="finding-title">A-06 — Anneau de focus : contraste et distinction insuffisants (2.4.7, 1.4.11)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« focus visible <code>{colors.primary}</code> 2 px ») ; DESIGN.md &gt; <code>terminal</code>, <code>button-primary</code>, <code>graph-head</code>.</span>
+            </header>
+            <div class="finding-note">en thème clair, l&#x27;anneau <code>primary</code> <code>#451DC7</code> sur le fond du terminal <code>#0A0A14</code> ne fait que 2,11:1 (&lt; 3:1). Sur <code>button-primary</code> (fond <code>primary</code>) ou sur <code>graph-head</code> / <code>new-mark</code> (fond encre), un anneau collé de même couleur que le fond est nul (1,00:1) ; aucun décalage n&#x27;est spécifié hors <code>designable</code>. En sombre, l&#x27;anneau <code>primary-dark</code> passe partout (≥ 5,0:1).</div>
+            <div class="finding-fix"><strong>Fix :</strong> anneau double (2 px <code>ink</code> + 2 px <code>surface-raised</code>, ou décalage de 2 px) ; dans le terminal, anneau <code>on-ink</code> (blanc, 19,7:1) ou <code>primary-dark</code> en thème clair. Ajouter à <code>tests/test_web_tokens.py</code> : anneau de focus ≥ 3:1 sur chaque surface où un élément focalisable peut se trouver.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-07 — Bordures <code>line</code> quasi invisibles comme limites de composants (1.4.11)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>answer-slot</code> (bordure <code>line</code> en tirets), <code>reset-button</code>, <code>pane</code>, <code>scenario-card</code> indisponible ; champ SHA (aucune bordure spécifiée).</span>
+            </header>
+            <div class="finding-note"><code>line</code> sur surface-raised 1,24:1 (clair), 1,48:1 (sombre) ; sur neutral-soft 1,08:1 et 1,35:1. La case de réponse vide, le champ SHA et le bouton « Recommencer » n&#x27;ont donc pas de limite visible à 3:1. Le texte d&#x27;aide les identifie en partie, mais un champ de saisie sans bord ne passe pas.</div>
+            <div class="finding-fix"><strong>Fix :</strong> bordure de champ et de case (vide et pleine) en <code>muted</code> ou <code>ink-soft</code> (3:1 minimum : <code>muted</code> fait 3,38:1 en clair, 4,90:1 en sombre sur surface-raised) ; spécifier explicitement le champ SHA.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-08 — Anneau « lié » = même teinte que le focus, sélection distinguée par la couleur seule (1.4.1, 2.4.7)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>link-state</code> (anneau 2 px de couleur de discipline), <code>designable</code> ; Colors (<code>discipline-prompt</code> = <code>primary</code>).</span>
+            </header>
+            <div class="finding-note">pour les éléments du dépôt local, l&#x27;anneau « lié » est violet <code>primary</code>, exactement la couleur de l&#x27;anneau de focus et du contour <code>designable</code>. Anneau lié, focus, contour désignable et sélection <code>ink</code> ne se distinguent que par teinte ou par pointillés (désignable). Un utilisateur qui ne distingue pas ces teintes ne sait pas où est son focus.</div>
+            <div class="finding-fix"><strong>Fix :</strong> différencier par la forme : focus = anneau double plein décalé ; lié = fond teinté + coche ou marque « lié » ; sélection = contour épais ink + marque ● ; désignable = tirets. Ajouter un état texte (<code>aria-selected</code>, nom « lié à… »).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-09 — Carte de la chaîne dépliée : gestion du focus non spécifiée (2.4.11, 4.1.2, 2.1.1)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Disposition A (« par-dessus les vues »), <code>chain-band</code> / <code>chain-map</code>.</span>
+            </header>
+            <div class="finding-note">la carte se superpose aux vues, sans modale. Tab peut alors atteindre des éléments cachés sous la carte (focus entièrement masqué, 2.4.11). Aucun <code>aria-expanded</code> sur « Carte ▾ », aucune règle de focus à l&#x27;ouverture (premier nœud ? bouton ?) ni de retour du focus à la fermeture par Échap. La station courante (« Vous êtes ici ») n&#x27;a pas d&#x27;<code>aria-current</code>.</div>
+            <div class="finding-fix"><strong>Fix :</strong> « Carte ▾ » = bouton <code>aria-expanded</code> + <code>aria-controls</code> ; à l&#x27;ouverture, focus sur le titre ou la station demandée ; vues dessous <code>inert</code> ; Échap ferme et rend le focus au bouton ; <code>aria-current=&quot;step&quot;</code> sur la station courante ; zones de la carte en régions nommées, nœuds en liste.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-10 — Terminal : flux de lecture et distinction stdout/stderr pour les lecteurs d&#x27;écran (1.3.1, 4.1.3, 3.1.2)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« Terminal ») ; State Patterns (Commande refusée) ; Voice and Tone (langue de git).</span>
+            </header>
+            <div class="finding-note">(a) stderr se distingue seulement par une teinte voisine (<code>on-ink-soft</code> contre <code>on-ink</code>) et un filet de 2 px ; « annoncés comme tels » n&#x27;est pas réalisé par une technique (préfixe masqué). (b) <code>role=&quot;log&quot;</code> est poli : une sortie de <code>git log</code> de plusieurs centaines de lignes inonde le lecteur ; « refus » doit être immédiat (la règle générale dit « annoncés tout de suite ») mais il est écrit dans un log poli. (c) Une sortie de git en anglais (MinGit) dans une page <code>lang=&quot;fr&quot;</code> est mal prononcée. (d) Le terminal « lecture seule pendant le quiz » n&#x27;est pas exposé (<code>aria-readonly</code>, raison reliée).</div>
+            <div class="finding-fix"><strong>Fix :</strong> préfixe masqué visuellement « erreur standard : » devant chaque ligne stderr, « code de sortie 128, échec » sur la ligne finale ; garder le log poli mais résumer en fin de commande (voir A-03) avec <code>aria-atomic</code> sur le résumé, et <code>role=&quot;alert&quot;</code> pour <code>terminal-refused</code> ; <code>lang=&quot;en&quot;</code> sur les blocs de sortie anglais ; <code>aria-readonly=&quot;true&quot;</code> + <code>aria-describedby</code> sur la saisie quand elle est restreinte.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-11 — Onglets d&#x27;indice verrouillés et déblocage dépendant du temps (4.1.2, 4.1.3, 2.2.1)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Indices à paliers ; DESIGN.md &gt; <code>hint-tabs</code>.</span>
+            </header>
+            <div class="finding-note">l&#x27;onglet verrouillé est « grisé » : si implémenté avec <code>disabled</code>, il sort de l&#x27;ordre de tabulation et la condition (« Disponible après un essai ou un moment de lecture ») n&#x27;est pas atteinte par un lecteur d&#x27;écran. Le déblocage se produit sans événement annoncé. Pas de motif <code>role=&quot;tablist&quot;</code> précisé (flèches, <code>aria-selected</code>). Voir « Temps » : pas de violation de 2.2.1, la durée interne ne coupe rien.</div>
+            <div class="finding-fix"><strong>Fix :</strong> <code>role=&quot;tablist&quot;</code>/<code>tab</code>/<code>tabpanel</code>, onglet verrouillé en <code>aria-disabled=&quot;true&quot;</code> toujours focalisable, condition reliée par <code>aria-describedby</code>, déblocage annoncé en <code>role=&quot;status&quot;</code> (« La solution est disponible. ») ; ne pas cacher le cadenas, l&#x27;icône a un nom (« verrouillé »).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-12 — <code>quiz-banner</code> : position, annonce et retour (4.1.3, 2.4.3, 3.2.x)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Quiz à exécution réelle ; Component Patterns (<code>quiz-banner</code>).</span>
+            </header>
+            <div class="finding-note">le bandeau est « au-dessus des vues », donc probablement avant le panneau dans l&#x27;ordre du DOM, alors que l&#x27;utilisateur est dans le panneau quand il l&#x27;a déclenché. L&#x27;apparition n&#x27;est pas annoncée ; le focus reste sur « Exécuter ma réponse ». Le bouton « J&#x27;ai compris, rétablir l&#x27;état » n&#x27;est pas dans l&#x27;ordre de lecture du flux d&#x27;action. La couleur d&#x27;avertissement est accompagnée de l&#x27;icône ⚠ et de texte : conforme à 1.4.1.</div>
+            <div class="finding-fix"><strong>Fix :</strong> <code>role=&quot;status&quot;</code> (ou <code>alert</code> : l&#x27;état est bloquant pour les commandes), contenu texte complet ; focus déplacé sur le bandeau ou lien « Aller au bandeau » dans le panneau ; ordre du DOM : bandeau juste avant le panneau ; après rétablissement, focus sur le panneau (« Rétabli »).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-13 — Terminal : piège potentiel et sortie du focus (2.1.2, 2.4.3, 2.1.4)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Interaction Primitives (« Terminal »), Component Patterns (<code>terminal</code>, ↑/↓, Ctrl+C, Ctrl+L), Accessibility Floor.</span>
+            </header>
+            <div class="finding-note">pas de piège aujourd&#x27;hui (Tab sort, F6 aussi), mais : (a) « Échap rend le focus au document » : cible non définie (où atterrit-il ?) ; et Échap est aussi dans la hiérarchie Échap (popover, carte, désignation...) : un Échap dans le terminal agit-il sur les deux ? (b) la complétion est exclue en v0.1 mais une v ultérieure qui capterait Tab créerait un piège ; (c) Ctrl+C/Ctrl+L s&#x27;ajoutent aux raccourcis du navigateur (Ctrl+L = barre d&#x27;adresse) : les raccourcis à caractère unique sont absents, ce qui est bien.</div>
+            <div class="finding-fix"><strong>Fix :</strong> écrire que Tab quitte toujours le terminal ; Échap met le focus sur le titre de la vue 4 (et uniquement cela) ; hiérarchie Échap évaluée seulement hors terminal ; garder Tab libre si une complétion arrive (utiliser Ctrl+Espace). Ajouter dans la vue un lien d&#x27;évitement « Aller à la vue suivante ».</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-14 — Correspondances au focus : annonce bavarde et doublonnée (4.1.3)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« Correspondances au clavier »).</span>
+            </header>
+            <div class="finding-note">une région <code>aria-live=&quot;polite&quot;</code> résume « 3 éléments liés : ... » à chaque focus. Avec un focus itinérant dans le graphe, chaque flèche déclenche l&#x27;annonce de l&#x27;élément (nom accessible) puis celle de la région : double lecture, et file d&#x27;attente.</div>
+            <div class="finding-fix"><strong>Fix :</strong> lier le résumé par <code>aria-describedby</code> au nœud focalisé, ou n&#x27;annoncer qu&#x27;après une pause (≈ 500 ms) et sur sélection (Entrée) seulement ; garder la liste des correspondants consultable par une touche (« L » ou lien « Voir les éléments liés ») plutôt qu&#x27;à chaque déplacement.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-15 — Masquage des vues et poignées : focus et alternative au glisser (2.4.3, 4.1.2, 2.5.7)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Masquage et agrandissement.</span>
+            </header>
+            <div class="finding-note">« — » masque une vue (focus perdu sur un élément disparu) ; « ⛶ » mode focus (Échap) ; la poignée de gouttière n&#x27;est décrite qu&#x27;au clavier par pas de 16 px et double-clic. Rôle ARIA absent. Le glisser a une alternative clavier, mais pas d&#x27;alternative à pointeur unique non glissé (2.5.7) hormis le double-clic de réinitialisation.</div>
+            <div class="finding-fix"><strong>Fix :</strong> après « — », focus sur la puce « + Nom » ; après « + », focus sur le titre de la vue ; poignée <code>role=&quot;separator&quot;</code> avec <code>aria-valuenow/min/max</code> et flèches ; ajouter boutons « Élargir » / « Réduire » dans « Volets ▾ » comme alternative à pointeur unique.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">A-16 — Réflexion et zoom 400 % (1.4.10, 1.4.4)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Responsive &amp; Platform (« Très petite (&lt; 1280 px) : mode focus seul » ; « à 125 % … repli »).</span>
+            </header>
+            <div class="finding-note">à 200 % ou 400 % de zoom sur 1920 px, la fenêtre équivaut à 960 ou 480 px CSS : le mode focus doit alors suffire sans défilement horizontal pour le contenu non bidimensionnel (panneau, explications, catalogue, diagnostic). La spec écarte « mobile » mais le critère s&#x27;applique au zoom.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter la règle « à 320 px CSS (400 %), le panneau Scénario et les pages annexes se lisent sur une colonne sans défilement horizontal ; seuls le graphe, le diff et le terminal peuvent défiler dans les deux sens » ; tester à 200 % et 400 %.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-17 — Règle « muted jamais en texte » (1.4.3)</h3>
+              <span class="finding-location">DESIGN.md &gt; Colors, <code>state-unavailable</code>, <code>discipline-neutral</code>.</span>
+            </header>
+            <div class="finding-note"><code>muted</code> <code>#8A8A9E</code> fait 3,38:1 sur surface-raised et 3,12:1 sur surface en clair (4,90 et 5,50 en sombre). Il sert de filet et de tirets (3:1 : OK) mais pas de texte. La spec utilise bien <code>ink-soft</code> pour les textes grisés ; la règle n&#x27;est pas écrite.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter aux Don&#x27;t : « <code>muted</code> et <code>discipline-neutral</code> ne servent jamais pour du texte ni pour l&#x27;icône seule en thème clair ».</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-18 — Couleurs jaunes en clair sous 3:1 comme limite (1.4.11)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>quiz-banner</code> (filet <code>warning</code>), Colors (<code>hosting-network</code>, <code>discipline-network</code>).</span>
+            </header>
+            <div class="finding-note"><code>warning</code> sur blanc 1,52:1, <code>discipline-network</code> <code>#D9A400</code> sur blanc 2,27:1. Le filet du bandeau est décoratif (icône ⚠ et texte portent le sens : conforme). Le bouton « Exécuter le code (réseau possible) » marqué en jaune doit avoir une limite à 3:1 s&#x27;il est identifié par sa bordure.</div>
+            <div class="finding-fix"><strong>Fix :</strong> bordure et icône du bouton réseau en <code>ink</code> ou <code>ink-soft</code>, la pastille jaune reste un complément ; vérifier qu&#x27;aucun filet jaune n&#x27;est seul porteur.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-19 — Segments de <code>step-progress</code> : relecture au survol seul (1.4.13, 2.1.1)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Component Patterns (<code>step-progress</code>, « Un segment terminé se survole »).</span>
+            </header>
+            <div class="finding-note">information donnée au seul survol, ce que la spec bannit elle-même (Interaction Primitives). Pas de rôle clavier.</div>
+            <div class="finding-fix"><strong>Fix :</strong> segments en boutons focalisables ouvrant la consigne dans une région déclarée (comme <code>explain-popover</code>) ; barre en <code>role=&quot;list&quot;</code>, état « terminé / courante / à venir » dans le nom.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-20 — Mouvement et mise à jour automatique (2.2.2, 2.3.3)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Accessibility Floor (« Mouvement réduit »), State Patterns (chronomètres).</span>
+            </header>
+            <div class="finding-note"><code>prefers-reduced-motion</code> est traité (point fixe, transitions coupées, défilement sans animation). Il reste : chronomètres qui s&#x27;incrémentent (« En cours… 3 s », « Modifié il y a 2 s ») pendant plus de 5 s ; le chronomètre ne doit pas être annoncé chaque seconde. Pas de bascule manuelle dans « Affichage ▾ ».</div>
+            <div class="finding-fix"><strong>Fix :</strong> retirer le chronomètre de toute région live (annoncer « En cours » une fois, « Terminé » à la fin) ; ajouter dans « Affichage ▾ » un réglage « Réduire les animations » qui complète la préférence système ; le point « en cours » fixe reste accompagné du mot.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-21 — Branche locale, branche distante et tag : forme voisine (1.4.1)</h3>
+              <span class="finding-location">DESIGN.md &gt; Shapes, <code>graph-branch</code>, <code>graph-remote-ref</code>.</span>
+            </header>
+            <div class="finding-note">branche locale et ref distante sont deux pilules ; seuls le préfixe « origin/ » et la teinte (vert d&#x27;eau, bordure 2 px) les distinguent. Le préfixe texte suffit pour 1.4.1, mais la différence visuelle est faible en niveaux de gris. Commit de l&#x27;agent / collègue : badges texte, conforme. Commit perdu : tirets + libellé, conforme.</div>
+            <div class="finding-fix"><strong>Fix :</strong> ajouter une icône (ordinateur / nuage) dans la pilule distante, et une forme distincte (pilule à bord plein pour local, pilule à double bord pour distant).</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-22 — Champ SHA et bouton « Valider » inactif (3.3.1, 3.3.3, 4.1.2)</h3>
+              <span class="finding-location">EXPERIENCE.md &gt; Désignation (point 4), Entretien RSSI.</span>
+            </header>
+            <div class="finding-note">les messages (« Aucun commit ne correspond… », « Il manque la preuve… ») sont donnés mais pas leur technique : <code>role=&quot;alert&quot;</code>/<code>aria-live</code>, <code>aria-invalid</code>, <code>aria-describedby</code>. Un <code>button disabled</code> quitte la tabulation, le motif n&#x27;est alors pas lu.</div>
+            <div class="finding-fix"><strong>Fix :</strong> <code>aria-disabled=&quot;true&quot;</code> + <code>aria-describedby</code> vers le texte du motif ; erreur de SHA en <code>role=&quot;alert&quot;</code> avec <code>aria-invalid</code> ; l&#x27;aperçu du SHA résolu en <code>role=&quot;status&quot;</code>.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-23 — <code>diagnostic-badge</code> et lignes de diagnostic (1.3.1, 1.4.1)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>diagnostic-badge</code> ; EXPERIENCE.md &gt; Diagnostic.</span>
+            </header>
+            <div class="finding-note">la pastille rouge ne porte qu&#x27;un nombre. États ✓ / ⚠ / ✗ + mots : conforme. « ligne rouge » pour git absent est accompagné de la cause et de l&#x27;action : conforme.</div>
+            <div class="finding-fix"><strong>Fix :</strong> nom accessible « Diagnostic, 2 outils absents ou trop anciens » ; tableau avec en-têtes <code>th</code> et <code>scope</code>, état dans une cellule texte.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">A-24 — Éléments purement décoratifs sous 3:1 (information de repli présente)</h3>
+              <span class="finding-location">DESIGN.md &gt; <code>pr-check</code> en cours (point <code>state-active</code> <code>#04F06A</code> sur <code>primary-soft</code> 1,28:1 en clair), <code>scenario-card</code> indisponible (tirets <code>line</code> 1,08:1), <code>pane</code> (bordure <code>line</code> 1,15:1).</span>
+            </header>
+            <div class="finding-note">sans conséquence tant que l&#x27;état est dit aussi par un mot (« En cours », « Indisponible », raison visible). À noter pour que personne ne s&#x27;appuie ensuite sur ces éléments comme seul signal.</div>
+            <div class="finding-fix"><strong>Fix :</strong> consigner dans DESIGN.md que ces éléments sont décoratifs ; <code>aria-hidden=&quot;true&quot;</code> sur le point.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><strong>Numérotation des questions non bloquantes (low)</strong> : EXPERIENCE &gt; Questions ouvertes commence à 5. Les questions bloquantes 1 à 4 ont été tranchées et ne sont plus listées, donc la numérotation commence à 5 sans explication. *Fix:* renuméroter à partir de 1 ou ajouter « (1 à 4 tranchées, voir memlog) ».</li>
+        <li>Références croisées : toutes résolues (Information Architecture, Désignation, Indices à paliers, Quiz à exécution réelle, Diagnostic, Pipeline simulé, Vocabulaire, Exports, Responsive &amp; Platform, State Patterns &gt; Commande refusée).</li>
+        <li>Chemin <code>sources</code> : résolu depuis <code>ux-designs/ux-wavedevsecops-2026-10-18/</code> vers <code>planning-artifacts/prds/prd-wavedevsecops-2026-10-18/</code> (prd.md, addendum.md) ; <code>imports/wavestack-digest.md</code> présent.</li>
+        <li>Syntaxe : aucun diagramme Mermaid ; la disposition A est un schéma ASCII lisible. Cellule « Version requise » du Diagnostic avec « … » à compléter (gitleaks) ; versions minimales marquées <code>[ASSUMPTION]</code>.</li>
+        <li>Colonne du tableau des proportions : 40 + 33 + 27 = 100 % ; 55 + 45 = 100 % ; cohérent.</li>
+      </ul>
+    </div>
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: _bmad-output\planning-artifacts\ux-designs\ux-wavedevsecops-2026-10-18\review-rubric.md · review-accessibilite.md</span>
+        <span>Generated: 2026-10-18T14:28:31+02:00</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

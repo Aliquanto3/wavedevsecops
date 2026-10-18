@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>Espace de travail v0.2</title>
+<style>
+/*
+  Maquette key-espace-travail : espace de travail v0.2, disposition A, 1920x1080. Illustre, et ne remplace pas, les spines.
+  DESIGN.md : Layout & Spacing (disposition A, bandeau chain-band 44 px, panneau 440 px) ; Elevation & Depth ; Shapes ;
+    Colors (une couleur = un sens, états, terminal, code) ; Typography ; Components > Focus, liaison, sélection (link-state, focus-ring) ;
+    Panneau Scénario (scenario-panel, mode-badge, path-badge, step-progress, hint-tabs) ; Terminal (terminal-prompt, -stderr, -exit-error, -app-message) ;
+    Dépôt local (graph-commit, graph-edge, graph-head, graph-branch, graph-remote-ref, new-mark, staging-index) ;
+    Code (diff-view) ; Distant + PR (pr-card, pr-check, review-log, merge-blocked) ; Chaîne et vocabulaire (chain-band, glossary-term).
+  EXPERIENCE.md : Information Architecture > Disposition A et proportions ; Component Patterns ; Correspondances entre vues (ligne Check) ;
+    State Patterns (PR bloquée, Synchro après commande) ; Accessibility Floor (graphe, terminal, indices) ; Key Flows > Flow 4 (UJ-3), étape 3.
+  Correspondance montrée : check bandit focalisé -> commit e4b7c21, ligne 27 du diff, sortie du terminal, raison de merge-blocked ; le reste estompé (décors à 0,35, texte en ink-soft, sans opacité sur le texte).
+*/
+/* === Jetons : DESIGN.md (clair), puis sombre par prefers-color-scheme et par la case Thème sombre (:has, sans JS) === */
+:root{--ui:'Atkinson Hyperlegible',system-ui,sans-serif;--display:Fredoka,system-ui,sans-serif;--mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;--term-lit-fill:#3A1A2B;--term-lit-ring:#E8639F;
+--primary:#451DC7;--primary-deep:#250F6B;--primary-soft:#EDE7FE;--accent:#04F06A;--accent-soft:#CAFEE0;--ink:#0A0A14;--ink-soft:#4A4A5E;--muted:#8A8A9E;--line:#E6E6EC;--surface:#F6F5FA;--surface-raised:#FFFFFF;--warning:#FFCA4A;--danger:#FF2A49;--on-primary:#FFFFFF;--relief:#D9D0F6;--relief-active:#C9BCF5;--dot:#D6CCF5;--hosting-boundary:#0A0A14;--state-active:#04F06A;--state-ok:#04F06A;--state-blocked:#FF2A49;--state-error:#FF2A49;--state-unavailable:#8A8A9E;--discipline-prompt:#451DC7;--discipline-prompt-soft:#EEE9FC;--discipline-context:#0F7B6C;--discipline-context-soft:#E2F3EF;--discipline-harness:#B8327A;--discipline-harness-soft:#FBE7F1;--discipline-network:#D9A400;--discipline-network-soft:#FFF5D1;--discipline-neutral:#8A8A9E;--discipline-neutral-soft:#EFEFF4;--on-ink:#FFFFFF;--on-ink-soft:#CFCDE4;--produced-soft:#E8EEF7;--json-key:#1E3A8A;--json-string:#7A3410;--json-literal:#0B5E73;--ink-fill:#0A0A14;--ink-fill-edge:#0A0A14;--on-discipline:#FFFFFF;--on-vivid:#0A0A14;--warning-soft:#FFF4D6;--danger-soft:#FDE8EB;--logo-tile:#FFFFFF;--terminal-bg:#0A0A14;--terminal-fg:#FFFFFF;--terminal-fg-soft:#CFCDE4;--terminal-accent:#9C86FF;--terminal-danger:#FF6B7F;--terminal-rule:#8A8A9E;--focus-on-ink:#FFFFFF;
+}
+@media (prefers-color-scheme: dark){:root{
+--primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent:#04F06A;--accent-soft:#0F3A24;--ink:#ECEBF5;--ink-soft:#B4B3C7;--muted:#8A8A9E;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;--warning:#FFCA4A;--danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;--dot:#262538;--hosting-boundary:#ECEBF5;--state-active:#04F06A;--state-ok:#04F06A;--state-blocked:#FF6B7F;--state-error:#FF6B7F;--state-unavailable:#8A8A9E;--discipline-prompt:#9C86FF;--discipline-prompt-soft:#262047;--discipline-context:#2FB8A3;--discipline-context-soft:#12302B;--discipline-harness:#E8639F;--discipline-harness-soft:#3A1A2B;--discipline-network:#E8B516;--discipline-network-soft:#3A3010;--discipline-neutral:#8A8A9E;--discipline-neutral-soft:#26252F;--on-ink:#FFFFFF;--on-ink-soft:#CFCDE4;--produced-soft:#1A2335;--json-key:#9DBBFF;--json-string:#F2A77E;--json-literal:#6FD3E3;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;--on-discipline:#0E0B1E;--on-vivid:#0A0A14;--warning-soft:#3A3010;--danger-soft:#3A1820;--logo-tile:#FFFFFF;--terminal-bg:#12121C;--terminal-fg:#ECEBF5;--terminal-fg-soft:#CFCDE4;--terminal-accent:#9C86FF;--terminal-danger:#FF6B7F;--terminal-rule:#8A8A9E;--focus-on-ink:#FFFFFF;
+}}
+:root:has(#theme-dark:checked){
+--primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent:#04F06A;--accent-soft:#0F3A24;--ink:#ECEBF5;--ink-soft:#B4B3C7;--muted:#8A8A9E;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;--warning:#FFCA4A;--danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;--dot:#262538;--hosting-boundary:#ECEBF5;--state-active:#04F06A;--state-ok:#04F06A;--state-blocked:#FF6B7F;--state-error:#FF6B7F;--state-unavailable:#8A8A9E;--discipline-prompt:#9C86FF;--discipline-prompt-soft:#262047;--discipline-context:#2FB8A3;--discipline-context-soft:#12302B;--discipline-harness:#E8639F;--discipline-harness-soft:#3A1A2B;--discipline-network:#E8B516;--discipline-network-soft:#3A3010;--discipline-neutral:#8A8A9E;--discipline-neutral-soft:#26252F;--on-ink:#FFFFFF;--on-ink-soft:#CFCDE4;--produced-soft:#1A2335;--json-key:#9DBBFF;--json-string:#F2A77E;--json-literal:#6FD3E3;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;--on-discipline:#0E0B1E;--on-vivid:#0A0A14;--warning-soft:#3A3010;--danger-soft:#3A1820;--logo-tile:#FFFFFF;--terminal-bg:#12121C;--terminal-fg:#ECEBF5;--terminal-fg-soft:#CFCDE4;--terminal-accent:#9C86FF;--terminal-danger:#FF6B7F;--terminal-rule:#8A8A9E;--focus-on-ink:#FFFFFF;
+}
+
+/* === Base commune (composants de DESIGN.md > Components) === */
+*{box-sizing:border-box}
+html{background:var(--surface)}
+body{margin:0;min-width:1920px;background:var(--surface);color:var(--ink);font:400 14px/1.5 var(--ui)}
+button,input{font:inherit;color:inherit}
+button{cursor:default}
+h1,h2,h3,p,ul,ol{margin:0;padding:0}
+ul,ol{list-style:none}
+code,.mono{font-family:var(--mono);font-size:13px;line-height:1.5}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cap{width:1920px;padding:16px 16px 8px;font:600 18px/1.3 var(--display);color:var(--ink)}
+.cap span{font:400 13px/1.4 var(--ui);color:var(--ink-soft);margin-left:12px}
+
+/* Etats : un fond/trait "decor" estompable sans toucher au texte (DESIGN > Focus, liaison) */
+.bg{position:relative;isolation:isolate}
+.bg::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--fill,transparent);border:var(--bw,0) var(--bs,solid) var(--bc,transparent);opacity:var(--decor,1);z-index:-1;pointer-events:none}
+.dim{--decor:.35;color:var(--ink-soft)}
+.lit{--bw:2px;--bc:var(--discipline-harness)}
+.lit-prompt{--bw:2px;--bc:var(--discipline-prompt);--fill:var(--discipline-prompt-soft)}
+.lit-harness-fill{--fill:var(--discipline-harness-soft)}
+
+/* Cadre de navigateur 1920x1080 */
+.frame{width:1920px;height:1080px;display:grid;grid-template-rows:40px minmax(0,1fr);overflow:hidden;background:var(--surface);color:var(--ink)}
+.chrome{display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--surface-raised);border-bottom:2px solid var(--line)}
+.chrome .lights{display:flex;gap:6px}
+.chrome .lights i{width:12px;height:12px;border-radius:50%;background:var(--relief-active)}
+.chrome .tabname{font:500 12px/1.2 var(--display);color:var(--ink-soft);padding:0 12px}
+.addr{flex:0 1 720px;height:28px;display:flex;align-items:center;padding:0 14px;border:2px solid var(--line);border-radius:9999px;background:var(--surface);font:400 13px/1 var(--mono);color:var(--ink)}
+.theme{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 14px;border:2px solid var(--muted);border-radius:18px;background:var(--surface-raised);font:500 12px/1.2 var(--display)}
+.theme input{width:18px;height:18px;margin:0;accent-color:var(--primary)}
+.app{display:grid;min-height:0;grid-template-rows:56px minmax(0,1fr)}
+.app.with-chain{grid-template-rows:56px 44px minmax(0,1fr)}
+
+/* site-nav */
+.nav{display:flex;align-items:center;gap:20px;height:56px;margin:0 8px;padding:0 20px;background:var(--surface-raised);border:2px solid var(--line);border-top:0;border-radius:0 0 26px 26px}
+.brand{font:600 18px/1.15 var(--display);color:var(--primary-deep)}
+.nav a{display:inline-flex;align-items:center;min-height:32px;padding:0 4px;color:var(--ink);text-decoration:none;font:400 14px/1.5 var(--ui)}
+.nav .push{margin-left:auto}
+.menu-btn{min-height:32px;padding:0 14px;border:2px solid var(--primary);border-radius:18px;background:var(--surface-raised);color:var(--primary);font:500 12px/1.2 var(--display)}
+
+/* Boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:4px 16px;border-radius:18px;border:0;font:500 14px/1.2 var(--display);margin-bottom:4px}
+.btn-primary{background:var(--primary);color:var(--on-primary);box-shadow:0 4px 0 var(--primary-deep)}
+.btn-sec{background:var(--surface-raised);color:var(--primary);border:2px solid var(--primary);box-shadow:0 4px 0 var(--relief-active)}
+.btn-reset{background:var(--surface-raised);color:var(--ink);border:2px solid var(--muted)}
+.btn-off,.btn[aria-disabled="true"]{background:var(--discipline-neutral-soft);color:var(--ink-soft);border:2px solid var(--muted);box-shadow:none}
+.btn-armed{background:var(--primary);color:var(--on-primary);border:0;box-shadow:0 4px 0 var(--primary-deep)}
+.btn-block{width:100%}
+
+/* Vues (pane) */
+.ws{display:grid;gap:8px;padding:8px;min-height:0;background-color:var(--surface);background-image:radial-gradient(var(--dot) 1.5px,transparent 1.6px);background-size:18px 18px}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--surface-raised);border-radius:26px;box-shadow:0 4px 0 var(--relief);overflow:hidden}
+.ph{display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;background:var(--surface);flex:none}
+.step{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--ink-fill);color:var(--on-ink);border:1px solid var(--ink-fill-edge);font:600 14px/1.2 var(--display);flex:none}
+.pt{font:600 18px/1.15 var(--display);white-space:nowrap}
+.pst{font:400 13px/1.3 var(--ui);color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pctl{margin-left:auto;display:flex;gap:6px;flex:none}
+.pctl button{width:32px;height:32px;border:2px solid var(--muted);border-radius:12px;background:var(--surface-raised);font:600 14px/1 var(--display)}
+.pb{flex:1;min-height:0;overflow:auto;padding:12px}
+.chip{display:inline-flex;align-items:center;min-height:32px;padding:0 14px;border:2px dashed var(--primary);border-radius:9999px;background:var(--primary-soft);color:var(--primary);font:500 12px/1.2 var(--display)}
+.chips{display:flex;gap:8px;align-items:center}
+
+/* Bandeau de la chaine */
+.chain{display:flex;align-items:stretch;height:44px;margin:0;padding:0 8px;background:var(--surface-raised);border-bottom:2px solid var(--line)}
+.stn{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;font:500 12px/1.2 var(--display);color:var(--ink-soft);border:0;background:transparent}
+.stn.cur{background:var(--discipline-harness-soft);border-bottom:3px solid var(--discipline-harness);color:var(--ink)}
+.stn .here{padding:2px 8px;border-radius:9999px;background:var(--surface-raised);border:2px solid var(--discipline-harness);color:var(--ink);font:500 12px/1.2 var(--display)}
+.boundary{display:flex;align-items:center;gap:6px;padding:0 10px;border-left:2px solid var(--hosting-boundary);border-right:2px solid var(--hosting-boundary);font:600 12px/1.2 var(--display);color:var(--ink)}
+.chain .menu-btn{align-self:center;margin-left:10px}
+
+/* Panneau Scenario */
+.panel{display:flex;flex-direction:column;gap:10px;min-height:0;padding:16px;background:var(--surface-raised);border-radius:26px;box-shadow:0 4px 0 var(--relief);overflow:auto}
+.panel h2{font:600 18px/1.15 var(--display)}
+.badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mode{display:inline-flex;align-items:center;min-height:24px;padding:0 10px;border-radius:12px;background:var(--ink-fill);color:var(--on-ink);border:1px solid var(--ink-fill-edge);font:500 12px/1.2 var(--display)}
+.path{display:inline-flex;align-items:center;min-height:24px;padding:0 12px;border-radius:9999px;background:var(--surface);color:var(--ink);border:2px solid var(--ink-soft);font:500 12px/1.2 var(--display)}
+.ibtn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--primary);background:transparent;color:var(--primary);font:italic 600 13px/1 var(--display)}
+.prog{display:flex;flex-direction:column;gap:2px}
+.prog .n{font:600 14px/1.2 var(--display)}
+.segs{display:flex;gap:6px}
+.seg{flex:1;height:24px;display:flex;align-items:center;border:0;background:transparent;padding:0}
+.seg i{display:block;width:100%;height:10px;border-radius:9999px}
+.seg.done i{background:var(--ink)}
+.seg.cur i{background:var(--primary)}
+.seg.next i{border:2px dashed var(--muted)}
+.consigne{font:400 16px/1.5 var(--ui)}
+.explain{border:2px solid var(--muted);border-left:4px solid var(--primary);border-radius:18px;padding:10px 14px;background:var(--surface-raised)}
+.explain h3{font:600 18px/1.3 var(--display);margin-bottom:2px}
+.explain p{font:400 14px/1.5 var(--ui)}
+.explain p+p{margin-top:6px}
+.gt{text-decoration:underline dotted 2px var(--primary);text-underline-offset:3px}
+.qlabel{font:600 14px/1.2 var(--display)}
+
+/* hint-tabs */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line)}
+.tab{min-height:36px;padding:0 12px;border:0;background:transparent;font:500 12px/1.2 var(--display);color:var(--ink);display:inline-flex;align-items:center;gap:6px;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab.on{border-bottom-color:var(--primary)}
+.tab.lock{background:var(--discipline-neutral-soft);color:var(--ink-soft);border-radius:12px 12px 0 0}
+.hint{padding:8px 4px;font:400 14px/1.5 var(--ui)}
+.hint.lockmsg{background:var(--discipline-neutral-soft);color:var(--ink-soft);border-radius:0 0 12px 12px;padding:8px 12px;margin-top:-2px}
+.ico{width:16px;height:16px;flex:none;vertical-align:-3px}
+
+/* Etats de check, pastilles, tags */
+.tag-ink{display:inline-flex;align-items:center;padding:0 8px;min-height:20px;border-radius:12px;background:var(--ink-fill);color:var(--on-ink);border:1px solid var(--ink-fill-edge);font:500 12px/1.2 var(--display)}
+.tag-dash{display:inline-flex;align-items:center;padding:0 8px;min-height:20px;border-radius:12px;border:2px dashed var(--muted);color:var(--ink-soft);background:var(--surface);font:500 12px/1.2 var(--display)}
+.chk{display:flex;align-items:center;gap:8px;min-height:28px;padding:2px 12px;border-radius:18px;--fill:var(--surface);font:400 13px/1.4 var(--ui)}
+.chk.ok{--fill:var(--accent-soft)}
+.chk.fail{--fill:var(--danger-soft)}
+.chk.run{--fill:var(--primary-soft)}
+.chk .g{font:700 14px/1 var(--ui);width:14px;text-align:center}
+.chk .dur{margin-left:auto;color:var(--ink-soft)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--state-active);border:2px solid var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:6px;min-height:22px;padding:0 10px;border-radius:9999px;background:var(--surface);border:2px solid var(--line);font:500 12px/1.2 var(--display)}
+
+/* Graphe */
+.gr{display:grid;grid-template-columns:64px 72px minmax(0,1fr);align-items:center;height:28px;border-radius:12px;font:400 13px/1.4 var(--mono)}
+.gr .sha{font:400 13px/1.4 var(--mono)}
+.gr .msg{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden}
+.gr svg.lane{width:64px;height:28px;display:block}
+.branch{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 10px;border-radius:9999px;background:var(--primary-soft);color:var(--primary-deep);border:2px solid var(--primary);font:500 12px/1.2 var(--mono)}
+.rref{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 10px;border-radius:9999px;background:var(--discipline-context-soft);color:var(--ink);border:4px double var(--discipline-context);font:500 12px/1.2 var(--mono)}
+.head{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:12px;background:var(--ink-fill);color:var(--on-ink);border:1px solid var(--ink-fill-edge);font:500 12px/1.2 var(--display)}
+.new{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:12px;background:var(--ink-fill);color:var(--on-ink);border:1px solid var(--ink-fill-edge);font:500 12px/1.2 var(--display)}
+.agent{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:9999px;background:var(--primary-soft);color:var(--primary-deep);font:500 12px/1.2 var(--display)}
+.idx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.idx>div{border-radius:18px;padding:6px 10px;min-height:50px}
+.idx .staged{--fill:var(--accent-soft)}
+.idx .untracked{}
+.idx b{display:block;font:500 12px/1.2 var(--display);margin-bottom:2px}
+.idx .empty{font:400 13px/1.4 var(--ui);color:var(--ink-soft)}
+
+/* Diff */
+.diff{font:400 13px/24px var(--mono)}
+.dl{display:grid;grid-template-columns:44px 44px 22px minmax(0,1fr);height:24px;align-items:center;white-space:pre}
+.dl .ln{text-align:right;padding-right:8px;color:var(--ink-soft)}
+.dl.add{--fill:var(--accent-soft)}
+.dl.del{--fill:var(--danger-soft)}
+.dl.hunk{--fill:var(--surface);color:var(--ink-soft)}
+.k{color:var(--json-key)}.s{color:var(--json-string)}.l{color:var(--json-literal)}
+.filebar{display:flex;align-items:center;gap:10px;min-height:30px;margin-bottom:4px}
+.filebar .tree{min-height:24px;padding:0 10px;border:2px solid var(--muted);border-radius:12px;background:var(--surface-raised);font:500 12px/1.2 var(--display)}
+.filebar .path-f{font:500 13px/1.4 var(--mono)}
+
+/* Terminal */
+.tpane .pb{padding:0 8px 8px}
+.term{height:100%;overflow:auto;background:var(--terminal-bg);color:var(--terminal-fg);border-radius:18px;padding:6px 14px;font:400 13px/1.5 var(--mono)}
+.tl{height:19.5px;white-space:pre;display:flex;align-items:center;gap:0}
+.tl .pm{color:var(--terminal-accent);margin-right:8px}
+.tl.err{color:var(--terminal-fg-soft);border-left:2px solid var(--terminal-rule);padding-left:8px;margin-left:-10px}
+.tl.app{font:400 13px/1.4 var(--ui);color:var(--terminal-fg-soft);border-left:3px solid var(--terminal-accent);padding-left:8px;margin-left:-11px}
+.tl.app b{color:var(--terminal-accent);margin-right:6px;font-weight:700}
+.tl.exit{font:500 12px/1.2 var(--display);color:var(--terminal-fg)}
+.tl.exit b{color:var(--terminal-danger);margin-right:6px}
+.term .dim{color:var(--terminal-fg-soft)}
+.term .tlit{--fill:var(--term-lit-fill);--bc:var(--term-lit-ring);--bw:2px;border-radius:6px;padding:0 6px;margin:0 -6px}
+.term .tdim{padding:0 6px;margin:0 -6px}
+.cursor{display:inline-block;width:8px;height:15px;background:var(--terminal-fg);margin-left:2px}
+
+/* Page */
+.ws{grid-template-columns:440px minmax(0,1fr)}
+.col{display:grid;grid-template-rows:40fr 33fr 27fr;gap:8px;min-height:0}
+.row-top{display:grid;grid-template-columns:55fr 45fr;gap:8px;min-height:0}
+.dim svg.lane{opacity:.35}
+.dim .branch,.dim .rref{background:var(--surface);border-color:var(--line);color:var(--ink-soft)}
+.dim .k,.dim .s,.dim .l{color:inherit}
+.dim .agent{background:var(--surface);color:var(--ink-soft)}
+.gr.lit-prompt .sha{font-weight:700}
+.refs{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-height:30px}
+.refs .lbl{font:500 12px/1.2 var(--display)}
+.refs .rref{height:26px}
+.pr{border:2px solid var(--muted);border-radius:18px;padding:6px 12px 8px;display:flex;flex-direction:column;gap:5px}
+.pr-head{display:flex;align-items:center;gap:10px;min-height:32px}
+.pr-head h3{font:600 18px/1.3 var(--display)}
+.pr-head code{color:var(--ink)}
+.pr-head .btn{margin:0 0 0 auto}
+.failwrap{display:flex;flex-direction:column;gap:4px}
+.faildetail{display:flex;align-items:center;gap:12px;padding:0 14px 0 34px;min-height:24px;font:400 13px/1.4 var(--ui)}
+.faildetail a{color:var(--primary);text-decoration:underline;text-underline-offset:2px;font-family:var(--mono)}
+.faildetail .lk{margin-left:auto;display:flex;gap:14px}
+.chk.focus{outline:2px solid var(--primary);outline-offset:2px}
+.blocked{display:flex;gap:12px;align-items:flex-start}
+.blocked .btn{margin:0;flex:none}
+.reasons li{display:flex;align-items:center;gap:8px;min-height:22px;padding:0 8px;font:400 13px/1.4 var(--ui);border-radius:12px}
+.reasons li::before{content:"-";color:var(--ink-soft)}
+.passes{display:flex;flex-wrap:wrap;gap:5px}
+.passes .chk{padding:2px 12px;gap:8px;white-space:nowrap}
+.passes .chk .dur{margin-left:6px}
+.rv{display:flex;align-items:center;gap:12px;min-height:26px;border-left:2px solid var(--ink-soft);padding-left:10px;font:400 13px/1.4 var(--ui)}
+.rv .cnt{margin-left:auto;font:600 14px/1.2 var(--display)}
+.rv .cnt small{font:400 13px/1.4 var(--ui);color:var(--ink-soft);margin-left:6px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-poste" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 14h6" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-serveur" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="2" y="9" width="12" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+</svg>
+
+<div class="frame">
+  <div class="chrome">
+    <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="tabname">WaveDevSecOps</span>
+    <span class="addr">http://127.0.0.1:8765/scenario/outil-trop-puissant</span>
+    <label class="theme"><input type="checkbox" id="theme-dark"> Thème sombre</label>
+  </div>
+
+  <div class="app with-chain">
+    <header class="nav">
+      <span class="brand">WaveDevSecOps</span>
+      <a href="#">Catalogue</a>
+      <a href="#">Vocabulaire</a>
+      <a href="#">Diagnostic</a>
+      <button class="menu-btn push" aria-haspopup="menu">Volets ▾</button>
+      <button class="menu-btn" aria-haspopup="menu">Affichage ▾</button>
+    </header>
+
+    <nav class="chain" aria-label="Carte de la chaîne">
+      <span class="stn">Station 1 · Poste local</span>
+      <span class="stn">Station 2 · PR et CI</span>
+      <span class="stn cur" aria-current="step">Station 3 · Sécurité et qualité <span class="here">Vous êtes ici</span></span>
+      <span class="boundary" aria-label="Frontière entre intégration continue et livraison continue">CI | CD</span>
+      <span class="stn">Station 4 · Livraison</span>
+      <button class="menu-btn" aria-expanded="false">Carte ▾</button>
+    </nav>
+
+    <main class="ws">
+      <!-- Panneau Scénario -->
+      <section class="panel" aria-label="Scénario">
+        <h2>Outil trop puissant</h2>
+        <div class="badges">
+          <span class="mode">Mode A</span><span class="path">Parcours LLM</span>
+          <button class="ibtn" aria-label="Qu’est-ce que le mode A et le parcours LLM ?">i</button>
+        </div>
+        <div class="prog">
+          <span class="n">Étape 3 sur 7</span>
+          <div class="segs">
+            <button class="seg done" aria-label="Étape 1, faite"><i></i></button>
+            <button class="seg done" aria-label="Étape 2, faite"><i></i></button>
+            <span class="seg cur" aria-current="step"><i></i></span>
+            <span class="seg next"><i></i></span><span class="seg next"><i></i></span><span class="seg next"><i></i></span><span class="seg next"><i></i></span>
+          </div>
+        </div>
+        <p class="consigne">Le pipeline simulé a relancé vos checks après le push. Ouvrez le check bandit dans Distant + PR et repérez la ligne qu’il signale.</p>
+        <div class="explain" role="region" aria-label="Explication de l’étape">
+          <h3>Pourquoi bandit bloque la PR</h3>
+          <p>bandit est une barrière de <span class="gt">SAST</span> : il lit le code sans l’exécuter. Ici, il refuse <code>subprocess.run(…, shell=True)</code> à la ligne 27 de <code>agent/tools.py</code> (règle B602).</p>
+          <p>La commande est construite avec <code>pattern</code> et <code>path</code>, que l’agent remplit librement : un simple <code>;</code> y ferait lancer une autre commande. Le GitHub simulé bloque le merge, car ce check est obligatoire.</p>
+        </div>
+        <div>
+          <div class="tabs" role="tablist" aria-label="Aide">
+            <button class="tab on" role="tab" aria-selected="true">Piste</button>
+            <button class="tab" role="tab" aria-selected="false">Commande partielle</button>
+            <button class="tab lock" role="tab" aria-selected="false" aria-disabled="true" aria-describedby="sol-cond"><svg class="ico"><use href="#i-lock"/></svg>Solution</button>
+          </div>
+          <p class="hint">Dans le diff de Code, quel argument de <code>subprocess.run</code> laisse le shell interpréter toute la chaîne ?</p>
+          <p class="hint lockmsg" id="sol-cond"><svg class="ico"><use href="#i-lock"/></svg> Solution verrouillée. Disponible après un essai ou un moment de lecture.</p>
+        </div>
+        <div style="margin-top:auto"><button class="btn btn-reset">Recommencer</button></div>
+        <p class="sr" role="status">Commande terminée. Vues mises à jour : 1 branche distante, 1 PR. Étape 3 validée. 4 éléments liés au check bandit : commit e4b7c21, ligne 27 de agent/tools.py, sortie de bandit, raison de blocage du merge.</p>
+      </section>
+
+      <div class="col">
+        <div class="row-top">
+          <!-- 1. Dépôt local -->
+          <section class="pane" aria-label="Dépôt local">
+            <div class="ph"><span class="step">1</span><h2 class="pt">Dépôt local</h2><span class="pst">Graphe des commits et index, comme git log --all et git status</span>
+              <span class="pctl"><button aria-label="Passer à la liste">≡</button><button aria-label="Masquer la vue">—</button><button aria-label="Agrandir la vue">⛶</button></span></div>
+            <div class="pb">
+              <div class="gr lit-prompt bg" style="--fill:var(--discipline-prompt-soft)">
+                <svg class="lane" viewBox="0 0 64 28" aria-hidden="true"><path d="M44 14V28" stroke="var(--ink-soft)" stroke-width="2" fill="none"/><circle cx="44" cy="14" r="7" fill="var(--surface-raised)" stroke="var(--discipline-prompt)" stroke-width="3"/></svg>
+                <span class="sha">e4b7c21</span>
+                <span class="msg"><span>Ajoute l’outil de recherche</span><span class="head">HEAD</span><span class="branch"><svg class="ico" style="width:12px;height:12px"><use href="#i-poste"/></svg>feature</span><span class="rref"><svg class="ico" style="width:12px;height:12px"><use href="#i-serveur"/></svg>origin/feature</span><span class="new">Nouveau</span></span>
+              </div>
+              <div class="gr dim bg" style="--fill:transparent">
+                <svg class="lane" viewBox="0 0 64 28" aria-hidden="true"><path d="M44 0V28" stroke="var(--ink-soft)" stroke-width="2" fill="none"/><circle cx="44" cy="14" r="7" fill="var(--surface-raised)" stroke="var(--discipline-prompt)" stroke-width="3"/></svg>
+                <span class="sha">8d20f5a</span>
+                <span class="msg"><span>Ajoute les tests de l’outil de recherche</span></span>
+              </div>
+              <div class="gr dim bg" style="--fill:transparent">
+                <svg class="lane" viewBox="0 0 64 28" aria-hidden="true"><path d="M16 0V28M44 0L16 14" stroke="var(--ink-soft)" stroke-width="2" fill="none"/><circle cx="16" cy="14" r="7" fill="var(--surface-raised)" stroke="var(--discipline-prompt)" stroke-width="3"/></svg>
+                <span class="sha">3c1a8f4</span>
+                <span class="msg"><span>Ajoute la page d’accueil</span><span class="branch"><svg class="ico" style="width:12px;height:12px"><use href="#i-poste"/></svg>main</span><span class="rref"><svg class="ico" style="width:12px;height:12px"><use href="#i-serveur"/></svg>origin/main</span></span>
+              </div>
+              <div class="gr dim bg" style="--fill:transparent">
+                <svg class="lane" viewBox="0 0 64 28" aria-hidden="true"><path d="M16 0V14" stroke="var(--ink-soft)" stroke-width="2" fill="none"/><circle cx="16" cy="14" r="7" fill="var(--surface-raised)" stroke="var(--discipline-prompt)" stroke-width="3"/></svg>
+                <span class="sha">a91b6e0</span>
+                <span class="msg"><span>Initialise le projet</span></span>
+              </div>
+              <div class="idx" style="margin-top:12px" role="group" aria-label="Index">
+                <div class="staged dim bg"><b>Indexé</b><span class="empty">Aucun fichier</span></div>
+                <div class="bg dim" style="--bw:2px;--bc:var(--muted)"><b>Modifié, non indexé</b><span class="empty">Aucun fichier</span></div>
+                <div class="untracked bg dim" style="--bw:2px;--bc:var(--muted);--bs:dashed"><b>Non suivi</b><span class="mono">?? .coverage</span></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Distant + PR -->
+          <section class="pane" aria-label="Distant + PR">
+            <div class="ph"><span class="step">2</span><h2 class="pt">Distant + PR</h2><span class="pst">Refs de origin et PR du GitHub simulé</span>
+              <span class="pctl"><button aria-label="Masquer la vue">—</button><button aria-label="Agrandir la vue">⛶</button></span></div>
+            <div class="pb">
+              <div class="refs"><span class="lbl">Refs de origin</span>
+                <span class="rref dim bg" style="--fill:var(--discipline-context-soft)"><svg class="ico" style="width:12px;height:12px"><use href="#i-serveur"/></svg>origin/main · 3c1a8f4</span>
+                <span class="rref dim bg" style="--fill:var(--discipline-context-soft)"><svg class="ico" style="width:12px;height:12px"><use href="#i-serveur"/></svg>origin/feature · e4b7c21</span>
+              </div>
+              <article class="pr" aria-label="PR numéro 2">
+                <div class="pr-head"><h3>PR n°2</h3><code>feature → main</code><span class="pill">Ouverte</span><span class="btn btn-off" aria-disabled="true" style="margin-left:auto">Merger</span></div>
+                <div class="failwrap">
+                  <div class="chk fail bg lit focus" tabindex="0"><span class="g">✗</span><code>bandit</code><span>Échec</span><span class="tag-ink">Obligatoire</span><span class="dur">3 s</span></div>
+                  <div class="faildetail"><span>Sortie :</span><a href="#">agent/tools.py:27</a><span>règle <code>B602</code> shell=True</span><span class="lk"><a href="#" style="font-family:var(--ui)">Voir la sortie</a><a href="#" style="font-family:var(--ui)">Voir dans le pipeline</a></span></div>
+                </div>
+                <div class="blocked">
+                  <ul class="reasons" aria-label="Raisons du blocage">
+                    <li class="bg lit" style="--fill:var(--surface)">bandit est en échec (obligatoire)</li>
+                    <li class="bg dim">Approbations : 0 sur 2</li>
+                  </ul>
+                </div>
+                <div class="passes">
+                  <div class="chk ok bg dim"><span class="g">✓</span><code>ruff</code><span>Réussi</span><span class="dur">2 s</span></div>
+                  <div class="chk ok bg dim"><span class="g">✓</span><code>pytest</code><span>Réussi</span><span class="dur">5 s</span></div>
+                  <div class="chk ok bg dim"><span class="g">✓</span><code>gitleaks</code><span>Réussi</span><span class="dur">3 s</span></div>
+                  <div class="chk run bg dim"><span class="dot" aria-hidden="true"></span><code>pip-audit</code><span>En cours</span><span class="dur">4 s</span></div>
+                  <div class="chk run bg dim"><span class="dot" aria-hidden="true"></span><code>quality gate</code><span>En cours</span><span class="dur">4 s</span></div>
+                </div>
+                <div class="rv bg dim"><span>Camille a demandé une revue · 14:51</span><span class="cnt">Approbations : 0 sur 2<small>2 approbations requises</small></span></div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <!-- 3. Code -->
+        <section class="pane" aria-label="Code">
+          <div class="ph"><span class="step">3</span><h2 class="pt">Code</h2><span class="pst">Fichiers du bac à sable, diff et éditeur</span>
+            <span class="pctl"><button aria-label="Masquer la vue">—</button><button aria-label="Agrandir la vue">⛶</button></span></div>
+          <div class="pb">
+            <div class="filebar" style="margin-top:-4px"><button class="tree" aria-expanded="false">Fichiers ▸</button><span class="path-f">agent/tools.py</span><span class="pst">Diff du commit e4b7c21</span><button class="btn btn-sec" style="margin:0 0 0 auto;min-height:28px;padding:2px 14px">Ouvrir dans mon éditeur</button></div>
+            <div class="diff" role="group" aria-label="Diff de agent/tools.py">
+              <div class="dl hunk bg dim"><span class="ln"></span><span class="ln"></span><span></span><span>@@ -23,3 +23,7 @@</span></div>
+              <div class="dl bg dim"><span class="ln">23</span><span class="ln">23</span><span></span><span><span class="k">import</span> subprocess</span></div>
+              <div class="dl bg dim"><span class="ln">24</span><span class="ln">24</span><span></span><span></span></div>
+              <div class="dl add bg dim"><span class="ln"></span><span class="ln">25</span><span>+</span><span><span class="k">def</span> search_files(pattern: str, path: str = <span class="s">"."</span>) -&gt; str:</span></div>
+              <div class="dl add bg dim"><span class="ln"></span><span class="ln">26</span><span>+</span><span>    cmd = f<span class="s">"grep -rn {pattern} {path}"</span></span></div>
+              <div class="dl add bg lit" tabindex="0"><span class="ln">&nbsp;</span><span class="ln" style="color:var(--ink)">27</span><span>+</span><span>    result = subprocess.run(cmd, shell=<span class="l">True</span>, capture_output=<span class="l">True</span>, text=<span class="l">True</span>)</span></div>
+              <div class="dl add bg dim"><span class="ln"></span><span class="ln">28</span><span>+</span><span>    <span class="k">return</span> result.stdout</span></div>
+              <div class="dl del bg dim"><span class="ln">25</span><span class="ln"></span><span>−</span><span>TOOLS = {}</span></div>
+              <div class="dl add bg dim"><span class="ln"></span><span class="ln">29</span><span>+</span><span>TOOLS = {<span class="s">"search_files"</span>: search_files}</span></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Terminal -->
+        <section class="pane tpane" aria-label="Terminal">
+          <div class="ph"><span class="step">4</span><h2 class="pt">Terminal</h2><span class="pst">Vrai git, dans le bac à sable</span>
+            <span class="pctl"><button aria-label="Masquer la vue">—</button><button aria-label="Agrandir la vue">⛶</button></span></div>
+          <div class="pb">
+            <div class="term" role="log" aria-label="Terminal" tabindex="0">
+              <div class="tl dim"><span class="pm">bac-a-sable (feature) $</span>git push origin feature</div>
+              <div class="tl err dim"><span class="sr">erreur standard : </span>Vers ../origin.git</div>
+              <div class="tl err dim"> * [nouvelle branche]      feature -&gt; feature</div>
+              <div class="tl dim"><span class="pm">bac-a-sable (feature) $</span>bandit -r agent/ -ll</div>
+              <div class="tl tlit bg" style="--fill:var(--term-lit-fill)">&gt;&gt; Issue: [B602:subprocess_popen_with_shell_equals_true] subprocess call with shell=True identified, security issue.</div>
+              <div class="tl tlit bg" style="--fill:var(--term-lit-fill)">   Severity: High   Confidence: High</div>
+              <div class="tl tlit bg" style="--fill:var(--term-lit-fill)">   Location: ./agent/tools.py:27:13</div>
+              <div class="tl exit"><b>✗</b>code de sortie 1</div>
+              <div class="tl app"><b>›</b>Le GitHub simulé a relancé le pipeline : le check bandit est en échec.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

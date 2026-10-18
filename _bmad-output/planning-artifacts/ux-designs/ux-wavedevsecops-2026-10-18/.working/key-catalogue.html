@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalogue - WaveDevSecOps</title>
+<style>
+/*
+  Maquette : accueil Catalogue apres le premier lancement (parcours LLM choisi). Illustre les spines, sans les remplacer.
+  EXPERIENCE.md : Information Architecture > Catalogue (path-picker, trois catalogue-section, scenario-card
+    avec lignes Mode A / Mode B, « Reprendre », « Exporter mon rapport » en pied) ;
+    Component Patterns (path-picker, catalogue-section, scenario-card ; carte indisponible non ouvrable avec
+    lien « Voir le diagnostic ») ; State Patterns > Outil manquant ; Exports > Rapport de progression ;
+    Flow 2 (etapes 2 et 3) ; Accessibility Floor (jamais la couleur seule, grise sans opacity).
+  DESIGN.md : Components > Catalogue, diagnostic, exports (path-picker, catalogue-section, scenario-card,
+    diagnostic-badge) ; Colors > Etats (state-unavailable) ; Chaine et vocabulaire (nom « Station n · Nom ») ;
+    Elevation & Depth (relief sur les cartes, pas sur les cartes indisponibles).
+  Theme : variables sur :root ; sombre par prefers-color-scheme ET case « Theme sombre » (:has, sans JS).
+*/
+:root{
+  --primary:#451DC7;--primary-deep:#250F6B;--primary-soft:#EDE7FE;--accent:#04F06A;--accent-soft:#CAFEE0;
+  --ink:#0A0A14;--ink-soft:#4A4A5E;--muted:#8A8A9E;--line:#E6E6EC;--surface:#F6F5FA;--surface-raised:#FFFFFF;
+  --warning:#FFCA4A;--danger:#FF2A49;--on-primary:#FFFFFF;--relief:#D9D0F6;--relief-active:#C9BCF5;
+  --on-vivid:#0A0A14;--warning-soft:#FFF4D6;--danger-soft:#FDE8EB;--ink-fill:#0A0A14;--ink-fill-edge:#0A0A14;--on-ink:#FFFFFF;
+  --neutral-soft:#EFEFF4;--harness:#B8327A;--harness-soft:#FBE7F1;--context:#0F7B6C;
+}
+@media (prefers-color-scheme:dark){:root{
+  --primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent-soft:#0F3A24;
+  --ink:#ECEBF5;--ink-soft:#B4B3C7;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;
+  --danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;
+  --warning-soft:#3A3010;--danger-soft:#3A1820;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;
+  --neutral-soft:#26252F;--harness:#E8639F;--harness-soft:#3A1A2B;--context:#2FB8A3;
+}}
+:root:has(#dark-toggle:checked){
+  --primary:#9C86FF;--primary-deep:#C9BDFF;--primary-soft:#2A2350;--accent-soft:#0F3A24;
+  --ink:#ECEBF5;--ink-soft:#B4B3C7;--line:#3A394F;--surface:#12121C;--surface-raised:#1E1D2C;
+  --danger:#FF6B7F;--on-primary:#0E0B1E;--relief:#2A2156;--relief-active:#3A2E78;
+  --warning-soft:#3A3010;--danger-soft:#3A1820;--ink-fill:#33257A;--ink-fill-edge:#7C6AD6;
+  --neutral-soft:#26252F;--harness:#E8639F;--harness-soft:#3A1A2B;--context:#2FB8A3;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--surface);color:var(--ink);font:400 14px/1.5 "Atkinson Hyperlegible",system-ui,"Segoe UI",sans-serif}
+h1,h2,h3,.fred{font-family:Fredoka,system-ui,"Segoe UI",sans-serif;margin:0}
+code,.mono{font:400 13px/1.5 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace}
+code{background:var(--surface);border:2px solid var(--muted);border-radius:12px;padding:0 6px}
+a{color:var(--primary)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.frame{width:1920px;height:1080px;border:2px solid var(--muted);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;background:var(--surface)}
+.chrome{display:flex;align-items:center;gap:16px;height:48px;padding:0 16px;background:var(--surface-raised);border-bottom:2px solid var(--line);flex:none}
+.url{flex:1;max-width:720px;border:2px solid var(--muted);border-radius:9999px;padding:2px 16px;font:400 13px/1.5 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;background:var(--surface)}
+.toggle{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:32px;font:500 12px/1.2 Fredoka,system-ui,sans-serif;cursor:pointer}
+.toggle input{width:20px;height:20px;accent-color:var(--primary)}
+.viewport{flex:1;overflow:auto;padding:16px 24px 32px}
+.site-nav{display:flex;align-items:center;gap:24px;height:56px;padding:0 24px;background:var(--surface-raised);border:2px solid var(--line);border-radius:26px;max-width:1440px;margin:0 auto 24px}
+.brand{font:600 18px/1.15 Fredoka,system-ui,sans-serif;color:var(--primary-deep);margin-right:8px}
+.site-nav a,.site-nav .btn-lite{display:inline-flex;align-items:center;gap:8px;min-height:32px;color:var(--ink);text-decoration:none;font:500 14px/1.2 Fredoka,system-ui,sans-serif;padding:0 4px}
+.site-nav a[aria-current="page"]{border-bottom:3px solid var(--primary)}
+.site-nav .right{margin-left:auto}
+.btn-lite{background:none;border:2px solid var(--muted);border-radius:18px;padding:0 12px!important;color:var(--ink)}
+.badge-diag{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 8px;border-radius:9999px;background:var(--danger);color:var(--on-vivid);font:600 14px/1.2 Fredoka,system-ui,sans-serif}
+.pane-title{font:600 18px/1.15 Fredoka,system-ui,sans-serif}
+.pane-subtitle{font:400 13px/1.3 "Atkinson Hyperlegible",system-ui,sans-serif;color:var(--ink-soft);margin:4px 0 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 16px;border-radius:18px;font:500 14px/1.2 Fredoka,system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn-primary{background:var(--primary);color:var(--on-primary);border:2px solid var(--primary);box-shadow:0 4px 0 var(--primary-deep)}
+.btn-secondary{background:var(--surface-raised);color:var(--primary);border:2px solid var(--primary);box-shadow:0 4px 0 var(--relief-active)}
+.pill{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 10px;border-radius:9999px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:500 12px/1.2 Fredoka,system-ui,sans-serif;white-space:nowrap}
+.pill.ok{background:var(--accent);color:var(--on-vivid);border-color:var(--accent)}
+.pill.warn{background:var(--warning);color:var(--on-vivid);border-color:var(--warning)}
+.pill.fail{background:var(--danger);color:var(--on-vivid);border-color:var(--danger)}
+.home{max-width:1440px;margin:0 auto}
+.home h1{font-size:20px;line-height:1.1}
+.picker-row{display:flex;align-items:center;gap:24px;margin:0 0 24px;flex-wrap:wrap}
+.picker{display:inline-flex;gap:8px;border:0;padding:0;margin:0}
+.picker legend{position:absolute;left:-9999px}
+.picker input{position:absolute;opacity:0;width:1px;height:1px}
+.picker label{display:inline-flex;align-items:center;min-height:36px;padding:0 20px;border-radius:9999px;border:2px solid var(--muted);background:var(--surface);color:var(--ink);font:500 12px/1.2 Fredoka,system-ui,sans-serif;cursor:pointer}
+.picker input:checked+label{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.picker input:focus-visible+label{outline:2px solid var(--primary);outline-offset:2px}
+.picker-row p{margin:0;color:var(--ink-soft);font-size:13px}
+.section{margin-bottom:32px}
+.section>h2{font:600 18px/1.15 Fredoka,system-ui,sans-serif}
+.section>.pane-subtitle{margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.station{margin:0 0 24px}
+.station h3{font:600 14px/1.2 Fredoka,system-ui,sans-serif;margin:0 0 8px;padding-left:12px;border-left:3px solid var(--harness)}
+.card{background:var(--surface-raised);border-radius:26px;box-shadow:0 4px 0 var(--relief);padding:16px;display:flex;flex-direction:column;gap:12px}
+.card h3{font:600 18px/1.3 Fredoka,system-ui,sans-serif;margin:0;display:flex;align-items:center;gap:12px}
+.card h3 a{color:var(--ink);text-decoration:none}
+.card .desc{margin:0;color:var(--ink-soft);font-size:13px}
+.ord{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9999px;background:var(--ink-fill);color:var(--on-ink);border:2px solid var(--ink-fill-edge);font:600 14px/1.2 Fredoka,system-ui,sans-serif}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.modes.single{grid-template-columns:1fr}
+.mode{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.mode+.mode{border-left:2px solid var(--line);padding-left:16px}
+.mode b{font:500 12px/1.2 Fredoka,system-ui,sans-serif;color:var(--ink-soft)}
+.mode .score{font-size:13px;color:var(--ink)}
+.sp{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 10px;border-radius:9999px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:500 12px/1.2 Fredoka,system-ui,sans-serif;white-space:nowrap}
+.sp.done{background:var(--accent-soft)}
+.sp.doing{background:var(--primary-soft);border-color:var(--primary)}
+.sp .dot{width:8px;height:8px;border-radius:9999px;background:var(--primary)}
+.btn-sm{min-height:32px;padding:0 14px}
+.card.off{background:var(--neutral-soft);box-shadow:none;border:2px dashed var(--muted);color:var(--ink-soft)}
+.card.off h3,.card.off h3 a,.card.off .desc{color:var(--ink-soft)}
+.card.off .sp{background:var(--neutral-soft);border-color:var(--muted);color:var(--ink)}
+.reason{margin:0;font-size:13px;color:var(--ink)}
+.reason a{color:var(--primary-deep);font-weight:700}
+.foot{display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:16px;border-top:2px solid var(--line)}
+.foot p{margin:0;color:var(--ink-soft);font-size:13px}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="chrome">
+    <span class="url">http://127.0.0.1:8742/</span>
+    <label class="toggle"><input type="checkbox" id="dark-toggle"> Thème sombre</label>
+  </div>
+  <div class="viewport">
+    <header class="site-nav">
+      <span class="brand">WaveDevSecOps</span>
+      <a href="#" aria-current="page">Catalogue</a>
+      <a href="#">Vocabulaire</a>
+      <a href="#">Fiche</a>
+      <a href="#" aria-label="Diagnostic, 2 outils absents ou trop anciens">Diagnostic <span class="badge-diag" aria-hidden="true">2</span></a>
+      <span class="right btn-lite">Affichage ▾</span>
+    </header>
+
+    <main class="home">
+      <h1 class="pane-title">Catalogue</h1>
+      <p class="pane-subtitle" style="margin-bottom:16px">Vos scénarios, dans l'ordre conseillé. Chaque parcours garde sa progression.</p>
+
+      <div class="picker-row">
+        <fieldset class="picker">
+          <legend>Parcours</legend>
+          <input type="radio" name="parcours" id="p-llm" checked><label for="p-llm">Parcours LLM</label>
+          <input type="radio" name="parcours" id="p-sans"><label for="p-sans">Parcours sans IA</label>
+        </fieldset>
+        <p>Les deux parcours suivent la même progression ; seul le code d'exercice change.</p>
+      </div>
+
+      <section class="section" aria-labelledby="h-socle">
+        <h2 id="h-socle">Socle git</h2>
+        <p class="pane-subtitle">8 scénarios dans l'ordre conseillé, du premier commit à la récupération</p>
+        <div class="grid">
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">1</span><a href="#">add / commit</a></h3>
+            <div class="modes">
+              <div class="mode"><b>Mode A</b><span class="sp done"><span aria-hidden="true">✓</span> Terminé</span><span class="score">3 sur 4 du premier coup · 1 indice</span></div>
+              <div class="mode"><b>Mode B</b><span class="sp done"><span aria-hidden="true">✓</span> Terminé</span><span class="score">2 sur 2 du premier coup · 0 indice</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">2</span><a href="#">push / pull</a></h3>
+            <div class="modes">
+              <div class="mode"><b>Mode A</b><span class="sp doing"><span class="dot" aria-hidden="true"></span> En cours</span><span class="score">Étape 3 sur 6</span><a class="btn btn-primary btn-sm" href="#">Reprendre</a></div>
+              <div class="mode"><b>Mode B</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">3</span><a href="#">branche</a></h3>
+            <div class="modes single">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">4</span><a href="#">PR / merge</a></h3>
+            <div class="modes single">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">5</span><a href="#">conflit</a></h3>
+            <div class="modes single">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">6</span><a href="#">stash</a></h3>
+            <div class="modes">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+              <div class="mode"><b>Mode B</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">7</span><a href="#">rebase</a></h3>
+            <div class="modes">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+              <div class="mode"><b>Mode B</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+          <article class="card">
+            <h3><span class="ord" aria-hidden="true">8</span><a href="#">récupération (reflog / reset)</a></h3>
+            <div class="modes single">
+              <div class="mode"><b>Mode A</b><span class="sp">À faire</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-stations">
+        <h2 id="h-stations">Stations</h2>
+        <p class="pane-subtitle">Les barrières de la chaîne DevSecOps, station par station</p>
+
+        <div class="station"><h3>Station 1 · Poste local</h3>
+          <div class="grid">
+            <article class="card"><h3><a href="#">Lint et tests avant commit</a></h3><p class="desc">ruff et pytest : défaut de lint, test cassé.</p><div class="mode"><span class="sp">À faire</span></div></article>
+            <article class="card off" aria-disabled="true"><h3>Secret dans un commit</h3><p class="desc">Hook pre-commit gitleaks.</p><div class="mode"><span class="sp"><span aria-hidden="true">⊘</span> Indisponible</span></div><p class="reason">Nécessite gitleaks · <a href="#">Voir le diagnostic</a></p></article>
+          </div>
+        </div>
+        <div class="station"><h3>Station 2 · PR et CI</h3>
+          <div class="grid">
+            <article class="card"><h3><a href="#">Checks, revue et protection de main</a></h3><p class="desc">Check en échec, PR sans revue, push direct refusé.</p><div class="mode"><span class="sp">À faire</span></div></article>
+          </div>
+        </div>
+        <div class="station"><h3>Station 3 · Sécurité et qualité</h3>
+          <div class="grid">
+            <article class="card off" aria-disabled="true"><h3>Code vulnérable</h3><p class="desc">bandit, contrôle SAST.</p><div class="mode"><span class="sp"><span aria-hidden="true">⊘</span> Indisponible</span></div><p class="reason">Nécessite bandit · <a href="#">Voir le diagnostic</a></p></article>
+            <article class="card"><h3><a href="#">Dépendance vulnérable</a></h3><p class="desc">pip-audit et SBOM.</p><div class="mode"><span class="sp">À faire</span></div></article>
+            <article class="card"><h3><a href="#">Couverture sous le seuil</a></h3><p class="desc">Quality gate.</p><div class="mode"><span class="sp">À faire</span></div></article>
+            <article class="card off" aria-disabled="true"><h3>Clé d'API en dur</h3><p class="desc">gitleaks, parcours LLM.</p><div class="mode"><span class="sp"><span aria-hidden="true">⊘</span> Indisponible</span></div><p class="reason">Nécessite gitleaks · <a href="#">Voir le diagnostic</a></p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="h-parler">
+        <h2 id="h-parler">Savoir en parler</h2>
+        <p class="pane-subtitle">Expliquer les barrières, preuves à l'appui</p>
+        <div class="grid">
+          <article class="card"><h3><a href="#">Vocabulaire</a></h3><p class="desc">Les termes cibles et la barrière qui leur correspond.</p><div class="mode"><span class="sp">À faire</span></div></article>
+          <article class="card"><h3><a href="#">Entretien RSSI</a></h3><p class="desc">Un quiz : chaque réponse désigne une preuve dans les vues.</p><div class="mode"><span class="sp">À faire</span></div></article>
+          <article class="card"><h3><a href="#">Fiche barrière, risque, preuve</a></h3><p class="desc">Correspondances ISO 27001, NIS2, DORA et CRA, à exporter.</p><div class="mode"><span class="sp">À faire</span></div></article>
+        </div>
+      </section>
+
+      <div class="foot">
+        <a class="btn btn-secondary" href="#">Exporter mon rapport</a>
+        <p>Rien n'est envoyé : vous choisissez à qui transmettre le fichier.</p>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
