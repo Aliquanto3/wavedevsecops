@@ -1,7 +1,7 @@
 ﻿# Installeur de WaveDevSecOps pour Windows 10 et 11, sans droits administrateur (AD-15, AD-20).
 #
 # Commande unique (voir le README) :
-#   [Net.ServicePointManager]::SecurityProtocol = 'Tls12'; iex ([Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1')).TrimStart([char]0xFEFF))
+#   [Net.ServicePointManager]::SecurityProtocol = 'Tls12'; $w = New-Object Net.WebClient; if ($env:HTTPS_PROXY) { $w.Proxy = New-Object Net.WebProxy($env:HTTPS_PROXY, $true); $w.Proxy.UseDefaultCredentials = $true }; iex ([Text.Encoding]::UTF8.GetString($w.DownloadData('https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1')).TrimStart([char]0xFEFF))
 #
 # Compatible Windows PowerShell 5.1. Aucune élévation : tout est écrit dans le profil de
 # l'utilisateur. Relancé, il met l'application à jour et conserve progress.json.
@@ -16,6 +16,7 @@
 #   WDS_INSTALL_SIMULATE_FAIL=<étapes séparées par des virgules : download, portablegit, clone, sync>,
 #   WDS_INSTALL_LIBONLY=1 (définit les fonctions sans rien lancer).
 
+$script:SavedErrorActionPreference = $ErrorActionPreference
 $ErrorActionPreference = 'Stop'
 $script:InstallerVersion = 1
 $script:RepoUrl = 'https://github.com/Aliquanto3/wavedevsecops.git'
@@ -209,7 +210,6 @@ function Initialize-Network {
         $env:UV_SYSTEM_CERTS = 'true'
         Write-Info "Proxy détecté : les téléchargements passent par lui, UV_SYSTEM_CERTS=true."
     }
-    $ProgressPreference = 'SilentlyContinue'
 }
 
 function Save-File([string]$Url, [string]$Destination) {
@@ -224,10 +224,15 @@ function Save-File([string]$Url, [string]$Destination) {
         if (Test-SimulatedFailure 'download') {
             throw (New-InstallError "Le téléchargement de $Url a échoué (simulation)." $script:NetworkSettings $script:RouteText)
         }
-        [IO.File]::WriteAllText($Destination, 'simulation')
+        if ($Url.EndsWith('/tools.toml') -and $env:WDS_INSTALL_SIMULATE_TOOLS_TOML) {
+            Copy-Item -LiteralPath $env:WDS_INSTALL_SIMULATE_TOOLS_TOML -Destination $Destination -Force
+        }
+        else { [IO.File]::WriteAllText($Destination, 'simulation') }
         return
     }
     $part = "$Destination.part"
+    # Locale à la fonction : sous PowerShell 5.1, la barre de progression ralentit fortement Invoke-WebRequest.
+    $ProgressPreference = 'SilentlyContinue'
     try {
         $request = @{ Uri = $Url; OutFile = $part; UseBasicParsing = $true }
         if ($script:Proxy) { $request["Proxy"] = $script:Proxy; $request["ProxyUseDefaultCredentials"] = $true }
@@ -341,6 +346,26 @@ function Get-UvInstallDir {
     return (Join-Path $env:USERPROFILE '.local\bin')
 }
 
+function ConvertTo-PsLiteral([string]$Text) { return "'" + ($Text -replace "'", "''") + "'" }
+
+function Get-UvInstallerCommand([string]$ScriptPath, [string]$Proxy) {
+    # L'installeur d'astral est lu puis passé à iex, comme sa commande officielle : pas de
+    # -File, donc pas de blocage par une politique d'exécution imposée par GPO. Le proxy est
+    # posé par défaut pour WebClient et Invoke-WebRequest, quel que soit l'outil qu'il utilise.
+    $lines = @(
+        "`$ErrorActionPreference = 'Stop'",
+        "`$ProgressPreference = 'SilentlyContinue'",
+        'try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }'
+    )
+    if ($Proxy) {
+        $lines += "`$wdsProxy = New-Object Net.WebProxy($(ConvertTo-PsLiteral $Proxy), `$true)"
+        $lines += '$wdsProxy.UseDefaultCredentials = $true'
+        $lines += '[Net.WebRequest]::DefaultWebProxy = $wdsProxy'
+    }
+    $lines += "Invoke-Expression ([IO.File]::ReadAllText($(ConvertTo-PsLiteral $ScriptPath), [Text.Encoding]::UTF8))"
+    return ($lines -join [Environment]::NewLine)
+}
+
 function Install-Uv([string]$DataDir, [hashtable]$Tool) {
     $version = Get-ProvisionedVersion $Tool
     $url = "https://astral.sh/uv/$version/install.ps1"
@@ -351,18 +376,33 @@ function Install-Uv([string]$DataDir, [hashtable]$Tool) {
         Add-SimLog "uv-install $version"
         return @{ Path = 'uv'; Version = $version }
     }
-    $code = Invoke-Native 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script) $null
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-UvInstallerCommand $script $script:Proxy)))
+    $code = Invoke-Native 'powershell.exe' @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded) $null
     $exe = Join-Path (Get-UvInstallDir) 'uv.exe'
     if ($code -ne 0 -or -not (Test-Path -LiteralPath $exe)) {
         Remove-Item -LiteralPath $script -Force -ErrorAction SilentlyContinue
-        throw (New-InstallError "L'installation de uv a échoué (code $code)." $script:NetworkSettings $script:RouteText)
+        $cause = "L'installation de uv a échoué (code $code) ; la cause est affichée juste au-dessus par l'installeur d'astral. " +
+            'Causes fréquentes : proxy non renseigné, certificats de l''entreprise, antivirus, ou mode de langage restreint de PowerShell (AppLocker).'
+        $route = 'installez uv vous-même (https://docs.astral.sh/uv/, version ' + $Tool['min_version'] + ' ou plus, dans le PATH), puis relancez la commande. ' + $script:RouteText
+        throw (New-InstallError $cause ($script:NetworkSettings + @('UV_INSTALL_DIR (dossier de uv.exe, par défaut %USERPROFILE%\.local\bin)')) $route)
     }
     return @{ Path = $exe; Version = (Get-ToolVersionText $exe @('--version') 'uv (\d+(?:\.\d+)+)') }
+}
+
+function Assert-AppDirReplaceable([string]$AppDir) {
+    # Un dossier « app » existant n'est remplacé que s'il est vide ou contient l'application
+    # (pyproject.toml ou .git) : un WDS_DATA_DIR mal placé ne doit pas effacer un dossier de l'utilisateur.
+    if (-not (Test-Path -LiteralPath $AppDir)) { return }
+    if (Test-Path -LiteralPath (Join-Path $AppDir 'pyproject.toml')) { return }
+    if (Test-Path -LiteralPath (Join-Path $AppDir '.git')) { return }
+    if (@(Get-ChildItem -LiteralPath $AppDir -Force).Count -eq 0) { return }
+    throw (New-InstallError "Le dossier « $AppDir » existe et ne contient pas l'application : il n'est pas modifié." @('WDS_DATA_DIR (dossier réservé à WaveDevSecOps)') 'choisissez un autre WDS_DATA_DIR, ou videz ce dossier « app » vous-même, puis relancez la commande.')
 }
 
 function Install-AppByClone([string]$DataDir, [string]$AppDir, [string]$GitExe, [string]$Ref) {
     $sslArgs = @()
     if ($script:Proxy) { $sslArgs = @('-c', 'http.sslBackend=schannel') }   # certificats de l'entreprise, magasin Windows
+    Assert-AppDirReplaceable $AppDir
     if ($script:Simulate) {
         if (Test-SimulatedFailure 'clone') {
             throw (New-InstallError 'Le clone de l''application a échoué (simulation).' $script:NetworkSettings $script:RouteText)
@@ -400,6 +440,7 @@ function Install-AppByClone([string]$DataDir, [string]$AppDir, [string]$GitExe, 
 }
 
 function Install-AppByZip([string]$DataDir, [string]$AppDir, [string]$Ref) {
+    Assert-AppDirReplaceable $AppDir
     $url = "$script:ZipUrlBase/$Ref.zip"
     $zip = Join-Path $DataDir "cache\downloads\wavedevsecops-$($Ref -replace '[\\/]', '_').zip"
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue   # un zip de branche change : toujours frais
@@ -412,6 +453,7 @@ function Install-AppByZip([string]$DataDir, [string]$AppDir, [string]$Ref) {
         [IO.File]::WriteAllText((Join-Path $staging 'pyproject.toml'), 'simulation')
     }
     else {
+        $ProgressPreference = 'SilentlyContinue'
         try {
             Expand-Archive -LiteralPath $zip -DestinationPath $staging -Force
             $inner = @(Get-ChildItem -LiteralPath $staging -Directory)
@@ -560,6 +602,10 @@ function Start-Installer {
         $global:LASTEXITCODE = 1
         # Lancé comme fichier, le code de sortie compte ; collé via iex, `exit` fermerait la console de l'utilisateur.
         if ($PSCommandPath) { exit 1 }
+    }
+    finally {
+        # Collé via iex, le script s'exécute dans la portée de la console : on lui rend sa préférence.
+        if (-not $PSCommandPath) { $script:ErrorActionPreference = $script:SavedErrorActionPreference }
     }
 }
 

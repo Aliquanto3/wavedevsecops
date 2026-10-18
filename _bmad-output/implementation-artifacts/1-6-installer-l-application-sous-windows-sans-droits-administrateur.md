@@ -36,3 +36,25 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.6 ».
 - Gitleaks (archive vérifiée par `checksums.txt`) et préchargement de `uv-cache` : hors critères de la story, à traiter avec les stories qui en ont besoin (station 1, AD-12).
 - Vérification d'empreinte de PortableGit : Git for Windows ne publie les sommes que dans les notes de release ; à ajouter à `tools.toml` si on veut la contrôler.
 - Vérifications sur un vrai poste Windows non administrateur (non reproduites par la CI) : téléchargements réels, extraction PortableGit, installeur de uv, clone et zip réels, proxy d'entreprise avec inspection TLS, exécution collée par `iex`, temps d'installation (objectif 10 minutes).
+
+## Revue
+
+Revue unique (Opus), après rebase sans conflit sur `main` (stories 1.3 et 1.4). Constats du second avis (Haiku) repris un par un.
+
+- medium · second avis 1 · corrigé · `$ProgressPreference` était posée en variable locale de `Initialize-Network`, sans effet sur `Invoke-WebRequest` : posée désormais dans `Save-File` et avant `Expand-Archive`.
+- medium · second avis 2 · corrigé · la commande d'amorçage ignorait `HTTPS_PROXY` : elle règle maintenant le proxy de son `WebClient` quand la variable est posée (sinon proxy système). Même commande dans le README et l'en-tête du script (test).
+- medium · second avis 3 · corrigé · installeur de uv lancé sans proxy explicite : la commande enfant pose `[Net.WebRequest]::DefaultWebProxy` (identifiants par défaut) et TLS 1.2 ; le message d'échec renvoie à la sortie d'astral affichée au-dessus, liste les causes fréquentes et la voie manuelle.
+- medium · second avis 4 · corrigé · sous `iex`, la simulation écrivait « simulation » dans `cache\tools.toml` : en simulation, le registre téléchargé est copié depuis `WDS_INSTALL_SIMULATE_TOOLS_TOML`. Tests ajoutés : commande du README exécutée telle quelle (script lu en `file://`), succès et échec (la console reste ouverte, `$LASTEXITCODE` = 1). Le code réel n'était pas fautif (téléchargement du registre depuis `raw.githubusercontent.com`).
+- medium · second avis 5 · corrigé · `-File` est bloqué par une politique d'exécution imposée par GPO : l'installeur d'astral est désormais lu puis passé à `iex` dans un PowerShell enfant (`-EncodedCommand`), comme sa commande officielle ; aucune politique d'exécution ne s'applique à `iex`. Test : commande enfant exécutée sur un faux installeur à bloc `param`, proxy vérifié.
+- low · second avis 6 · corrigé · un dossier `app` existant sans `.git` ni `pyproject.toml` et non vide n'est plus supprimé (clone et zip) : erreur claire, dossier intact (test).
+- low · second avis 7 · corrigé · sous `iex`, la préférence d'erreur de la console est rendue en fin d'installation (test). Les variables `$script:` restent dans la session : sans effet.
+
+### À vérifier sur un vrai poste Windows non administrateur
+
+1. Commande du README collée dans Windows PowerShell 5.1, sans proxy : installation complète, durée affichée sous 10 minutes, aucune invite UAC.
+2. Même commande avec `HTTPS_PROXY` posée (proxy d'entreprise, idéalement avec inspection TLS) : script, PortableGit, installeur de uv, clone (`http.sslBackend=schannel`) et `uv sync` passent par le proxy.
+3. Poste avec politique d'exécution `AllSigned` imposée par GPO : l'installeur de uv passe par `iex`.
+4. Poste sans git, puis avec git 2.30 : PortableGit 2.56.0.windows.2 extrait dans `<data>\tools\git`, `cmd\git.exe` présent ; codes de sortie lus par `Start-Process -Wait -PassThru`.
+5. Voie zip (`$env:WDS_INSTALL_METHOD = 'zip'`) : extraction et remontée du dossier `wavedevsecops-main`.
+6. Relance : mise à jour (`fetch` + `reset --hard`), `progress.json` intact, `run_count` incrémenté ; puis coupure réseau pendant le clone et relance.
+7. Mode de langage restreint (AppLocker/WDAC) : comportement de l'installeur et de celui d'astral, message affiché.

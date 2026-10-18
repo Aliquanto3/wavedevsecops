@@ -26,7 +26,7 @@ doivent comprendre ce que l'agent fait sur leur dépôt. Pédagogie inspirée de
 Dans PowerShell (Windows 10 ou 11), un compte standard suffit :
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; iex ([Text.Encoding]::UTF8.GetString((New-Object Net.WebClient).DownloadData('https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1')).TrimStart([char]0xFEFF))
+[Net.ServicePointManager]::SecurityProtocol = 'Tls12'; $w = New-Object Net.WebClient; if ($env:HTTPS_PROXY) { $w.Proxy = New-Object Net.WebProxy($env:HTTPS_PROXY, $true); $w.Proxy.UseDefaultCredentials = $true }; iex ([Text.Encoding]::UTF8.GetString($w.DownloadData('https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1')).TrimStart([char]0xFEFF))
 ```
 
 L'installeur place uv dans votre profil, récupère l'application dans
@@ -36,7 +36,7 @@ Relancez la même commande pour mettre à jour : `progress.json` est conservé, 
 installation interrompue reprend là où elle s'est arrêtée.
 
 - **Derrière un proxy** : posez `HTTPS_PROXY` (et `NO_PROXY=127.0.0.1,localhost`) avant la commande ;
-  l'installeur passe par lui et pose `UV_SYSTEM_CERTS=true`.
+  la commande et l'installeur passent par lui (sinon par le proxy système), et l'installeur pose `UV_SYSTEM_CERTS=true`.
 - **Sans git ou si le clone échoue** : `$env:WDS_INSTALL_METHOD = 'zip'` avant la commande.
 - **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche : `$env:WDS_INSTALL_REF`.
 

@@ -197,6 +197,83 @@ def test_install_json_futur_non_modifie(tmp_path: Path) -> None:
 
 
 def test_proxy_pose_uv_system_certs(tmp_path: Path) -> None:
-    out = _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0", HTTPS_PROXY="http://proxy.invalid:8080")
+    out = _install(
+        tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0", HTTPS_PROXY="http://proxy.invalid:8080"
+    )
     assert out.returncode == 0, out.stdout
     assert "Proxy détecté" in out.stdout and "UV_SYSTEM_CERTS=true" in out.stdout
+
+
+def _readme_command() -> str:
+    readme = (ROOT / "README.md").read_text("utf-8")
+    lines = [line for line in readme.splitlines() if "DownloadData(" in line]
+    assert len(lines) == 1
+    return lines[0].strip()
+
+
+def _paste(data: Path, after: str = "", **extra: str) -> subprocess.CompletedProcess[str]:
+    """Exécute la commande du README telle quelle (voie `iex`), le script lu en `file://`."""
+    raw = "https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/install.ps1"
+    command = _readme_command().replace(raw, SCRIPT.as_uri())
+    env = _env(data, WDS_INSTALL_SIMULATE_TOOLS_TOML=str(ROOT / "tools.toml"), **extra)
+    return _run(["-Command", f"$ErrorActionPreference = 'Continue'; {command}; {after}"], env)
+
+
+def test_commande_du_readme_identique_a_l_entete() -> None:
+    assert _readme_command() in SCRIPT.read_text("utf-8-sig").splitlines()[3]
+    assert "$env:HTTPS_PROXY" in _readme_command()
+
+
+def test_voie_iex_installe_en_simulation(tmp_path: Path) -> None:
+    out = _paste(tmp_path, "'EAP=' + $ErrorActionPreference", WDS_INSTALL_SIMULATE_GIT="2.43.0")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "Installation terminée" in out.stdout
+    assert "raw.githubusercontent.com/Aliquanto3/wavedevsecops/main/tools.toml" in "\n".join(
+        _log(tmp_path)
+    )
+    assert json.loads((tmp_path / "install.json").read_text("utf-8"))["versions"]["git"] == "2.43.0"
+    assert "EAP=Continue" in out.stdout  # la console garde sa préférence d'erreur
+
+
+def test_voie_iex_echec_ne_ferme_pas_la_console(tmp_path: Path) -> None:
+    out = _paste(
+        tmp_path,
+        "'APRES=' + $LASTEXITCODE",
+        WDS_INSTALL_SIMULATE_GIT="none",
+        WDS_INSTALL_SIMULATE_FAIL="download",
+    )
+    assert "Cause :" in out.stdout and "Relancez" in out.stdout
+    assert "APRES=1" in out.stdout
+    assert not (tmp_path / "install.json").exists()
+
+
+def test_installeur_uv_lu_par_iex_avec_proxy(tmp_path: Path) -> None:
+    # L'installeur d'astral est simulé par un script local à bloc param, comme le vrai.
+    marker = tmp_path / "marker.txt"
+    fake = tmp_path / "uv install.ps1"
+    fake.write_text(
+        "param([switch]$NoModifyPath)\n"
+        "$a = [Net.WebRequest]::DefaultWebProxy.Address.ToString()\n"
+        f"[IO.File]::WriteAllText('{marker}', $a)\n",
+        "utf-8",
+    )
+    proxy = "http://proxy.invalid:8080"
+    out = _lib(
+        f"$c = Get-UvInstallerCommand '{fake}' '{proxy}'; "
+        "$e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($c)); "
+        "Invoke-Native 'powershell.exe' @('-NoProfile', '-EncodedCommand', $e) $null; "
+        "if ($c -match '-File') { 'FILE' }",
+        tmp_path,
+    )
+    assert out.splitlines()[-1] == "0"
+    assert marker.read_text("utf-8").startswith(proxy)
+
+
+def test_dossier_app_etranger_non_supprime(tmp_path: Path) -> None:
+    foreign = tmp_path / "app" / "mes-notes.txt"
+    foreign.parent.mkdir()
+    foreign.write_text("à garder", "utf-8")
+    for method in ("clone", "zip"):
+        out = _install(tmp_path, WDS_INSTALL_METHOD=method, WDS_INSTALL_SIMULATE_GIT="2.43.0")
+        assert out.returncode == 1 and "ne contient pas l'application" in out.stdout
+        assert foreign.read_text("utf-8") == "à garder"
