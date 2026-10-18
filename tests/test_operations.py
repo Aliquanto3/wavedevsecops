@@ -269,7 +269,15 @@ def test_file_pleine_refusee(layout: Layout, disk: Disk) -> None:
 def test_veille_refuse_les_operations_en_attente(layout: Layout, disk: Disk) -> None:
     h = Harness(layout, disk)
     gate = threading.Event()
-    running = h.engine.submit(_op(lambda ctx: gate.wait(WAIT) and 0))
+    entered = threading.Event()
+
+    def hold(ctx: OpContext) -> int:
+        entered.set()
+        assert gate.wait(WAIT)
+        return 0
+
+    running = h.engine.submit(_op(hold))
+    assert entered.wait(WAIT)  # en cours : la veille l'attend au lieu de la refuser
     pending = h.engine.submit(_op())
     closer = threading.Thread(target=h.engine.close)
     closer.start()
