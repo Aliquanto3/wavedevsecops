@@ -148,6 +148,10 @@ export function createTerminal(body, { store, timers = globalThis }) {
     if (history.length > HISTORY_MAX) history.shift();
     historyIndex = null;
     input.value = "";
+    if (text === "clear") {
+      store.terminalClear(); // comme Ctrl+L : l'affichage seul est effacé, pas l'historique
+      return;
+    }
     store.terminalAppend({ kind: "input", text, prompt: promptText(store.state) });
     try {
       const response = await post("terminal_line", { line: text });

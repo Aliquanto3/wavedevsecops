@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -55,13 +54,31 @@ class GitSubcommand(BaseModel):
         return self
 
 
+class FileCommandSpec(BaseModel):
+    """Commande de fichiers (story 2.5), exécutée en Python sur `wsfs`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    read: bool = False
+    """Vrai : lecture, admise pendant un quiz."""
+    options: list[str] = []
+    min_args: int = 0
+    max_args: int | None = None
+    globs: bool = False
+    """Vrai : `*` et `?` sont résolus dans le bac à sable (rm, mv, cp seulement)."""
+    redirect: bool = False
+    """Vrai : `> f` ou `>> f` en fin de ligne (echo) ; sans redirection, c'est une lecture."""
+    text: bool = False
+    """Vrai : les arguments sont du texte (echo), pas des chemins ni des options."""
+
+
 class Allowlist(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: int
     messages: dict[str, str]
     forbidden_options: list[str]
-    files: dict[str, Any] = Field(default_factory=dict)
+    files: dict[str, FileCommandSpec] = Field(default_factory=dict)
     git: dict[str, GitSubcommand]
 
     def message(self, key: str, **values: object) -> str:

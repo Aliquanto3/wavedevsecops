@@ -30,8 +30,9 @@ from wavedevsecops.engine import (
     register_intent,
     resolve_git,
 )
+from wavedevsecops.terminal import files
 from wavedevsecops.terminal.allowlist import Allowlist, get_allowlist
-from wavedevsecops.terminal.parse import GitCommand, Refused, parse_line
+from wavedevsecops.terminal.parse import FileCommand, GitCommand, Refused, parse_line
 
 log = logging.getLogger("wavedevsecops")
 
@@ -130,6 +131,16 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     return code if code is not None else EXIT_INTERRUPTED
 
 
+def _run_file(ctx: OpContext, command: FileCommand, allow: Allowlist) -> int:
+    """Commande de fichiers : Python sur `wsfs`, dans `repo/` (story 2.5)."""
+    result = files.execute(ctx.layout.repo, command, allow)
+    for text, stream in result.lines:
+        ctx.output(text, stream)
+    if result.code == files.EXIT_FAILED:
+        ctx.output(allow.message("exit_code", code=result.code), "exit")
+    return result.code
+
+
 def build_terminal_line(engine: WorkspaceEngine, body: TerminalLine) -> Operation:
     """Traduit une ligne tapée en opération : refusée à l'écran, ou git dans `repo/`."""
     allow = get_allowlist(engine.settings)
@@ -140,6 +151,10 @@ def build_terminal_line(engine: WorkspaceEngine, body: TerminalLine) -> Operatio
     if command is None:
         return Operation(
             INTENT, lambda ctx: 0, writes=False, validate=False, precheck=lambda ctx: False
+        )
+    if isinstance(command, FileCommand):
+        return Operation(
+            INTENT, lambda ctx: _run_file(ctx, command, allow), writes=not command.read
         )
     return Operation(
         INTENT,

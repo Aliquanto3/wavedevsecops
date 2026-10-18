@@ -82,8 +82,8 @@ def test_cd_refuse_avec_explication(allow: Allowlist) -> None:
 
 def test_commande_inconnue_et_git_nu(allow: Allowlist) -> None:
     with pytest.raises(Refused) as refused:
-        parse_line("rm -rf /", allow)
-    assert "« rm » n'est pas une commande" in refused.value.text
+        parse_line("chmod 777 a", allow)
+    assert "« chmod » n'est pas une commande" in refused.value.text
     with pytest.raises(Refused) as bare:
         parse_line("git", allow)
     assert "git status" in bare.value.text

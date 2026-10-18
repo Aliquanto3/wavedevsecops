@@ -202,8 +202,10 @@ def read_entry(root: Path, path: str) -> bytes | None:
     """
     pure = check_relative(path, portable=False)
     try:
-        parent = root.resolve() if len(pure.parts) == 1 else confine(
-            root, pure.parent.as_posix(), portable=False
+        parent = (
+            root.resolve()
+            if len(pure.parts) == 1
+            else confine(root, pure.parent.as_posix(), portable=False)
         )
     except SandboxPathError:
         return None
@@ -320,3 +322,199 @@ def move(
             if attempt >= attempts:
                 raise
             sleep(pause_s * attempt)
+
+# --- Commandes de fichiers du terminal (story 2.5) -------------------------------------------
+# Toutes passent par `confine` : aucun chemin du terminal n'atteint le disque sans lui.
+
+
+class SandboxFileError(AppError):
+    """Opération de fichier impossible dans l'espace (absent, déjà là, dossier non vide…)."""
+
+    def __init__(self, cause: str, action: str = "Vérifiez le nom avec « ls ».") -> None:
+        super().__init__(cause, action)
+
+
+def _entry(root: Path, path: str, *, portable: bool = True) -> Path:
+    """Entrée désignée par `path` sans suivre un lien final : un lien se supprime ou se
+    déplace lui-même (jamais sa cible, qui peut sortir de l'espace)."""
+    pure = check_relative(path, portable=portable)
+    base = root.resolve()
+    if len(pure.parts) == 1:
+        return base / pure.name
+    return confine(root, pure.parent.as_posix(), portable=portable) / pure.name
+
+
+def list_dir(root: Path, path: str = ".", *, hidden: bool = False) -> list[tuple[str, bool]]:
+    """Entrées `(nom, est_dossier)` triées d'un dossier de l'espace ; `.git` n'y figure jamais."""
+    base = root.resolve() if path in ("", ".") else confine(root, path, portable=False)
+    if not base.is_dir():
+        raise SandboxFileError(f"« {path} » n'est pas un dossier.")
+    entries = []
+    for child in sorted(base.iterdir(), key=lambda p: p.name.lower()):
+        if _is_git_dir(child.name) or (not hidden and child.name.startswith(".")):
+            continue
+        entries.append((child.name, child.is_dir() and not child.is_symlink()))
+    return entries
+
+
+def kind_of(root: Path, path: str) -> str:
+    """`file`, `dir`, `symlink` ou `missing` pour l'entrée `path` (sans suivre un lien final)."""
+    entry = _entry(root, path, portable=False)
+    if entry.is_symlink():
+        return "symlink"
+    if entry.is_dir():
+        return "dir"
+    return "file" if entry.exists() else "missing"
+
+
+def read_text(root: Path, path: str) -> str:
+    """Texte (UTF-8, erreurs remplacées) d'un fichier de l'espace."""
+    kind = kind_of(root, path)
+    if kind == "missing":
+        raise SandboxFileError(f"« {path} » n'existe pas.")
+    if kind == "dir":
+        raise SandboxFileError(f"« {path} » est un dossier, pas un fichier.")
+    data = read_bytes(root, path)
+    if data is None:
+        raise SandboxFileError(f"« {path} » n'a pas pu être lu.")
+    return data.decode("utf-8", errors="replace")
+
+
+def append_text(root: Path, path: str, text: str) -> Path:
+    """Ajoute `text` (UTF-8, LF) à la fin de `path`, créé au besoin."""
+    target = confine(root, path)
+    if target.is_dir():
+        raise SandboxFileError(f"« {path} » est un dossier.")
+    existing = target.read_bytes() if target.is_file() else b""
+    _atomic_write(target, existing + to_lf(text).encode("utf-8"))
+    return target
+
+
+def touch(root: Path, path: str) -> Path:
+    """Crée un fichier vide, ou met à jour la date d'un fichier existant."""
+    target = confine(root, path)
+    if target.exists():
+        os.utime(target)
+    else:
+        _atomic_write(target, b"")
+    return target
+
+
+def make_directory(root: Path, path: str, *, parents: bool = False) -> Path:
+    target = confine(root, path)
+    if target.exists():
+        if parents and target.is_dir():
+            return target
+        raise SandboxFileError(f"« {path} » existe déjà.", "Choisissez un autre nom.")
+    if not parents and not target.parent.is_dir():
+        raise SandboxFileError(
+            f"Le dossier parent de « {path} » n'existe pas.", "Ajoutez l'option -p pour le créer."
+        )
+    target.mkdir(parents=parents)
+    return target
+
+
+def remove_path(root: Path, path: str, *, recursive: bool = False) -> None:
+    """Supprime un fichier, un lien (lui-même) ou, avec `recursive`, un dossier."""
+    entry = _entry(root, path)
+    kind = kind_of(root, path)
+    if kind == "missing":
+        raise SandboxFileError(f"« {path} » n'existe pas.")
+    if kind == "dir":
+        if not recursive:
+            raise SandboxFileError(
+                f"« {path} » est un dossier.", "Ajoutez l'option -r pour le supprimer."
+            )
+        remove_tree(entry)
+        return
+    try:
+        entry.unlink()
+    except PermissionError:
+        os.chmod(entry, stat.S_IWRITE)
+        entry.unlink()
+
+
+def _destination(root: Path, source: str, dest: str) -> Path:
+    """Cible de `mv`/`cp` : un dossier existant reçoit la source sous son nom."""
+    target = confine(root, dest)
+    if target.is_dir():
+        name = PurePosixPath(source).name
+        target = confine(root, f"{PurePosixPath(dest).as_posix()}/{name}")
+    if not target.parent.is_dir():
+        raise SandboxFileError(f"Le dossier de destination « {dest} » n'existe pas.")
+    return target
+
+
+def _inside(candidate: Path, parent: Path) -> bool:
+    return candidate == parent or candidate.is_relative_to(parent)
+
+
+def move_path(root: Path, source: str, dest: str) -> None:
+    src = _entry(root, source)
+    if kind_of(root, source) == "missing":
+        raise SandboxFileError(f"« {source} » n'existe pas.")
+    target = _destination(root, source, dest)
+    if src.is_dir() and _inside(target, src):
+        raise SandboxFileError(f"« {source} » ne peut pas être déplacé dans lui-même.")
+    if target.is_dir() and not target.is_symlink():
+        raise SandboxFileError(f"« {dest} » est un dossier existant.")
+    os.replace(src, target)
+
+
+def copy_path(root: Path, source: str, dest: str, *, recursive: bool = False) -> None:
+    src = _entry(root, source)
+    kind = kind_of(root, source)
+    if kind == "missing":
+        raise SandboxFileError(f"« {source} » n'existe pas.")
+    target = _destination(root, source, dest)
+    if kind == "dir":
+        if not recursive:
+            raise SandboxFileError(
+                f"« {source} » est un dossier.", "Ajoutez l'option -r pour le copier."
+            )
+        if _inside(target, src):
+            raise SandboxFileError(f"« {source} » ne peut pas être copié dans lui-même.")
+        if target.exists():
+            raise SandboxFileError(f"« {dest} » existe déjà.")
+        shutil.copytree(src, target, symlinks=True)
+        return
+    if kind == "symlink":
+        # Un lien est copié par sa cible, qui doit rester dans l'espace.
+        src = confine(root, source, portable=False)
+        if src.is_dir():
+            raise SandboxFileError(f"« {source} » est un lien vers un dossier.")
+    if target.is_dir():
+        raise SandboxFileError(f"« {dest} » est un dossier existant.")
+    _atomic_write(target, src.read_bytes())
+
+
+def _glob_regex(part: str) -> re.Pattern[str]:
+    body = "".join(".*" if c == "*" else "." if c == "?" else re.escape(c) for c in part)
+    return re.compile(body + r"\Z", re.DOTALL)
+
+
+def expand_glob(root: Path, pattern: str) -> list[str]:
+    """Chemins de l'espace qui correspondent à `pattern` (`*` et `?`, segment par segment).
+
+    Les noms qui commencent par un point ne sont pris que par un motif qui commence aussi
+    par un point ; `.git` n'est jamais pris. Sans `*` ni `?`, le motif est rendu tel quel
+    (la commande dira alors si le chemin existe).
+    """
+    if "*" not in pattern and "?" not in pattern:
+        return [pattern]
+    pure = check_relative(pattern, portable=False)
+    found = [""]
+    for part in pure.parts:
+        nxt: list[str] = []
+        for prefix in found:
+            if "*" in part or "?" in part:
+                try:
+                    names = list_dir(root, prefix.rstrip("/") or ".", hidden=part.startswith("."))
+                except AppError:
+                    continue
+                regex = _glob_regex(part)
+                nxt.extend(f"{prefix}{n}" for n, _ in names if regex.match(n))
+            else:
+                nxt.append(f"{prefix}{part}")
+        found = [f"{p}/" for p in nxt]
+    return sorted(p.rstrip("/") for p in found if kind_of(root, p.rstrip("/")) != "missing")

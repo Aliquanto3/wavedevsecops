@@ -1,7 +1,6 @@
 # Liste blanche du terminal (AD-4) : le seul fichier lu par la garde ET par le texte du refus.
 # Une sous-commande ou une option absente d'ici est refusée ; la liste citée à l'apprenant
-# est tirée de ce fichier. Les commandes de fichiers (ls, cat, echo…) s'ajouteront sous
-# `files` avec la story 2.5.
+# est tirée de ce fichier. Les commandes de fichiers (ls, cat, echo…) sont sous `files`.
 schema_version: 1
 
 messages:
@@ -31,6 +30,19 @@ messages:
   refused_argument: "« git {sub} {value} » n'est pas accepté dans ce terminal."
   too_many: "« git {sub} » reçoit trop d'arguments pour ce terminal."
   accepted_files: "Commandes de fichiers acceptées : {commands}."
+  file_unknown_option: "L'option « {option} » n'est pas acceptée pour « {command} »{accepted}."
+  file_options_none: " (cette commande n'a pas d'option dans ce terminal)"
+  file_options_some: " ; options acceptées : {options}"
+  file_too_few: "« {command} » attend au moins {count} argument(s)."
+  file_too_many: "« {command} » reçoit trop d'arguments pour ce terminal."
+  redirect_misplaced: >-
+    Une redirection ne s'écrit qu'avec « echo », une seule fois et en fin de ligne :
+    « echo texte > fichier » ou « echo texte >> fichier ».
+  redirect_target: "Il manque le nom du fichier après « {operator} »."
+  file_error: "{command} : {cause}"
+  file_no_match: "{command} : aucun fichier ne correspond à « {pattern} »."
+  file_multi_dest: "{command} : avec plusieurs sources, la destination doit être un dossier existant."
+  pwd_output: "/repo"
   hint: "Tapez une commande git, par exemple « git status »."
   exit_code: "Code de sortie : {code}"
   missing_message: "git attend un message de commit. Ajoutez `-m \"…\"`."
@@ -60,8 +72,19 @@ forbidden_options:
   - "-F"
   - "--file"
 
-# Commandes de fichiers, écrites en Python sur wsfs (story 2.5). Vide pour l'instant.
-files: {}
+# Commandes de fichiers, écrites en Python sur wsfs (story 2.5) : options, nombre d'arguments,
+# `globs` (rm, mv, cp : `*` et `?` résolus dans le bac à sable), `redirect` (echo : `>` et `>>`).
+files:
+  ls: {read: true, options: ["-a"], max_args: 1}
+  cat: {read: true, min_args: 1}
+  echo: {redirect: true, text: true}
+  touch: {min_args: 1}
+  mkdir: {options: ["-p"], min_args: 1}
+  rm: {options: ["-r", "-R", "-f"], min_args: 1, globs: true}
+  mv: {min_args: 2, globs: true}
+  cp: {options: ["-r", "-R"], min_args: 2, globs: true}
+  pwd: {read: true, max_args: 0}
+  clear: {read: true, max_args: 0}
 
 # Chaque sous-commande git : `read` (vrai : lecture, admise pendant un quiz ; un objet : lecture
 # seulement si toutes ses conditions tiennent), `options`, `value_options` (options qui prennent

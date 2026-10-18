@@ -269,18 +269,99 @@ def check_git(args: list[str], allow: Allowlist) -> GitCommand:
     )
 
 
-def parse_line(line: str, allow: Allowlist) -> GitCommand | None:
-    """Ligne tapée -> commande git acceptée, `None` si la ligne est vide ; sinon `Refused`."""
+@dataclass(frozen=True)
+class FileCommand:
+    """Commande de fichiers acceptée par la garde (story 2.5) ; exécutée par `terminal.files`."""
+
+    name: str
+    options: frozenset[str]
+    args: tuple[str, ...]
+    """Chemins (ou, pour `echo`, mots du texte), sans les options."""
+    read: bool
+    redirect: str | None = None
+    """`>` ou `>>` pour `echo texte > fichier`."""
+    target: str | None = None
+    """Fichier visé par la redirection."""
+
+
+def _file_refuse(allow: Allowlist, reason: str) -> Refused:
+    return Refused(f"{reason} {allow.accepted()}")
+
+
+def check_file(name: str, tokens: list[Token], allow: Allowlist) -> FileCommand:
+    """Valide une commande de fichiers (`tokens` : après le nom) contre la liste blanche."""
+    spec = allow.files[name]
+    redirect: str | None = None
+    target: str | None = None
+    operators = [i for i, token in enumerate(tokens) if token.operator]
+    if operators:
+        last_ok = (
+            spec.redirect
+            and len(operators) == 1
+            and operators[0] == len(tokens) - 2
+            and not tokens[-1].operator
+        )
+        if not last_ok:
+            only = len(operators) == 1 and operators[0] == len(tokens) - 1
+            if spec.redirect and only:
+                key = allow.message("redirect_target", operator=tokens[operators[0]].text)
+                raise _file_refuse(allow, key)
+            raise _file_refuse(allow, allow.message("redirect_misplaced"))
+        redirect, target = tokens[-2].text, tokens[-1].text
+        tokens = tokens[:-2]
+
+    options: set[str] = set()
+    args: list[str] = []
+    allowed = set(spec.options)
+    after_separator = spec.text
+    for token in tokens:
+        word = token.text
+        if after_separator or not word.startswith("-") or word == "-":
+            args.append(word)
+        elif word == "--":
+            after_separator = True
+        else:
+            letters = [f"-{c}" for c in word[1:]] if not word.startswith("--") else [word]
+            for option in letters:
+                if option not in allowed:
+                    where = (
+                        allow.message("file_options_some", options=", ".join(spec.options))
+                        if spec.options
+                        else allow.message("file_options_none")
+                    )
+                    reason = allow.message(
+                        "file_unknown_option", option=option, command=name, accepted=where
+                    )
+                    raise _file_refuse(allow, reason)
+                options.add(option)
+    if len(args) < spec.min_args:
+        raise _file_refuse(allow, allow.message("file_too_few", command=name, count=spec.min_args))
+    if spec.max_args is not None and len(args) > spec.max_args:
+        raise _file_refuse(allow, allow.message("file_too_many", command=name))
+    return FileCommand(
+        name=name,
+        options=frozenset(options),
+        args=tuple(args),
+        read=spec.read or (spec.redirect and redirect is None),
+        redirect=redirect,
+        target=target,
+    )
+
+
+def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | None:
+    """Ligne tapée -> commande acceptée, `None` si la ligne est vide ; sinon `Refused`."""
     tokens = tokenize(line, allow)
     if not tokens:
         return None
     head = tokens[0].text
-    if any(token.operator for token in tokens):
-        # Une redirection n'est permise qu'après `echo` (story 2.5) : ici, jamais.
-        symbol = next(token.text for token in tokens if token.operator)
-        raise Refused(f"{allow.message('metachar', found=symbol)} {allow.accepted()}")
     if tokens[0].operator:
         raise Refused(f"{allow.message('metachar', found=head)} {allow.accepted()}")
+    if head in allow.files:
+        return check_file(head, tokens[1:], allow)
+    if any(token.operator for token in tokens):
+        # Une redirection n'est permise qu'après `echo` : ici, jamais.
+        symbol = next(token.text for token in tokens if token.operator)
+        raise Refused(f"{allow.message('metachar', found=symbol)} {allow.accepted()}")
     if head == "cd":
         raise Refused(f"{allow.message('cd')} {allow.accepted()}")
     if head != "git":
