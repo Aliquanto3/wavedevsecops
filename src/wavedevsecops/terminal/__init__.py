@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from wavedevsecops import gitio
+from wavedevsecops import github_sim, gitio
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import (
     INTENTS,
@@ -136,6 +136,8 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
         ctx.output(allow.message("exit_code", code=code), "exit")
         if command.missing_message:
             ctx.output(allow.message("missing_message"), "app")
+    if code and command.sub == "push" and not killed:
+        _explain_protection(ctx, tool, command, allow)
     if command.touches_origin:
         for hook in AFTER_COMMAND_HOOKS:
             try:
@@ -143,6 +145,31 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
             except Exception:  # noqa: BLE001 - un crochet ne fait pas échouer la commande
                 log.exception("Crochet après %s dans %s", command.sub, ctx.workspace_id)
     return code if code is not None else EXIT_INTERRUPTED
+
+
+def _pushed_branches(tool: gitio.Git, repo: Path, command: GitCommand) -> list[str]:
+    """Branches visées par un `git push` : cibles des refspecs, ou branche courante sans refspec."""
+    names = []
+    for spec in command.positionals[1:]:
+        target = spec.lstrip("+").rpartition(":")[2]
+        names.append(target.removeprefix("refs/heads/"))
+    if names and "HEAD" not in names:
+        return names
+    head = tool.run("symbolic-ref", "-q", "--short", "HEAD", cwd=repo)
+    current = head.stdout.strip() if head.ok else ""
+    return [current if name == "HEAD" else name for name in names] or ([current] if current else [])
+
+
+def _explain_protection(
+    ctx: OpContext, tool: gitio.Git, command: GitCommand, allow: Allowlist
+) -> None:
+    """Après un `push` en échec : si la branche visée est protégée, dit pourquoi git l'a refusé.
+
+    Lu dans l'état du GitHub simulé (AD-8), jamais dans la sortie de git (AD-2)."""
+    for branch in _pushed_branches(tool, ctx.layout.repo, command):
+        if github_sim.direct_push_blocked(ctx.layout, branch):
+            ctx.output(allow.message("protected_branch", branch=branch), "app")
+            return
 
 
 def _run_file(ctx: OpContext, command: FileCommand, allow: Allowlist) -> int:

@@ -306,6 +306,34 @@ def test_push_pull_fetch_agissent_sur_origin_et_refusent_un_chemin(
     assert len(calls) == 3  # un refus n'appelle pas les crochets
 
 
+def test_push_sur_une_branche_protegee_est_refuse_et_explique(
+    space: Space, english: None, git_path: Path
+) -> None:
+    """Story 3.5 : le hook `pre-receive` refuse (`remote:`), le terminal dit pourquoi."""
+    from wavedevsecops import github_sim, hooks, wsfs
+    from wavedevsecops.contracts.github import BranchProtection
+
+    space.identify()
+    space.write("notes.md", "notes\n")
+    assert space.run("git add notes.md").code == 0
+    assert space.run("git commit -m notes").code == 0
+    git = gitio.Git.for_workspace(git_path, space.layout.root, space.settings)
+    git.internal("config", "core.hooksPath", "../hooks", cwd=space.layout.origin)
+    wsfs.write_executable(
+        space.layout.hooks, "pre-receive", hooks.hook_script("pre-receive", Path(sys.executable))
+    )
+    github_sim.set_protection(git, space.layout, BranchProtection(branch="main"))
+    refused = space.run("git push origin main")
+    assert refused.code != 0
+    assert "remote:" in refused.text("stderr")
+    assert refused.text("app").strip() == (
+        "Refusé par la protection de `main` : tout passe par une PR."
+    )
+    assert space.run("git switch -c feature").code == 0
+    ok = space.run("git push origin feature")
+    assert ok.code == 0 and ok.text("app") == ""
+
+
 def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None) -> None:
     def alter(ctx: OpContext) -> int:
         ctx.set_rest_state("quiz_altered")
