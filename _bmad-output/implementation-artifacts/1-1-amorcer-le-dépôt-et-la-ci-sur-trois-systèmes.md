@@ -39,3 +39,17 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 1.1 ».
 - AD-18 : lint de contenu, empreintes de référence, clone `autocrlf=true` sous Windows, tests de l'extra pywebview sous Windows : avec les stories qui créent ces contenus et `--window`.
 - Comparaison avec `tools.toml` : Story 1.4.
 - Bibliothèques vendorisées dans `static/` : leurs commentaires de licence contiennent souvent des URL ; la story qui les vendorise devra les retirer ou étendre la règle.
+
+## Revue
+
+Revue unique (Opus) de 08f41f5, avec la liste du second avis (Haiku). Critères d'acceptation : tous couverts.
+
+- medium · revue · corrigé : le test `connect(("example.org", 443))` lançait une vraie requête DNS avant l'événement d'audit (résolution en C dans `sock.connect`) et échouait hors ligne sur `gaierror`. Le hook refuse maintenant les événements `socket.getaddrinfo`/`gethostbyname*` pour un nom non loopback ; le test passe par `create_connection`. La limite restante (`sock.connect` avec un nom) est documentée dans `netguard.py` et relève du contrôle (4).
+- medium · second avis 1 · corrigé : `misplaced_static_dirs` fait échouer la suite si un dossier `static` existe ailleurs que `web/static/` ; l'absence de `web/static/` reste normale tant que `web` n'existe pas (Story 1.2).
+- medium · second avis 2 · corrigé : création de processus hors `procs` détectée aussi via `os.system/popen/spawn*/exec*/fork/posix_spawn/startfile`, `asyncio.create_subprocess_*`, `asyncio.subprocess`, `pty`, `ProcessPoolExecutor`.
+- medium · second avis 3 · corrigé : lecture de l'environnement suivie à travers les alias (`import os as o`) ; `from os import environ` était déjà détecté.
+- low · second avis 4 · corrigé (une ligne) : `_socket`, `urllib3`, `ftplib`, `smtplib`, `poplib`, `imaplib`, `xmlrpc.client` ajoutés à la liste d'AD-13 (1). `asyncio.open_connection` écarté : interdire `asyncio` n'a pas de sens, et le hook (3) couvre la connexion.
+- low · second avis 5 · rejeté : le critère accorde à `web` et `cli` l'écoute par `socket` ; distinguer écoute et connexion statiquement dépasse un garde-fou de test, le hook (3) refuse toute connexion sortante.
+- low · second avis 6 · corrigé (même correctif que le constat medium de revue).
+- low · second avis 7 · corrigé en partie : `ws://` et `wss://` ajoutés. `//hôte` rejeté : indiscernable des commentaires `//` en JS.
+- low · second avis 8 · reporté : la CI n'installe que `dev`. Le lock universel et `--locked` garantissent la résolution du groupe `chain` ; son installation sur les trois OS sera vérifiée en Story 1.4 (`tools.toml`), en ajoutant `--group chain` à `uv sync` dans la CI.

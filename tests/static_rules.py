@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import ipaddress
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -20,13 +20,44 @@ STATIC = SRC / "web" / "static"
 
 LEAVES = frozenset({"contracts", "events", "config"})
 PROCS_CALLERS = frozenset({"procs", "gitio", "toolrun"})
-NETWORK_MODULES = ("socket", "http.client", "urllib.request", "httpx", "requests", "aiohttp", "ssl")
+# Liste d'AD-13, plus les voies de contournement directes (`_socket`, clients stdlib, urllib3).
+NETWORK_MODULES = (
+    "socket",
+    "_socket",
+    "http.client",
+    "urllib.request",
+    "httpx",
+    "requests",
+    "aiohttp",
+    "ssl",
+    "urllib3",
+    "ftplib",
+    "smtplib",
+    "poplib",
+    "imaplib",
+    "xmlrpc.client",
+)
 # Seule l'écoute locale est permise à `web` et `cli` : ils peuvent importer `socket`, rien d'autre.
 LISTENING_COMPONENTS = frozenset({"web", "cli"})
 LISTENING_MODULES = frozenset({"socket"})
 NETWORK_COMPONENT = "llmrun"
-SUBPROCESS_MODULES = ("subprocess", "multiprocessing")
+# Modules, ou noms importés par `from x import y`, qui créent des processus.
+SUBPROCESS_MODULES = (
+    "subprocess",
+    "multiprocessing",
+    "pty",
+    "asyncio.subprocess",
+    "asyncio.create_subprocess_exec",
+    "asyncio.create_subprocess_shell",
+    "concurrent.futures.process",
+    "concurrent.futures.ProcessPoolExecutor",
+)
 ENV_ATTRIBUTES = frozenset({"environ", "environb", "getenv", "getenvb", "putenv", "unsetenv"})
+# Fonctions de `os` et `asyncio` qui créent des processus (appelées par attribut).
+PROCESS_ATTRIBUTES = {
+    "os": ("system", "popen", "spawn", "exec", "fork", "posix_spawn", "startfile"),
+    "asyncio": ("create_subprocess_exec", "create_subprocess_shell"),
+}
 
 
 def iter_modules(src: Path = SRC, package: str = PACKAGE) -> Iterator[tuple[str, Path]]:
@@ -78,11 +109,52 @@ def _matches(name: str, targets: tuple[str, ...] | frozenset[str]) -> str | None
     return None
 
 
+def _attribute_uses(
+    tree: ast.AST, module: str, accept: Callable[[str], bool]
+) -> Iterator[tuple[int, str]]:
+    """`(ligne, nom)` de chaque `module.nom` ou `from module import nom` retenu par `accept`.
+
+    Suit les alias (`import os as o`).
+    """
+    aliases = {module}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == module and alias.asname:
+                    aliases.add(alias.asname)
+        elif isinstance(node, ast.ImportFrom) and node.module == module and not node.level:
+            for alias in node.names:
+                if accept(alias.name):
+                    yield node.lineno, alias.name
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in aliases
+            and accept(node.attr)
+        ):
+            yield node.lineno, node.attr
+
+
+def process_call_violations(path: Path, module: str) -> list[str]:
+    """Appels qui créent un processus (`os.system`, `asyncio.create_subprocess_exec`…)."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    violations = []
+    for target, prefixes in PROCESS_ATTRIBUTES.items():
+        for lineno, name in _attribute_uses(tree, target, lambda n, p=prefixes: n.startswith(p)):
+            violations.append(
+                f"{module}:{lineno} appelle {target}.{name} : seul procs crée des processus"
+            )
+    return violations
+
+
 def dependency_violations(src: Path = SRC, package: str = PACKAGE) -> list[str]:
     """Règles de dépendance du spine (AD-1)."""
     violations = []
     for module, path in iter_modules(src, package):
         own = component(module)
+        if own != "procs":
+            violations.extend(process_call_violations(path, module))
         for name in sorted(imported_modules(path, module)):
             if _matches(name, SUBPROCESS_MODULES) and own != "procs":
                 violations.append(f"{module} importe {name} : seul procs crée des processus")
@@ -124,22 +196,12 @@ def env_read_violations(src: Path = SRC, package: str = PACKAGE) -> list[str]:
         if component(module) == "config":
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Attribute)
-                and node.attr in ENV_ATTRIBUTES
-                and isinstance(node.value, ast.Name)
-                and node.value.id == "os"
-            ):
-                violations.append(f"{module}:{node.lineno} lit os.{node.attr}")
-            elif isinstance(node, ast.ImportFrom) and node.module == "os":
-                for alias in node.names:
-                    if alias.name in ENV_ATTRIBUTES:
-                        violations.append(f"{module}:{node.lineno} importe os.{alias.name}")
+        for lineno, name in _attribute_uses(tree, "os", ENV_ATTRIBUTES.__contains__):
+            violations.append(f"{module}:{lineno} lit os.{name}")
     return violations
 
 
-URL_PATTERN = re.compile(r"https?://[^\s\"'`<>()\\]+", re.IGNORECASE)
+URL_PATTERN = re.compile(r"(?:https?|wss?)://[^\s\"'`<>()\\]+", re.IGNORECASE)
 BINARY_SUFFIXES = frozenset(
     {".woff2", ".woff", ".ttf", ".otf", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp"}
 )
@@ -169,7 +231,7 @@ def is_loopback_url(url: str) -> bool:
 
 
 def static_url_violations(static: Path = STATIC) -> list[str]:
-    """AD-13, contrôle 2 : aucune URL `http(s)://` non loopback dans `static/`."""
+    """AD-13, contrôle 2 : aucune URL `http(s)://` ou `ws(s)://` non loopback dans `static/`."""
     if not static.is_dir():
         return []
     violations = []
@@ -184,3 +246,12 @@ def static_url_violations(static: Path = STATIC) -> list[str]:
             line = text.count("\n", 0, match.start()) + 1
             violations.append(f"{path.relative_to(static).as_posix()}:{line} {url}")
     return violations
+
+
+def misplaced_static_dirs(src: Path = SRC, static: Path = STATIC) -> list[str]:
+    """Dossiers `static` hors de `STATIC` : le contrôle 2 ne les verrait pas."""
+    return [
+        p.relative_to(src).as_posix()
+        for p in sorted(src.rglob("static"))
+        if p.is_dir() and p.resolve() != static.resolve()
+    ]

@@ -5,7 +5,7 @@ from __future__ import annotations
 import socket
 
 import pytest
-from netguard import NetworkAccessError, is_loopback_address
+from netguard import NetworkAccessError, is_local_resolution, is_loopback_address
 
 
 def test_connexion_non_loopback_refusee() -> None:
@@ -16,10 +16,18 @@ def test_connexion_non_loopback_refusee() -> None:
             sock.connect(("192.0.2.1", 9))
 
 
-def test_connexion_par_nom_refusee() -> None:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        with pytest.raises(NetworkAccessError):
-            sock.connect(("example.org", 443))
+def test_connexion_par_nom_refusee_avant_dns() -> None:
+    # create_connection résout le nom par socket.getaddrinfo : refusé avant toute requête DNS
+    # (un gaierror trahirait une résolution partie sur le réseau).
+    with pytest.raises(NetworkAccessError):
+        socket.create_connection(("example.org", 443), timeout=0.5)
+    with pytest.raises(NetworkAccessError):
+        socket.getaddrinfo("example.org", 443)
+
+
+def test_resolution_locale_permise() -> None:
+    assert socket.getaddrinfo("localhost", 0)
+    assert socket.getaddrinfo("127.0.0.1", 0)
 
 
 def test_connexion_loopback_permise() -> None:
@@ -47,3 +55,11 @@ def test_connexion_loopback_permise() -> None:
 )
 def test_is_loopback_address(address: object, expected: bool) -> None:
     assert is_loopback_address(address) is expected
+
+
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [(None, True), ("", True), ("localhost", True), ("10.1.2.3", True), ("pypi.org", False)],
+)
+def test_is_local_resolution(host: object, expected: bool) -> None:
+    assert is_local_resolution(host) is expected

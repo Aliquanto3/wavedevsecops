@@ -45,6 +45,22 @@ def test_les_modules_feuilles_existent() -> None:
         ({"web/__init__.py": "from pkg import cli\n"}, "importe cli"),
         ({"engine/__init__.py": "from pkg.procs import spawn\n"}, "réservé à gitio"),
         ({"engine/__init__.py": "import subprocess\n"}, "seul procs"),
+        ({"engine/__init__.py": "import os\nos.system('x')\n"}, "appelle os.system"),
+        ({"engine/__init__.py": "import os as o\no.popen('x')\n"}, "appelle os.popen"),
+        ({"engine/__init__.py": "from os import spawnv\n"}, "appelle os.spawnv"),
+        ({"engine/__init__.py": "import os\nos.execvp('x', [])\n"}, "appelle os.execvp"),
+        (
+            {"engine/__init__.py": "import asyncio\nasyncio.create_subprocess_exec('x')\n"},
+            "appelle asyncio.create_subprocess_exec",
+        ),
+        (
+            {"engine/__init__.py": "from asyncio import create_subprocess_shell\n"},
+            "seul procs",
+        ),
+        (
+            {"engine/__init__.py": "from concurrent.futures import ProcessPoolExecutor\n"},
+            "seul procs",
+        ),
     ],
 )
 def test_violations_de_dependance_detectees(
@@ -62,7 +78,8 @@ def test_dependances_permises(tmp_path: Path) -> None:
             "cli.py": "from pkg.web import app\nfrom pkg import config\n",
             "web/__init__.py": "from . import routes\nfrom pkg.contracts import x\n",
             "gitio/__init__.py": "from pkg.procs import spawn\n",
-            "procs/__init__.py": "import subprocess\n",
+            "procs/__init__.py": "import subprocess\nimport os\nos.system('x')\n",
+            "engine/__init__.py": "import os\nos.path.join('a')\nimport asyncio\nasyncio.run\n",
         },
     )
     assert dependency_violations(src, "pkg") == []
@@ -75,6 +92,7 @@ def test_dependances_permises(tmp_path: Path) -> None:
         "import os\nos.getenv('X')\n",
         "from os import environ\n",
         "from os import getenv\n",
+        "import os as o\no.environ['X']\n",
     ],
 )
 def test_lecture_d_environnement_detectee(tmp_path: Path, code: str) -> None:
