@@ -54,7 +54,7 @@ development_status:
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: done
-  2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: backlog
+  2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: in-progress
   2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: backlog
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
   epic-2-retrospective: optional
@@ -80,7 +80,7 @@ development_status:
   epic-5: backlog
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: review
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
-  5-3-désigner-un-élément-dans-les-vues: in-progress
+  5-3-désigner-un-élément-dans-les-vues: review
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
   5-6-le-scénario-b-env-committé: backlog

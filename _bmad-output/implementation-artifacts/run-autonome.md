@@ -312,6 +312,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 01:09 · 4.7 · fusion · CI branche verte sur 6 jobs, suite complète du sommet de pile 1043 passed / 42 skipped, commit de fusion sur main, story done ; 6.5 éligible · 48fd456
 - 2026-10-19 01:10 · 4.6 · fusion · rebase de fond sur la pile 4.7 fini par dev-story Opus (steps.py, app.py, workspace.css, store.js, scenario.js : deux côtés gardés), test d'intégration bilan + indice ajouté ; tests ciblés 133 passed, suite complète en lots 936 + 133 passed, aucun échec ; branche poussée, CI en cours · 316f3dc
 - 2026-10-19 01:11 · 6.5 · dev · lancé (dev-story Sonnet ; contrat du bilan de 4.7) ; 4.4 attend la fusion de 4.6 (hints.settle) · —
+- 2026-10-19 01:12 · 5.3 · dev · fini, 993 passed / 41 skipped, CI verte ; front seul : designation.js (mode armé, answer-slot, champ SHA via resolve_sha, step_id toujours joint), data-designable dans repo.js ; correction affichée reportée à 5.5, liste filtrable à 5.4 ; contrôles navigateur pour Anaël · 4ad6a6d
+- 2026-10-19 01:12 · 5.3 · second-avis · lancé · —
+- 2026-10-19 01:12 · 2.9 · dev · lancé (dev-story Sonnet ; 2.8 done ; ouvre 2.10 avec 3.3) ; 5.4 attend 5.3 (même front), 7.4 ★ attend que github_sim se libère (3.3, 3.5) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
