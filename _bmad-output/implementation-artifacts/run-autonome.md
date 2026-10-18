@@ -285,6 +285,18 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 00:15 · 5.2 · review · rebase sur main (un conflit de fond dans engine/steps.py validate et panel : tout 4.5 gardé, marques designable ajoutées), M1 corrigé (step_id obligatoire, 422 sinon), L4 (test de rejeu stabilisé), L6 (annonce non relancée sur même op_id) ; M2 écarté (quiz_altered laisse le quiz courant, désignation refusée), L5 sans objet ; 960 passed / 41 skipped, CI branche verte sur 6 jobs · cf75e4f
 - 2026-10-19 00:15 · — · décision pour Anaël · 5.2 : ajouter step_id (obligatoire) à answer_submit dans AD-17 du spine · —
 - 2026-10-19 00:19 · 5.2 · fusion · rebase sur le suivi (sans code), tests ciblés 58 passed, ff sur main, story done ; 5.3, 5.4 et 4.4 éligibles (créneaux pleins : 7.2, 5.1, 3.3 ; 4.4 attendra aussi 4.6 pour la clôture des indices) · 884560f
+- 2026-10-19 00:20 · 6.1 · review · rebase sans conflit, M1 (progress.json illisible → motif français), M2 (pas de boucle de repli, LOAD_FAILED), L5 (test de dérive SOCLE_ORDER), L6 (libellé d'outil au 409) corrigés ; L3, L4, L7 écartés ; 967 passed, CI branche verte · 9d68f20
+- 2026-10-19 00:20 · — · décision pour Anaël · 6.1 : valider les identifiants du socle (add-commit, push-pull, branche, pr-merge, conflit, stash, rebase, recuperation) avant 6.2 · —
+- 2026-10-19 00:25 · 2.8 · review · rebase sans conflit, M2 relevé en high et corrigé (ouverture comme texte : verbe edit / Bloc-notes, open -t, xdg-open hors .desktop), M5 (non suivis dans le diff), M6 (rôles heading/group), M3 (droits conservés), L8, L9 partiel corrigés ; M1 (LF, règle wsfs), M4 (déjà refusé, test ajouté), L7, L10 écartés ; 983 passed, CI branche verte · 3ceae98
+- 2026-10-19 00:25 · — · décision pour Anaël · 2.8 : sous Windows, un fichier sans verbe edit s'ouvre dans le Bloc-notes (sécurité) ; à vérifier sur poste · —
+- 2026-10-19 00:28 · 4.7 · review · rebase sans conflit, M1 (ordre FR-9 dans scenarios/order.py hors web), M2 (total des questions tiré du scénario), L4, L8 corrigés ; L3, L7 écartés ; L5, L6 reportés à 4.4 ; 971 passed, CI branche verte · a0c3ac4
+- 2026-10-19 00:30 · 4.6 · review · rebase sans conflit, M1 corrigé (hints.settle appelé par setup replace et restore ; 4.4 devra l'appeler), L2 (read_ms plafonné à 15 min), L5 (commande refusée = essai) corrigés ; L3, L4 écartés ; 979 passed, CI branche verte · 57a5f6d
+- 2026-10-19 00:30 · — · décision pour Anaël · 4.6 : plafond de lecture 15 min ; une commande refusée débloque la solution comme un essai · —
+- 2026-10-19 00:30 · 6.1, 2.8, 4.7, 4.6 · fusion · empilées dans cet ordre : 6.1 sur main (suite complète 985 passed / 41 skipped), 2.8 sur 6.1 (conflit d'ajout app.py résolu par l'orchestrateur, suite complète du sommet 1026 passed / 42 skipped), 4.7 sur 2.8 (conflit d'ordre d'initialisation manager.py résolu, catalogue de 6.1 aligné sur scenarios.order) ; 4.6 sur 4.7 en conflit de fond (steps.py, app.py, store.js, scenario.js, workspace.css) → dev-story Opus pour le rebase · 0959686
+- 2026-10-19 00:42 · 6.1 · fusion · CI branche verte sur 6 jobs, ff sur main, story done · 4720ff4
+- 2026-10-19 00:42 · 3.3 · dev · fini, 975 passed / 41 skipped, CI verte ; projection views.remote (branches distantes, pr-card, checks, raisons liées, review-log), element_id pr:, check:, review: documentés pour 2.10 · 3a2c25a
+- 2026-10-19 00:42 · 3.3 · second-avis · lancé · —
+- 2026-10-19 00:42 · 5.3 · dev · lancé (dev-story Sonnet ; chemin critique de l'Epic 5) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

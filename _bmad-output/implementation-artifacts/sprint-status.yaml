@@ -62,7 +62,7 @@ development_status:
   epic-3: in-progress
   3-1-tenir-un-modèle-de-pr-complet-prêt-pour-les-stations: done
   3-2-ouvrir-une-pr-et-la-merger: done
-  3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: in-progress
+  3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: review
   3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: done
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
   epic-3-retrospective: optional
@@ -80,7 +80,7 @@ development_status:
   epic-5: backlog
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: in-progress
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
-  5-3-désigner-un-élément-dans-les-vues: backlog
+  5-3-désigner-un-élément-dans-les-vues: in-progress
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
   5-6-le-scénario-b-env-committé: backlog
@@ -89,7 +89,7 @@ development_status:
   epic-5-retrospective: optional
 
   epic-6: in-progress
-  6-1-choisir-son-parcours-et-parcourir-le-catalogue: review
+  6-1-choisir-son-parcours-et-parcourir-le-catalogue: done
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: backlog
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
