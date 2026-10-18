@@ -160,6 +160,17 @@ export async function loadCatalogue({ fetchImpl = (...a) => fetch(...a), track =
     cache: "no-store",
     credentials: "same-origin",
   });
-  if (!response.ok) throw new Error(`/api/catalogue : ${response.status}`);
+  if (!response.ok) {
+    let reason = "";
+    try {
+      reason = (await response.json()).reason_text || "";
+    } catch (err) {
+      reason = "";
+    }
+    const error = new Error(reason || `/api/catalogue : ${response.status}`);
+    error.status = response.status;
+    error.reasonText = reason;
+    throw error;
+  }
   return response.json();
 }

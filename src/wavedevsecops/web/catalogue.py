@@ -262,6 +262,16 @@ def _missing_tool(
     return None
 
 
+def tool_labels(settings: Settings) -> dict[str, str]:
+    """Libellés des outils (`content/diagnostic.yaml`) ; vide s'ils sont illisibles."""
+    try:
+        tool_texts = diagnostic.load_texts(settings).get("tools", {})
+    except (OSError, UnicodeDecodeError, yaml.YAMLError, AttributeError) as error:
+        log.warning("Libellés d'outils illisibles (%s) : identifiants utilisés", error)
+        return {}
+    return {k: v.get("label", k) for k, v in tool_texts.items() if isinstance(v, dict)}
+
+
 def _socle_rank(scenario_id: str) -> tuple[int, str]:
     if scenario_id in SOCLE_ORDER:
         return SOCLE_ORDER.index(scenario_id), scenario_id
@@ -283,12 +293,7 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
     if track is None:
         return body
     progress = ProgressStore.for_dir(settings.resolved_data_dir()).all_progress()
-    try:
-        tool_texts = diagnostic.load_texts(settings).get("tools", {})
-    except (OSError, UnicodeDecodeError, yaml.YAMLError, AttributeError) as error:
-        log.warning("Libellés d'outils illisibles (%s) : identifiants utilisés", error)
-        tool_texts = {}
-    labels = {k: v.get("label", k) for k, v in tool_texts.items() if isinstance(v, dict)}
+    labels = tool_labels(settings)
     probed: dict[str, bool] = {}
     grouped: dict[str, dict[str, Any]] = {}
     for loaded in load_catalogue(settings):
@@ -362,7 +367,11 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
     async def catalogue(track: str | None = None) -> Response:
         if track is not None and track not in {key for key, _, _ in TRACKS}:
             return _refusal(422, "Ce parcours n'existe pas. Choisissez-en un dans la liste.")
-        return JSONResponse(await asyncio.to_thread(catalogue_body, settings, track))
+        try:
+            body = await asyncio.to_thread(catalogue_body, settings, track)
+        except AppError as error:  # progress.json illisible ou d'une version future
+            return _refusal(500, f"{error.cause_text} {error.action_text}")
+        return JSONResponse(body)
 
     @app.post("/api/open")
     async def open_workspace(request: Request) -> Response:
@@ -378,12 +387,12 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         if track not in loaded.scenario.tracks:
             return _refusal(422, "Ce scénario n'est pas proposé dans ce parcours.")
         missing = await asyncio.to_thread(
-            _missing_tool, list(loaded.scenario.tools), settings, {}, {}
+            lambda: _missing_tool(list(loaded.scenario.tools), settings, {}, tool_labels(settings))
         )
         if missing is not None:
             return _refusal(
                 409,
-                f"Ce scénario nécessite {missing[0]}, qui manque sur ce poste. "
+                f"Ce scénario nécessite {missing[1]}, qui manque sur ce poste. "
                 "Ouvrez le diagnostic pour voir quoi faire.",
             )
         workspace_id = workspace_id_for(track, loaded.scenario.key)

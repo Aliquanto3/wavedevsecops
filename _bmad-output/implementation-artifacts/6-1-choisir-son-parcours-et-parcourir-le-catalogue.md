@@ -40,3 +40,14 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.1 » ; F
 - Sections « Stations » et « Savoir en parler », « Reprendre », pied « Exporter mon rapport » : stories 9.3, 6.4, 6.5.
 - Aucun scénario du socle n'existe encore hors le bac à sable libre : l'ordre se vérifiera avec 6.2 et 6.3.
 - Page Diagnostic : le lien « Voir le diagnostic » mène à `/diagnostic` sans ancre sur l'outil.
+
+## Revue
+
+- Medium · second avis M1 · corrigé : `progress.json` illisible faisait lever `UnreadableDataError` dans `GET /api/catalogue?track=` (500 sans corps JSON). La route traduit toute `AppError` en 500 `{reason_text: cause + action}` (« … renommez-le pour repartir de zéro »). Test : `test_progress_illisible_rend_un_motif_et_non_une_erreur_nue`.
+- Medium · second avis M2 · corrigé : `main.js` revenait au choix du parcours sur toute erreur, puis le même clic échouait en boucle sans message. Le repli ne vaut plus que pour un 422 (parcours mémorisé invalide) ; sinon le motif du serveur s'affiche (`LOAD_FAILED` à défaut). `loadCatalogue` porte `status` et `reasonText` (test DOM).
+- Low · second avis L3 · rejeté : `?track=` vide rend 422 avec un motif en français ; le front n'envoie jamais de parcours vide.
+- Low · second avis L4 · rejeté : chaque pilule est un bouton atteignable au clavier (Tab, Entrée) ; le motif APG (flèches qui sélectionnent) déclencherait un rechargement à chaque flèche, puisque choisir recharge le catalogue.
+- Low · second avis L5 · corrigé : garde `test_scenarios_du_socle_livres_figurent_dans_l_ordre_conseille` sur `content/` (6.2 et 6.3 devront nommer leurs ids dans `SOCLE_ORDER`).
+- Low · second avis L6 · corrigé : le 409 de `POST /api/open` nomme le libellé de l'outil (`content/diagnostic.yaml`), via `tool_labels` partagé avec le catalogue.
+- Low · second avis L7 · rejeté : même convention que les 12 autres fichiers de tests JS ; Node est présent sur les runners GitHub.
+- Complexité : 0 constat (catalogue reconstruit par requête, `_socle_rank` sur un tuple de 8, sondes d'outils en cache par requête).

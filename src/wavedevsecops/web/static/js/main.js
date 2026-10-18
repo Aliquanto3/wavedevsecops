@@ -84,8 +84,9 @@ async function showCatalogue(container) {
     try {
       catalogue = await loadCatalogue({ track });
     } catch (err) {
-      if (!track) throw err;
-      // Parcours mémorisé devenu invalide : retour au choix du parcours.
+      if (!track || err.status !== 422) throw err;
+      // Parcours mémorisé devenu invalide (422) : retour au choix du parcours. Toute autre
+      // erreur (progress.json illisible…) s'affiche : un repli rejouerait le même échec.
       catalogue = await loadCatalogue();
     }
     renderCatalogue(
@@ -102,7 +103,7 @@ async function showCatalogue(container) {
       },
     );
   } catch (err) {
-    message(container, LOAD_FAILED);
+    message(container, (err && err.reasonText) || LOAD_FAILED);
   }
 }
 

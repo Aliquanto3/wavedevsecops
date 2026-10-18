@@ -212,3 +212,29 @@ def test_chaque_parcours_a_son_espace_et_chaque_scenario_son_etat_initial(
         instance, "POST", "/api/open", {"scenario_id": "pr-merge", "mode": "A", "track": "no_ai"}
     )
     assert status in (200, 202) and no_ai["workspace_id"] == "no_ai.pr-merge.A"
+
+
+def test_progress_illisible_rend_un_motif_et_non_une_erreur_nue(
+    instance: cli.Instance, settings: Settings
+) -> None:
+    data = settings.resolved_data_dir()
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "progress.json").write_text("{ pas du json", encoding="utf-8")
+    status, body = _call(instance, "GET", "/api/catalogue?track=llm")
+    assert status == 500
+    assert "progress.json" in body["reason_text"] and "renommez" in body["reason_text"]
+
+
+def test_scenarios_du_socle_livres_figurent_dans_l_ordre_conseille() -> None:
+    """Garde contre la dérive de `SOCLE_ORDER` : un scénario du socle livré dans `content/`
+    doit y être nommé (seul le bac à sable libre vient après, hors ordre)."""
+    from wavedevsecops.web.catalogue import SOCLE_ORDER, SOCLE_SECTION, load_catalogue
+
+    hors_ordre = {"bac-a-sable-libre"}
+    content = Path(__file__).resolve().parents[1] / "content"
+    socle = {
+        loaded.scenario.scenario_id
+        for loaded in load_catalogue(Settings(content_dir=content))
+        if loaded.scenario.catalogue and loaded.scenario.section in (None, SOCLE_SECTION)
+    }
+    assert socle - hors_ordre <= set(SOCLE_ORDER)

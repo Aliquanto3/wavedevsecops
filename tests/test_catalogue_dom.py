@@ -190,3 +190,26 @@ console.log(JSON.stringify({ first, stored: getTrack(storage), bare, labels: [..
     assert out["survived"] is True and out["brokenRead"] is None
     assert out["opens"][0][1] == {"scenario_id": "add-commit", "mode": "A", "track": "no_ai"}
     assert out["urls"] == ["/api/catalogue?track=no_ai", "/api/catalogue"]
+
+
+def test_erreur_du_catalogue_porte_le_statut_et_le_motif(tmp_path: Path) -> None:
+    # main.js ne revient au choix du parcours que sur 422 ; sinon il affiche `reasonText`.
+    out = _js(
+        tmp_path,
+        """
+const fail = (status, body) => async () => ({ ok: false, status, json: async () => body });
+const seen = [];
+for (const [status, body] of [[500, { reason_text: "Le fichier progress.json est illisible. Renommez-le." }], [422, {}]]) {
+  try { await loadCatalogue({ fetchImpl: fail(status, body), track: "llm" }); }
+  catch (err) { seen.push([err.status, err.reasonText]); }
+}
+try { await loadCatalogue({ fetchImpl: async () => ({ ok: false, status: 502, json: async () => { throw new Error("html"); } }) }); }
+catch (err) { seen.push([err.status, err.reasonText]); }
+console.log(JSON.stringify(seen));
+""",
+    )
+    assert out == [
+        [500, "Le fichier progress.json est illisible. Renommez-le."],
+        [422, ""],
+        [502, ""],
+    ]
