@@ -192,8 +192,8 @@ def has_conflict(git: Git, layout: Layout, base_sha: str, head_sha: str) -> bool
 # --- Calcul de mergeable --------------------------------------------------------------------
 
 
-ConflictProbe = Callable[[str, str], bool]
-"""`(base_sha, head_sha) -> conflit ?`"""
+ConflictProbe = Callable[[str, str], bool | None]
+"""`(base_sha, head_sha) -> conflit ?` ; `None` : fusion impossible à calculer."""
 
 
 def _requeue(check: Check, head_sha: str, base_sha: str) -> Check:
@@ -257,7 +257,7 @@ def evaluate(
                 f"La branche « {missing} » n'existe pas sur origin : le GitHub simulé ne peut "
                 "pas calculer cette PR."
             ),
-            element_id=element_id("ref", f"refs/heads/{missing}"),
+            element_id=element_id("ref", f"refs/remotes/origin/{missing}"),
         )
         update |= {"checks": checks, "mergeable": False, "blocking_reasons": [reason]}
         return pr.model_copy(update=update), False
@@ -272,7 +272,8 @@ def evaluate(
     ]
     current = pr.model_copy(update=update | {"head_sha": head_sha, "base_sha": base_sha})
     reasons = [r for c in checks if c.required and (r := _check_reason(current, c))]
-    approvals = current.approvals()
+    stale_dismissed = protection is not None and protection.dismiss_stale_reviews
+    approvals = current.count_approvals(head_sha=head_sha if stale_dismissed else None)
     if approvals < current.required_approvals:
         reasons.append(
             BlockReason(
@@ -284,7 +285,19 @@ def evaluate(
                 element_id=current.element,
             )
         )
-    if conflict(base_sha, head_sha):
+    conflicting = conflict(base_sha, head_sha)
+    if conflicting is None:
+        reasons.append(
+            BlockReason(
+                kind="conflict",
+                text=(
+                    f"Le GitHub simulé n'a pas pu calculer la fusion de « {pr.head} » dans "
+                    f"« {pr.base} » : la PR reste bloquée."
+                ),
+                element_id=current.element,
+            )
+        )
+    elif conflicting:
         reasons.append(
             BlockReason(
                 kind="conflict",
@@ -296,19 +309,27 @@ def evaluate(
             )
         )
     current = current.model_copy(
-        update={"checks": checks, "mergeable": not reasons, "blocking_reasons": reasons}
+        update={
+            "checks": checks,
+            "approvals": approvals,
+            "mergeable": not reasons,
+            "blocking_reasons": reasons,
+        }
     )
     return current, sha_changed
 
 
 def _recompute(git: Git, layout: Layout, state: GithubState) -> RefreshResult:
     branches = origin_branches(git, layout)
-    cache: dict[tuple[str, str], bool] = {}
+    cache: dict[tuple[str, str], bool | None] = {}
 
-    def conflict(base_sha: str, head_sha: str) -> bool:
+    def conflict(base_sha: str, head_sha: str) -> bool | None:
         key = (base_sha, head_sha)
         if key not in cache:
-            cache[key] = has_conflict(git, layout, base_sha, head_sha)
+            try:
+                cache[key] = has_conflict(git, layout, base_sha, head_sha)
+            except GitError:
+                cache[key] = None
         return cache[key]
 
     result = RefreshResult(state)
@@ -335,7 +356,10 @@ def _commit(git: Git, layout: Layout, state: GithubState, *, force: bool = False
 def refresh(git: Git, layout: Layout) -> RefreshResult:
     """Après un changement des refs de `origin` : recalcule toutes les PR ouvertes.
 
-    N'écrit que si une PR a changé ; idempotent."""
+    N'écrit que si une PR a changé ; idempotent. Sans `github.json` (espace préparé avant le
+    GitHub simulé), il n'y a aucune PR : rien n'est écrit."""
+    if _read_raw(layout) is None:
+        return RefreshResult(GithubState())
     return _commit(git, layout, load(layout))
 
 
@@ -373,6 +397,13 @@ def open_pr(
         raise GithubSimError(
             f"La PR irait de « {head} » vers elle-même.",
             "Choisissez une branche de tête différente de la base.",
+        )
+    checks = list(checks)
+    job_ids = [c.job_id for c in checks]
+    if len(set(job_ids)) != len(job_ids):
+        raise GithubSimError(
+            "La PR déclare deux fois le même check.",
+            "Déclarez chaque job_id une seule fois.",
         )
     state = load(layout)
     if any(p.state == "open" and (p.head, p.base) == (head, base) for p in state.pulls):

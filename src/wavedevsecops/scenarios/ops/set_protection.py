@@ -26,6 +26,8 @@ class Args(OpArgs):
     """`job_id` des checks obligatoires pour merger vers cette branche."""
     block_direct_push: bool = True
     """Refus d'un push direct par le hook `pre-receive` (story 3.5)."""
+    dismiss_stale_reviews: bool = False
+    """Vrai : une revue faite sur un ancien `head_sha` ne compte plus."""
 
     reference_fields: ClassVar[tuple[str, ...]] = ("branch",)
 
@@ -38,7 +40,7 @@ class Args(OpArgs):
     @classmethod
     def _jobs(cls, value: list[str]) -> list[str]:
         for job in value:
-            if not re.match(JOB_ID_PATTERN, job):
+            if not re.fullmatch(JOB_ID_PATTERN, job):
                 raise ValueError(f"job_id invalide : « {job} »")
         if len(set(value)) != len(value):
             raise ValueError("job_id en double dans required_checks")
@@ -55,6 +57,7 @@ def apply(args: Args, ctx: SetupContext) -> str:
             required_approvals=args.required_approvals,
             required_checks=list(args.required_checks),
             block_direct_push=args.block_direct_push,
+            dismiss_stale_reviews=args.dismiss_stale_reviews,
         ),
     )
     return element_id("ref", f"refs/remotes/origin/{branch}")

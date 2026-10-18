@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, get_args
 
-from wavedevsecops import projections
+from wavedevsecops import github_sim, projections
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine.fingerprint import fingerprint
@@ -101,12 +101,40 @@ def repo_projector(settings: Settings, git_path: Path | None = None) -> Projecto
     return project
 
 
-def external_change(engine: WorkspaceEngine, projector: Projector) -> Operation:
+GithubRefresher = Callable[[OpContext], str | None]
+"""Recalcule les PR contre les refs de `origin` ; rend la nouvelle empreinte si l'état du
+GitHub simulé a changé, sinon `None`."""
+
+
+def github_refresher(settings: Settings, git_path: Path | None = None) -> GithubRefresher:
+    """Après un changement des refs de `origin` : `github_sim.refresh` dans la file (AD-8)."""
+    resolved: dict[str, Path] = {}
+
+    def refresh(ctx: OpContext) -> str | None:
+        if not (ctx.layout.repo / ".git").exists():
+            return None
+        if "git" not in resolved:
+            resolved["git"] = git_path or resolve_git(settings)
+        git = Git.for_workspace(resolved["git"], ctx.layout.root, settings)
+        if not github_sim.refresh(git, ctx.layout).updated:
+            return None
+        return fingerprint(ctx.layout, git)
+
+    return refresh
+
+
+def external_change(
+    engine: WorkspaceEngine,
+    projector: Projector,
+    refresh_github: GithubRefresher | None = None,
+) -> Operation:
     """Opération « changement externe » : porte l'`epoch` de sa création (AD-1).
 
     La pré-vérification l'abandonne sans bruit si ni l'empreinte ni le `RepoState` relu
     n'ont changé depuis la dernière projection : l'empreinte ignore la configuration, or
-    `git branch -u` ne change que l'amont, que le `RepoState` porte.
+    `git branch -u` ne change que l'amont, que le `RepoState` porte. Le corps recalcule
+    ensuite les PR du GitHub simulé : les refs de `origin` ont pu changer hors de
+    l'application (AD-8) ; la projection publiée après le corps relit l'état recalculé.
     """
 
     def precheck(ctx: OpContext) -> bool:
@@ -117,6 +145,8 @@ def external_change(engine: WorkspaceEngine, projector: Projector) -> Operation:
         return projection.views.get("repo") != ctx.last_views.get("repo")
 
     def body(ctx: OpContext) -> int:
+        if refresh_github is not None and (refreshed := refresh_github(ctx)) is not None:
+            ctx.data["fingerprint"] = refreshed
         ctx.emit(Kind.EXTERNAL_CHANGE, ExternalChange(fingerprint=ctx.data["fingerprint"]))
         return 0
 
@@ -178,6 +208,7 @@ class WorkspaceManager:
         self.boot_id = boot_id or secrets.token_hex(8)
         self._git_path = git_path
         self._projector = projector or repo_projector(settings, git_path)
+        self._refresh_github = github_refresher(settings, git_path)
         self._validator = validator
         if watch and watcher_factory is None:
             quiet_s = settings.watch_quiet_ms / 1000
@@ -306,7 +337,8 @@ class WorkspaceManager:
 
     def _propose_external(self, active: _Active) -> None:
         try:
-            active.engine.submit(external_change(active.engine, self._projector))
+            op = external_change(active.engine, self._projector, self._refresh_github)
+            active.engine.submit(op)
         except OperationRefused as refused:
             log.info("Changement externe ignoré : %s", refused.reason_text)
 

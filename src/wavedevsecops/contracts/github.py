@@ -84,6 +84,8 @@ class BranchProtection(_Model):
     """`job_id` des checks obligatoires pour merger vers cette branche."""
     block_direct_push: bool = True
     """Vrai : un push direct sur la branche est refusé (`pre-receive`, story 3.5)."""
+    dismiss_stale_reviews: bool = False
+    """Vrai : seules les revues du `head_sha` courant comptent (faux par défaut, comme GitHub)."""
 
 
 class BlockReason(_Model):
@@ -108,6 +110,8 @@ class PullRequest(_Model):
     base_sha: str = Field(pattern=SHA_PATTERN)
     checks: list[Check] = Field(default_factory=list)
     reviews: list[Review] = Field(default_factory=list)
+    approvals: int = Field(default=0, ge=0)
+    """Approbations comptées au dernier calcul (`count_approvals`)."""
     required_approvals: int = Field(default=0, ge=0)
     """Approbations requises : celles de la protection de la base."""
     protection: BranchProtection | None = None
@@ -120,10 +124,14 @@ class PullRequest(_Model):
     def element(self) -> str:
         return element_id("pr", str(self.number))
 
-    def approvals(self) -> int:
-        """Auteurs distincts dont la dernière revue décisive est une approbation."""
+    def count_approvals(self, *, head_sha: str | None = None) -> int:
+        """Auteurs distincts dont la dernière revue décisive est une approbation.
+
+        `head_sha` donné : seules les revues faites sur ce commit comptent."""
         last: dict[str, str] = {}
         for review in sorted(self.reviews, key=lambda r: r.review_id):
+            if head_sha is not None and review.commit_sha != head_sha:
+                continue
             if review.state != "commented":
                 last[review.author] = review.state
         return sum(1 for state in last.values() if state == "approved")

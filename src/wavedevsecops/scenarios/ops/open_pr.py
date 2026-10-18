@@ -55,6 +55,14 @@ class Args(OpArgs):
     def _branch(cls, value: str) -> str:
         return check_branch(value)
 
+    @field_validator("checks")
+    @classmethod
+    def _unique_jobs(cls, value: list[CheckDecl]) -> list[CheckDecl]:
+        jobs = [c.job_id for c in value]
+        if len(set(jobs)) != len(jobs):
+            raise ValueError("job_id en double dans checks")
+        return value
+
 
 def apply(args: Args, ctx: SetupContext) -> str:
     pr = github_sim.open_pr(

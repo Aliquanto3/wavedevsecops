@@ -13,6 +13,7 @@ import re
 import shutil
 import stat
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -138,13 +139,29 @@ def to_lf(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
+REPLACE_ATTEMPTS = 3
+"""Essais de `os.replace` : sous Windows, un lecteur qui tient la cible le refuse un instant."""
+REPLACE_PAUSE_S = 0.05
+
+
+def _replace(tmp: str, target: Path) -> None:
+    for attempt in range(1, REPLACE_ATTEMPTS + 1):
+        try:
+            os.replace(tmp, target)
+            return
+        except PermissionError:
+            if os.name != "nt" or attempt == REPLACE_ATTEMPTS:
+                raise
+            time.sleep(REPLACE_PAUSE_S * attempt)
+
+
 def _atomic_write(target: Path, data: bytes) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".wds-", suffix=".tmp", dir=target.parent)
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
-        os.replace(tmp, target)
+        _replace(tmp, target)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise

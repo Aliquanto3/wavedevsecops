@@ -10,7 +10,13 @@ import pytest
 from wavedevsecops import github_sim
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import element_id
-from wavedevsecops.contracts.github import Check, GithubState, PullRequest, Review
+from wavedevsecops.contracts.github import (
+    BranchProtection,
+    Check,
+    GithubState,
+    PullRequest,
+    Review,
+)
 from wavedevsecops.engine import fingerprint, prepare_workspace
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios import LoadedScenario, parse_scenario
@@ -252,6 +258,14 @@ def test_conflit_detecte_par_merge_tree(settings: Settings, git_path: Path) -> N
     assert "en conflit" in reason.text
     assert not github_sim.has_conflict(git, prepared.layout, pr.base_sha, pr.base_sha)
 
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@exemple.test"}
+    env |= {"GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@exemple.test"}
+    tree = f"{pr.base_sha}^{{tree}}"
+    orphan = git.internal(
+        "commit-tree", tree, "-m", "sans parent", cwd=prepared.layout.origin, extra_env=env
+    ).strip()
+    assert github_sim.has_conflict(git, prepared.layout, pr.base_sha, orphan)
+
 
 def test_approbations_et_branche_disparue(settings: Settings, git_path: Path) -> None:
     extra = """\
@@ -265,7 +279,8 @@ def test_approbations_et_branche_disparue(settings: Settings, git_path: Path) ->
     prepared, git = _prepare(settings, git_path, extra, feature_path="autre.py")
     layout = prepared.layout
     pr = github_sim.load(layout).pull(1)
-    assert pr is not None and pr.mergeable and pr.approvals() == 1
+    assert pr is not None and pr.mergeable and pr.approvals == 1
+    assert json.loads(layout.github_json.read_text())["pulls"][0]["approvals"] == 1
     assert pr.reviews[0].author == PERSONAS["colleague"].name
     assert pr.reviews[0].element(1) == "review:1:1"
 
@@ -274,7 +289,7 @@ def test_approbations_et_branche_disparue(settings: Settings, git_path: Path) ->
     pr = github_sim.load(layout).pull(1)
     assert pr is not None and not pr.mergeable
     assert [r.kind for r in pr.blocking_reasons] == ["head_missing"]
-    assert pr.blocking_reasons[0].element_id == "ref:refs/heads/feature"
+    assert pr.blocking_reasons[0].element_id == "ref:refs/remotes/origin/feature"
 
 
 def test_la_derniere_revue_de_chaque_auteur_fait_foi() -> None:
@@ -286,7 +301,7 @@ def test_la_derniere_revue_de_chaque_auteur_fait_foi() -> None:
         Review(review_id=4, author="Agent", state="commented", commit_sha=sha),
     ]
     pr = PullRequest(number=1, head="f", base="main", head_sha=sha, base_sha=sha, reviews=reviews)
-    assert pr.approvals() == 1
+    assert pr.count_approvals() == 1
 
 
 def test_empreinte_sans_sortie_ni_duree(settings: Settings, git_path: Path) -> None:
@@ -345,3 +360,79 @@ def test_migrations_appliquees_au_chargement(
         "schema_version": 2,
         "ajout": True,
     }
+
+
+def _pr(**update) -> PullRequest:
+    fields = {"head_sha": "a" * 40, "base_sha": "a" * 40} | update
+    return PullRequest(number=2, head="feature", base="main", **fields)
+
+
+def test_fusion_incalculable_bloque_la_pr_sans_planter() -> None:
+    sha = "a" * 40
+    new, _ = github_sim.evaluate(_pr(), None, {"feature": sha, "main": sha}, lambda *_: None)
+    assert not new.mergeable
+    [reason] = new.blocking_reasons
+    assert reason.kind == "conflict" and "pas pu calculer" in reason.text
+
+
+def test_revues_perimees_ecartees_si_la_protection_le_demande() -> None:
+    old, new_sha, base = "a" * 40, "b" * 40, "c" * 40
+    review = Review(review_id=1, author="Sacha", state="approved", commit_sha=old)
+    pr = _pr(head_sha=old, base_sha=base, reviews=[review])
+    branches = {"feature": new_sha, "main": base}
+    keep = BranchProtection(branch="main", required_approvals=1)
+    new, _ = github_sim.evaluate(pr, keep, branches, lambda *_: False)
+    assert new.mergeable and new.approvals == 1
+    dismiss = keep.model_copy(update={"dismiss_stale_reviews": True})
+    new, _ = github_sim.evaluate(pr, dismiss, branches, lambda *_: False)
+    assert not new.mergeable and new.approvals == 0
+    assert [r.kind for r in new.blocking_reasons] == ["approvals"]
+
+
+def test_ops_refusent_job_id_invalide_ou_en_double() -> None:
+    from pydantic import ValidationError
+
+    from wavedevsecops.scenarios.ops import open_pr, set_protection
+
+    with pytest.raises(ValidationError):
+        set_protection.Args(op="set_protection", required_checks=["build\n"])
+    with pytest.raises(ValidationError):
+        open_pr.Args(op="open_pr", head="feature", checks=[{"job_id": "t"}, {"job_id": "t"}])
+
+
+def test_refresh_sans_github_json_n_ecrit_rien(settings: Settings, git_path: Path) -> None:
+    prepared, git = _prepare(settings, git_path)
+    layout = prepared.layout
+    layout.github_json.unlink()
+    assert github_sim.refresh(git, layout).updated == []
+    assert not layout.github_json.exists()
+    with pytest.raises(github_sim.GithubSimError, match="même check"):
+        github_sim.open_pr(
+            git,
+            layout,
+            "feature",
+            checks=[github_sim.DeclaredCheck("tests"), github_sim.DeclaredCheck("tests")],
+        )
+
+
+def test_changement_externe_recalcule_les_pr(settings: Settings, git_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from wavedevsecops.engine.manager import github_refresher
+
+    extra = """\
+  - op: open_pr
+    head: feature
+    checks:
+      - {job_id: tests, state: success, required: true}
+"""
+    prepared, git = _prepare(settings, git_path, extra, feature_path="autre.py")
+    layout = prepared.layout
+    refresh = github_refresher(settings, git_path)
+    ctx = SimpleNamespace(layout=layout)
+    assert refresh(ctx) is None  # type: ignore[arg-type]
+
+    _commit_and_push(git, layout, "feature", "autre.py", "valeur = 3\n")
+    assert refresh(ctx) == fingerprint(layout, git)  # type: ignore[arg-type]
+    pr = github_sim.load(layout).pulls[0]
+    assert pr.checks[0].state == "queued" and not pr.mergeable
