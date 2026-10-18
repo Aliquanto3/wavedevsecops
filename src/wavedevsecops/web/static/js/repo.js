@@ -3,6 +3,7 @@
 // marques « Nouveau », commits perdus, HEAD et refs viennent de `state_projected.views`. Ici, seules
 // des coordonnées d'écran se calculent à partir des cases du serveur (une rangée de 28 px par commit).
 import { el, svg } from "./dom.js";
+import { designationFor, markDesignated } from "./designation.js";
 import { selectionFor } from "./selection.js";
 
 export const ROW = 28; // rangée du graphe (graph-row-height)
@@ -68,6 +69,8 @@ function refPill(label) {
   const shape = { head: "graph-head", branch: "graph-branch", remote: "graph-remote-ref", tag: "graph-tag" };
   const pill = el("span", `${shape[label.kind] || "graph-tag"}${label.current ? " is-current" : ""}`, {
     "data-ref": label.element_id,
+    "data-designable": String(label.designable !== false),
+    "data-designate-id": label.element_id,
   });
   if (label.kind === "branch") pill.append(icon("poste"));
   else if (label.kind === "remote") pill.append(icon("serveur"));
@@ -167,6 +170,7 @@ export function buildGraph(graph) {
       type: "button",
       "data-select": true,
       "data-element-id": node.element_id,
+      "data-designable": String(node.designable !== false),
       "aria-label": node.a11y_name_text,
       "aria-pressed": "false",
     });
@@ -211,6 +215,7 @@ export function buildCommitList(graph, repo) {
     const button = el("button", "commit-pick", {
       type: "button",
       "data-element-id": node.element_id,
+      "data-designable": String(node.designable !== false),
       "aria-label": node.a11y_name_text,
       "aria-pressed": "false",
     });
@@ -270,6 +275,7 @@ export function buildStaging(staging, hasCommits) {
         type: "button",
         "data-select": true,
         "data-element-id": item.element_id,
+        "data-designable": String(item.designable !== false),
         "aria-label": item.a11y_name_text || `${label} : ${moved}`,
         "aria-pressed": "false",
       });
@@ -297,6 +303,7 @@ export function buildStaging(staging, hasCommits) {
 export function renderRepo(body, ctx, renderEmpty) {
   const { store, pane } = ctx;
   const selection = selectionFor(store);
+  const designation = designationFor(store);
   let mode = "graph"; // « graph » ou « list » : le bouton de l'en-tête bascule
   let drawn; // dernières vues dessinées
   const root = el("div", "repo-view");
@@ -369,6 +376,7 @@ export function renderRepo(body, ctx, renderEmpty) {
     );
     if (selection.value && !ids.has(selection.value)) selection.set(null);
     refreshSelection();
+    markDesignated(root, designation);
     settleRoving(focusedId);
     if (focusedId) {
       const again = [...root.querySelectorAll("button")].find(
@@ -389,6 +397,7 @@ export function renderRepo(body, ctx, renderEmpty) {
     draw(store.state, true);
   });
   selection.subscribe(refreshSelection);
+  designationFor(store).subscribe(() => markDesignated(root, designation));
   syncToggle();
   store.subscribe((state) => draw(state));
 }

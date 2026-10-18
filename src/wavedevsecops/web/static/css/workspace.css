@@ -890,3 +890,120 @@ main.is-workspace {
   font-family: var(--font-family-code);
   font-size: var(--font-size-code);
 }
+
+/* --- Désignation (story 5.3) ------------------------------------------------------------- */
+.designate-block {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.designate-question {
+  margin: 0;
+}
+
+.designate-button.is-armed {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.designate-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.answer-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--answer-slot-height);
+  padding: var(--space-2) var(--space-3);
+  border: var(--stroke-min) dashed var(--color-muted);
+  border-radius: var(--radius-md);
+}
+
+.answer-slot.is-filled {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-deep);
+}
+
+.answer-label {
+  font-size: var(--font-size-label);
+}
+
+.answer-help {
+  color: var(--color-ink-soft);
+}
+
+.answer-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.answer-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.answer-clear {
+  flex: none;
+  width: var(--hit-target-min);
+  height: var(--hit-target-min);
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  color: inherit;
+  cursor: pointer;
+}
+
+.sha-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sha-field {
+  min-height: var(--picker-height);
+  padding: 0 var(--space-3);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.sha-field[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.sha-help,
+.designate-once {
+  margin: 0;
+  font-size: var(--font-size-label);
+}
+
+.sha-error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.designate-submit {
+  width: 100%;
+}
+
+/* Mode armé : les désignables sont entourés de tirets, le curseur passe en croix ; un élément
+   choisi montre le contour plein de sélection à la place des tirets. */
+.workspace.is-designating [data-designable="true"]:not(tr) {
+  cursor: crosshair;
+  outline: var(--stroke-min) dashed var(--color-primary);
+  outline-offset: 1px;
+}
+
+.workspace [data-designable="true"].is-designated:not(tr) {
+  outline: var(--stroke-min) solid var(--color-ink);
+  outline-offset: 1px;
+}
