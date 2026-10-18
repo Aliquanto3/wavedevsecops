@@ -38,3 +38,24 @@ jobs:
       # socket.connect), les règles de dépendance d'AD-1 et la cohérence des versions d'AD-16.
       - name: pytest
         run: uv run pytest -q --tb=short
+
+      # AD-13, contrôle (4) : la suite de scénarios rejouée sans réseau, sous-processus
+      # (git) compris. L'espace de noms est créé par root, les tests tournent en runner.
+      - name: Scénarios sans réseau (unshare -n)
+        if: runner.os == 'Linux'
+        run: >
+          sudo unshare --net --
+          sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
+          .venv/bin/python -m pytest -q --tb=short
+          tests/test_scenarios.py tests/test_setup.py tests/test_fingerprints.py
+
+      # AD-18 : les empreintes ne bougent pas sur un clone en core.autocrlf=true. Les fichiers
+      # du dépôt sont réextraits avec ce réglage, puis les empreintes recomparées.
+      - name: Empreintes sur un clone core.autocrlf=true
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          git config core.autocrlf true
+          git rm -r --cached --quiet .
+          git reset --hard --quiet
+          uv run pytest -q --tb=short tests/test_scenarios.py tests/test_fingerprints.py

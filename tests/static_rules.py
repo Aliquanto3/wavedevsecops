@@ -268,3 +268,51 @@ def misplaced_static_dirs(src: Path = SRC, static: Path = STATIC) -> list[str]:
         for p in sorted(src.rglob("static"))
         if p.is_dir() and p.resolve() != static.resolve()
     ]
+
+
+# Composants qui manipulent un bac à sable : ils passent par `wsfs` pour toute écriture.
+SANDBOX_COMPONENTS = frozenset({"scenarios", "terminal", "engine", "github_sim"})
+WRITE_ATTRIBUTES = frozenset(
+    {
+        "write_text",
+        "write_bytes",
+        "unlink",
+        "mkdir",
+        "rmdir",
+        "touch",
+        "rename",
+        "symlink_to",
+        "hardlink_to",
+        "chmod",
+        "rmtree",
+    }
+)
+WRITE_MODULES = ("shutil",)
+
+
+def sandbox_write_violations(src: Path = SRC, package: str = PACKAGE) -> list[str]:
+    """Seul `wsfs` écrit un fichier du bac à sable : ni `open()`, ni `Path.write_*`, ni
+    `shutil` dans les composants qui le manipulent."""
+    violations = []
+    for module, path in iter_modules(src, package):
+        if component(module) not in SANDBOX_COMPONENTS:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Name) and func.id == "open":
+                violations.append(f"{module}:{node.lineno} appelle open() : passez par wsfs")
+            elif (
+                isinstance(func, ast.Attribute)
+                and func.attr in WRITE_ATTRIBUTES
+                and not (isinstance(func.value, ast.Name) and func.value.id == "wsfs")
+            ):
+                violations.append(
+                    f"{module}:{node.lineno} appelle .{func.attr}() : passez par wsfs"
+                )
+        for name in sorted(imported_modules(path, module)):
+            if _matches(name, WRITE_MODULES):
+                violations.append(f"{module} importe {name} : passez par wsfs")
+    return violations

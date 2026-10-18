@@ -63,6 +63,21 @@ class Settings(BaseModel):
     probe_timeout_s: float = 10.0
     """Délai maximal d'une sonde d'outil (version, locale, `xcode-select`), en secondes."""
 
+    git_timeout_s: float = 30.0
+    """Délai maximal d'une commande git interne (setup, lectures de l'empreinte), en secondes."""
+
+    def gitconfig_path(self) -> Path:
+        """`<data>/gitconfig`, désigné par `GIT_CONFIG_GLOBAL` (AD-3, AD-5)."""
+        return self.resolved_data_dir() / "gitconfig"
+
+    def workspaces_path(self) -> Path:
+        """`<data>/workspaces/` : un espace par parcours, scénario et mode (AD-5)."""
+        return self.resolved_data_dir() / "workspaces"
+
+    def scenarios_path(self) -> Path:
+        """`content/scenarios/` : un YAML par scénario et par mode (AD-7)."""
+        return self.content_path() / "scenarios"
+
     def tools_path(self) -> Path:
         return self.tools_file if self.tools_file is not None else project_root() / "tools.toml"
 

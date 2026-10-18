@@ -5,7 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from static_rules import dependency_violations, env_read_violations, iter_modules
+from static_rules import (
+    dependency_violations,
+    env_read_violations,
+    iter_modules,
+    sandbox_write_violations,
+)
 
 
 def _write(root: Path, files: dict[str, str]) -> Path:
@@ -100,3 +105,23 @@ def test_lecture_d_environnement_detectee(tmp_path: Path, code: str) -> None:
     violations = env_read_violations(src, "pkg")
     assert len(violations) == 1
     assert violations[0].startswith("pkg.engine")
+
+
+def test_seul_wsfs_ecrit_dans_le_bac_a_sable() -> None:
+    assert sandbox_write_violations() == []
+
+
+@pytest.mark.parametrize(
+    ("code", "expected"),
+    [
+        ("open('x', 'w')\n", "open()"),
+        ("from pathlib import Path\nPath('x').write_text('a')\n", ".write_text()"),
+        ("import shutil\n", "importe shutil"),
+        ("p = None\np.unlink()\n", ".unlink()"),
+    ],
+)
+def test_ecriture_hors_wsfs_detectee(tmp_path: Path, code: str, expected: str) -> None:
+    src = _write(tmp_path, {"scenarios/ops/x.py": code, "wsfs/__init__.py": code})
+    violations = sandbox_write_violations(src, "pkg")
+    assert len(violations) == 1, violations
+    assert violations[0].startswith("pkg.scenarios") and expected in violations[0]

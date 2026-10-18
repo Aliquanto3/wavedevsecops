@@ -1,0 +1,32 @@
+# Scénario d'essai : bac à sable libre (Story 2.1).
+# Deux commits sur main, poussés vers origin. Aucune étape : l'apprenant explore.
+schema_version: 1
+scenario_id: bac-a-sable-libre
+mode: A
+title_text: Bac à sable libre
+tracks: [llm, no_ai]
+tools: [git]
+template: empty
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+    as: readme
+  - op: commit
+    message: Ajoute le README
+    as: premier-commit
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: second-commit
+  - op: push
+    branch: main
+    as: origin-main
+steps: []

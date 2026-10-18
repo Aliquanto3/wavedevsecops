@@ -1,17 +1,24 @@
-"""Appels git : sonde de la langue de git (AD-3).
+"""Appels git : sonde de la langue, deux contextes d'appel, environnement hermétique (AD-3).
 
-Story 1.4 : seule la sonde de locale vit ici. Les deux contextes d'appel (apprenant et
-interne) et l'environnement hermétique arrivent avec les stories du terminal et du moteur.
+`gitio` est le seul module qui lance git (par `procs`). Il pose seul l'environnement
+hermétique : `GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL` vers `<data>/gitconfig`, réglages
+forcés par `GIT_CONFIG_COUNT`, aucun prompt, aucun éditeur, aucun proxy, entrée fermée.
+
+- Contexte interne (setup, projections, empreinte) : `LC_ALL=C`, `LANGUAGE` vide.
+- Contexte apprenant (commandes tapées) : locale française sondée, sinon anglais.
 """
 
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from wavedevsecops import procs
 from wavedevsecops.config import Settings, get_settings, inherited_environment
+from wavedevsecops.contracts import AppError
 
 FRENCH_LOCALES = ("fr_FR.UTF-8", "fr_FR.utf8")
 PROBE_ARGV = ("rev-parse", "--git-dir")
@@ -68,3 +75,197 @@ def probe_language(git: Path, settings: Settings | None = None) -> GitLanguage:
             if attempt.stderr.strip() and attempt.stderr != reference.stderr:
                 return GitLanguage("fr", locale)
     return GitLanguage("en")
+
+
+Context = Literal["internal", "learner"]
+
+FORCED_CONFIG: tuple[tuple[str, str], ...] = (
+    ("core.autocrlf", "false"),
+    ("core.eol", "lf"),
+    ("core.filemode", "false"),
+    ("core.symlinks", "false"),
+    ("core.longpaths", "true"),
+    ("core.quotePath", "false"),
+    ("core.pager", "cat"),
+    ("core.editor", ":"),
+    ("sequence.editor", ":"),
+    ("init.defaultBranch", "main"),
+    ("commit.gpgsign", "false"),
+    ("tag.gpgsign", "false"),
+    ("core.fsmonitor", "false"),
+    ("gc.auto", "0"),
+    ("maintenance.auto", "false"),
+    ("credential.helper", ""),
+)
+"""Réglages qui priment sur toute config de dépôt (AD-3) ; `core.hooksPath` s'y ajoute."""
+
+
+def _dropped(name: str) -> bool:
+    """Variables héritées retirées : git, locale, proxy, éditeur et pager du poste."""
+    upper = name.upper()
+    return (
+        upper.startswith(("GIT_", "LC_"))
+        or upper in {"LANG", "LANGUAGE", "EDITOR", "VISUAL", "PAGER", "LESS"}
+        or upper.endswith("_PROXY")
+    )
+
+
+def hermetic_environment(
+    *,
+    gitconfig: Path,
+    hooks_dir: Path,
+    context: Context = "internal",
+    locale: str | None = None,
+    ceiling: Path | None = None,
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Environnement de git selon AD-3, pour le contexte interne ou apprenant.
+
+    `extra` ajoute des variables propres à un appel (dates et identités du setup).
+    """
+    env = {k: v for k, v in inherited_environment().items() if not _dropped(k)}
+    forced = (*FORCED_CONFIG, ("core.hooksPath", hooks_dir.as_posix()))
+    env["GIT_CONFIG_COUNT"] = str(len(forced))
+    for index, (key, value) in enumerate(forced):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    env.update(
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL=str(gitconfig),
+        GIT_TERMINAL_PROMPT="0",
+        GIT_MERGE_AUTOEDIT="no",
+        GIT_PAGER="cat",
+        GIT_EDITOR=":",
+        GIT_SEQUENCE_EDITOR=":",
+    )
+    if ceiling is not None:
+        env["GIT_CEILING_DIRECTORIES"] = str(ceiling)
+    if context == "learner" and locale:
+        env.update(LANG=locale, LC_ALL=locale, LANGUAGE="fr")
+    else:
+        env.update(LC_ALL="C", LANGUAGE="")
+    if extra:
+        env.update(extra)
+    return env
+
+
+class GitError(AppError):
+    """Commande git interne en échec : le setup ou une lecture n'a pas abouti."""
+
+    def __init__(self, args: Sequence[str], result: procs.ProcResult) -> None:
+        if result.error:
+            why = f"git n'a pas pu être lancé ({result.error})"
+        elif result.timed_out:
+            why = "git n'a pas répondu à temps"
+        else:
+            why = f"git a répondu par le code {result.returncode}"
+        super().__init__(
+            f"La commande interne « git {' '.join(args)} » a échoué : {why}.",
+            "Ouvrez le diagnostic pour vérifier l'installation de git.",
+        )
+        self.result = result
+        self.detail = result.stderr.strip()
+
+
+@dataclass(frozen=True)
+class Git:
+    """Git d'un espace de travail : exécutable résolu, `gitconfig` et `hooks/` de l'espace."""
+
+    executable: Path
+    gitconfig: Path
+    hooks_dir: Path
+    ceiling: Path | None = None
+    timeout: float = 30.0
+    locale: str | None = None
+    """Locale française sondée (`probe_language`) pour le contexte apprenant."""
+
+    @classmethod
+    def for_workspace(
+        cls, executable: Path, workspace: Path, settings: Settings | None = None
+    ) -> Git:
+        """Git d'un espace : `hooks/` de l'espace, recherche de dépôt bornée à l'espace."""
+        settings = settings or get_settings()
+        return cls(
+            executable=executable,
+            gitconfig=settings.gitconfig_path(),
+            hooks_dir=workspace / "hooks",
+            ceiling=workspace,
+            timeout=settings.git_timeout_s,
+        )
+
+    def env(
+        self, context: Context = "internal", extra: Mapping[str, str] | None = None
+    ) -> dict[str, str]:
+        return hermetic_environment(
+            gitconfig=self.gitconfig,
+            hooks_dir=self.hooks_dir,
+            context=context,
+            locale=self.locale,
+            ceiling=self.ceiling,
+            extra=extra,
+        )
+
+    def run(
+        self,
+        *args: str,
+        cwd: Path,
+        context: Context = "internal",
+        extra_env: Mapping[str, str] | None = None,
+    ) -> procs.ProcResult:
+        """Lance `git args` dans `cwd` ; jamais d'exception pour un échec ordinaire."""
+        return procs.run(
+            [self.executable, *args],
+            env=self.env(context, extra_env),
+            cwd=cwd,
+            timeout=self.timeout,
+        )
+
+    def internal(self, *args: str, cwd: Path, extra_env: Mapping[str, str] | None = None) -> str:
+        """Commande interne (`LC_ALL=C`) qui doit réussir : sa sortie, sinon `GitError`."""
+        result = self.run(*args, cwd=cwd, extra_env=extra_env)
+        if not result.ok:
+            raise GitError(args, result)
+        return result.stdout
+
+
+def _split_z(output: str) -> list[str]:
+    return [item for item in output.split("\0") if item]
+
+
+def head_record(git: Git, repo: Path) -> str:
+    """`HEAD -> refs/heads/x` (symbolique) ou `HEAD <sha>` (détaché)."""
+    symbolic = git.run("symbolic-ref", "-q", "HEAD", cwd=repo)
+    if symbolic.ok:
+        return f"HEAD -> {symbolic.stdout.strip()}"
+    return "HEAD " + git.internal("rev-parse", "HEAD", cwd=repo).strip()
+
+
+def refs(git: Git, repo: Path) -> list[tuple[str, str]]:
+    """Refs du dépôt et leurs cibles, triées."""
+    out = git.internal("for-each-ref", "--format=%(refname)%09%(objectname)", cwd=repo)
+    pairs = [line.split("\t", 1) for line in out.splitlines() if line]
+    return sorted((name, target) for name, target in pairs)
+
+
+def reachable_objects(git: Git, repo: Path) -> list[str]:
+    """Objets accessibles depuis les refs et le reflog (identifiants triés)."""
+    out = git.internal("rev-list", "--objects", "--all", "--reflog", cwd=repo)
+    return sorted({line.split(" ", 1)[0] for line in out.splitlines() if line})
+
+
+def index_entries(git: Git, repo: Path) -> list[str]:
+    """Entrées de l'index : `mode oid étage chemin`, triées."""
+    out = git.internal("ls-files", "-s", "-z", cwd=repo)
+    return sorted(entry.replace("\t", " ", 1) for entry in _split_z(out))
+
+
+def worktree_paths(git: Git, repo: Path) -> list[str]:
+    """Chemins suivis ou non ignorés de l'arbre de travail (posix, triés, sans doublon)."""
+    out = git.internal("ls-files", "-z", "--cached", "--others", "--exclude-standard", cwd=repo)
+    return sorted(set(_split_z(out)))
+
+
+def stash_list(git: Git, repo: Path) -> list[str]:
+    """Commits du stash, du plus récent au plus ancien (l'ordre compte)."""
+    out = git.internal("stash", "list", "--format=%H", cwd=repo)
+    return [line for line in out.splitlines() if line]
