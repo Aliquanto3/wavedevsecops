@@ -98,7 +98,7 @@ def _read_raw(layout: Layout) -> dict[str, Any] | None:
         return None
     try:
         data = json.loads(path.read_bytes().decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    except OSError, UnicodeDecodeError, json.JSONDecodeError:
         raise GithubSimError(
             "L'état du GitHub simulé de cet espace (github.json) est illisible.",
             "Recommencez le scénario pour reconstruire l'espace.",
@@ -451,11 +451,105 @@ def open_pr(
     return written
 
 
+# --- Merge ----------------------------------------------------------------------------------
+
+
+MERGE_IDENTITY = {
+    "GIT_AUTHOR_NAME": "GitHub simulé",
+    "GIT_AUTHOR_EMAIL": "github-sim@wavedevsecops.invalid",
+    "GIT_COMMITTER_NAME": "GitHub simulé",
+    "GIT_COMMITTER_EMAIL": "github-sim@wavedevsecops.invalid",
+}
+"""Identité fixe des merges écrits par le GitHub simulé (AD-8)."""
+
+
+class MergeRaced(GithubSimError):
+    """`base` a bougé sur `origin` entre le calcul et l'écriture : rien n'a été écrit."""
+
+
+def merge_message(pr: PullRequest) -> str:
+    return f"Merge pull request #{pr.number} from {pr.head}"
+
+
+def _update_ref(git: Git, layout: Layout, ref: str, new: str, old: str) -> bool:
+    """`update-ref` avec l'ancienne valeur attendue ; faux si la ref a changé entre-temps."""
+    return git.run("update-ref", ref, new, old, cwd=layout.origin).ok
+
+
+def merge_pr(git: Git, layout: Layout, number: int) -> PullRequest:
+    """Merge la PR `number` dans `origin.git`, sans worktree ni `receive-pack` (AD-8).
+
+    `merge-tree --write-tree` calcule l'arbre, `commit-tree` écrit le commit de merge (message
+    et identité fixes), `update-ref` avance la base en vérifiant sa valeur d'avant. Refusé si la
+    PR n'est pas mergeable après recalcul ; si la base a bougé, `MergeRaced` après un recalcul.
+    """
+    state = load(layout)
+    pr = state.pull(number)
+    if pr is None:
+        raise GithubSimError(
+            f"La PR n°{number} n'existe pas.", "Ouvrez d'abord une PR depuis une branche poussée."
+        )
+    if pr.state != "open":
+        raise GithubSimError(
+            f"La PR n°{number} n'est plus ouverte.", "Seule une PR ouverte peut être mergée."
+        )
+    pr = _commit(git, layout, state).state.pull(number)
+    assert pr is not None
+    if not pr.mergeable:
+        reasons = " ".join(r.text for r in pr.blocking_reasons)
+        raise GithubSimError(
+            f"La PR n°{number} ne peut pas être mergée : {reasons}",
+            "Levez ces blocages, puis réessayez.",
+        )
+    tree_args = ("merge-tree", "--write-tree", pr.base_sha, pr.head_sha)
+    tree = git.run(*tree_args, cwd=layout.origin)
+    if not tree.ok:
+        raise GitError(tree_args, tree)
+    commit_args = (
+        "commit-tree",
+        tree.stdout.splitlines()[0].strip(),
+        "-p",
+        pr.base_sha,
+        "-p",
+        pr.head_sha,
+        "-m",
+        merge_message(pr),
+    )
+    commit = git.run(*commit_args, cwd=layout.origin, extra_env=MERGE_IDENTITY)
+    if not commit.ok:
+        raise GitError(commit_args, commit)
+    merge_sha = commit.stdout.strip()
+    if not _update_ref(git, layout, f"refs/heads/{pr.base}", merge_sha, pr.base_sha):
+        _commit(git, layout, load(layout))
+        raise MergeRaced(
+            f"La branche « {pr.base} » a bougé sur origin pendant le merge de la PR n°{number} : "
+            "rien n'a été écrit.",
+            "La PR a été recalculée ; relisez ses blocages, puis réessayez.",
+        )
+    fresh = load(layout)
+    merged = pr.model_copy(
+        update={
+            "state": "merged",
+            "merge_sha": merge_sha,
+            "mergeable": False,
+            "blocking_reasons": [],
+        }
+    )
+    pulls = [merged if p.number == number else p for p in fresh.pulls]
+    written = _commit(git, layout, fresh.model_copy(update={"pulls": pulls}), force=True)
+    result = written.state.pull(number)
+    assert result is not None
+    return result
+
+
 __all__ = [
     "DeclaredCheck",
     "DeclaredReview",
     "GithubSimError",
+    "MergeRaced",
     "RefreshResult",
+    "merge_message",
+    "merge_pr",
     "canonical_digest",
     "evaluate",
     "has_conflict",
