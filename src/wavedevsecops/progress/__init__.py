@@ -1,8 +1,8 @@
 """`progress.json` : suivi de l'apprenant, écrit par ce module seul (AD-14).
 
-Cette story ne pose que le fichier de base : `schema_version`, l'horodatage d'installation
-(lu dans `install.json` s'il existe) et celui du premier lancement. Les ajouts d'événements
-viennent avec les stories de suivi.
+Le fichier de base porte `schema_version`, l'horodatage d'installation (lu dans `install.json`
+s'il existe) et celui du premier lancement. Les faits du premier passage (`facts`, ajout
+seulement) et les états dérivés sont dans `progress.facts`.
 """
 
 from __future__ import annotations

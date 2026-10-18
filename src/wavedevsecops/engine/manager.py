@@ -46,6 +46,7 @@ from wavedevsecops.engine.watcher import TreeWatcher
 from wavedevsecops.engine.workspace import prepare_workspace, resolve_git
 from wavedevsecops.events import EngineStateName, EventLog, ExternalChange, Kind
 from wavedevsecops.gitio import Git
+from wavedevsecops.progress.facts import ProgressStore
 from wavedevsecops.scenarios import LoadedScenario
 from wavedevsecops.scenarios.model import KEBAB_PATTERN, Mode, Track
 from wavedevsecops.wsfs import Layout
@@ -220,6 +221,7 @@ class WorkspaceManager:
         self._projector = projector or repo_projector(settings, git_path)
         self._refresh_github = github_refresher(settings, git_path)
         self._steps = StepRunner(settings)
+        self._progress = ProgressStore.for_dir(settings.resolved_data_dir())
         self._validator = validator or self._steps.validate
         if watch and watcher_factory is None:
             quiet_s = settings.watch_quiet_ms / 1000
@@ -317,6 +319,8 @@ class WorkspaceManager:
             on_state=on_state,
             git_path=self._git_path,
             panel=self._steps.panel,
+            progress=self._progress,
+            replay=self._steps.replay,
         )
         active = _Active(engine)
         holder["active"] = active

@@ -13,6 +13,7 @@ le front ne calcule rien (AD-2).
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +112,11 @@ class StepRunner:
             published = StepVerdict(
                 step_id=step.step_id, passed=True, status="passed", next_step_id=following or ""
             )
-            return StepOutcome.explained(published, step.explanation_text, step.explain_ref)
+            facts = self._facts_of(run, [step.step_id], finished=following is None)
+            return replace(
+                StepOutcome.explained(published, step.explanation_text, step.explain_ref),
+                facts=tuple(facts),
+            )
         published = StepVerdict(
             step_id=step.step_id,
             passed=False,
@@ -121,6 +126,35 @@ class StepRunner:
             observed=[StepObserved(text=o.text, element_id=o.element_id) for o in verdict.observed],
         )
         return StepOutcome(published)
+
+    # ----------------------------------------------------------------- faits
+    @staticmethod
+    def _facts_of(run: dict[str, Any], step_ids: list[str], *, finished: bool) -> list[dict]:
+        """Faits du premier passage établis par `run.json` (AD-14) : étapes validées, fin."""
+        where = {
+            "track": run.get("track"),
+            "scenario_id": run.get("scenario_id"),
+            "mode": run.get("mode"),
+        }
+        facts = [{"kind": "step_validated", "step_id": sid, **where} for sid in step_ids]
+        if finished:
+            facts.append({"kind": "scenario_completed", **where})
+        return facts
+
+    def replay(self, engine: WorkspaceEngine) -> list[dict[str, Any]]:
+        """Faits que `run.json` établit déjà : l'écriture de `run.json` précède celle des faits,
+        un arrêt brutal entre les deux en laisse des manquants (le magasin ignore les doublons)."""
+        run = self._run(engine.layout)
+        scenario = self.scenario(run) if run is not None else None
+        if run is None or scenario is None:
+            return []
+        ids = [s.step_id for s in scenario.steps]
+        current = run.get("step_id")
+        if current is None:
+            return self._facts_of(run, ids, finished=bool(ids))
+        if current not in ids:
+            return []
+        return self._facts_of(run, ids[: ids.index(current)], finished=False)
 
     # --------------------------------------------------------------- panneau
     def panel(self, engine: WorkspaceEngine) -> dict[str, Any] | None:

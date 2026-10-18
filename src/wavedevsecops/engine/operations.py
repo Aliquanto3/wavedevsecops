@@ -4,7 +4,8 @@ Chaque espace a un fil qui exécute ses opérations en série. Pour chacune, la 
 toujours, dans cet ordre :
 
     engine_state(état de l'opération) → op_started → sortie (terminal_output…) → op_exit
-    → state_projected → [step_verdict → step_explanation] → engine_state(repos)
+    → state_projected → [step_verdict → step_explanation → progress_updated]
+    → engine_state(repos)
 
 Une opération n'émet jamais elle-même un `kind` de cette séquence (`SEQUENCE_KINDS`) :
 seule la file publie une explication, après les projections et le verdict.
@@ -43,6 +44,8 @@ from wavedevsecops.events import (
     Stream,
     TerminalOutput,
 )
+from wavedevsecops.events.catalog import ProgressUpdated
+from wavedevsecops.progress.facts import Fact, ProgressStore
 from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger("wavedevsecops")
@@ -101,6 +104,9 @@ class StepOutcome:
 
     verdict: StepVerdict
     explanation: StepExplanation | None = None
+    facts: tuple[dict[str, Any], ...] = ()
+    """Faits du premier passage que le verdict produit (`kind`, `step_id`, …) : la file les
+    complète (clé d'idempotence) et les soumet à `progress` après `run.json` (AD-14)."""
 
     @classmethod
     def explained(
@@ -265,7 +271,11 @@ class WorkspaceEngine:
         on_state: Callable[[EngineStateName], None] | None = None,
         git_path: Path | None = None,
         panel: Callable[[WorkspaceEngine], dict[str, Any] | None] | None = None,
+        progress: ProgressStore | None = None,
+        replay: Callable[[WorkspaceEngine], list[dict[str, Any]]] | None = None,
     ) -> None:
+        """`progress` reçoit les faits du premier passage ; `replay` rend, au démarrage, ceux que
+        `run.json` établit déjà (les doublons sont ignorés : seuls les manquants s'ajoutent)."""
         self.workspace_id = workspace_id
         self.git_path = git_path
         self._current: OpContext | None = None
@@ -276,6 +286,8 @@ class WorkspaceEngine:
         self._validator = validator
         self._on_state = on_state
         self._panel = panel
+        self._progress = progress
+        self._replay = replay
         self._lock = threading.Lock()
         self._queue: queue.Queue[Any] = queue.Queue()
         self._pending: list[tuple[Operation, Future[OpResult]]] = []
@@ -440,6 +452,7 @@ class WorkspaceEngine:
             self._thread.join(timeout)
 
     def _run(self) -> None:
+        self._replay_facts()
         self._initial_projection()
         while True:
             item = self._queue.get()
@@ -467,6 +480,35 @@ class WorkspaceEngine:
             except BaseException as exc:  # noqa: BLE001 - la file survit à tout
                 log.exception("Opération %s en échec dans %s", op.intent, self.workspace_id)
                 future.set_exception(exc)
+
+    def _submit_facts(self, drafts: list[dict[str, Any]], op_id: str | None) -> None:
+        """Soumet les faits à `progress` (après `run.json`) ; `progress_updated` si du neuf."""
+        if self._progress is None or not drafts:
+            return
+        key = {"workspace_id": self.workspace_id, "epoch": self.epoch, "op_id": op_id or "replay"}
+        added = self._progress.submit([Fact(**draft, **key) for draft in drafts])
+        if added:
+            first = added[0]
+            self.publish(
+                Kind.PROGRESS_UPDATED,
+                ProgressUpdated(
+                    track=first.track,
+                    scenario_id=first.scenario_id,
+                    mode=first.mode,
+                    facts=[f.kind for f in added],
+                    step_ids=[f.step_id for f in added if f.step_id],
+                ),
+                op_id=op_id,
+            )
+
+    def _replay_facts(self) -> None:
+        """Reprise après un arrêt brutal : `run.json` est écrit avant les faits (AD-14)."""
+        if self._replay is None or self._progress is None or not self.layout.run_json.exists():
+            return
+        try:
+            self._submit_facts(self._replay(self), None)
+        except Exception:  # noqa: BLE001 - un suivi illisible ne bloque pas l'ouverture
+            log.exception("Rejeu des faits de %s", self.workspace_id)
 
     def _initial_projection(self) -> None:
         """Projection d'ouverture : l'état réel est relu avant la première opération."""
@@ -568,6 +610,11 @@ class WorkspaceEngine:
                     self.publish(Kind.STEP_VERDICT, outcome.verdict, op_id=op.op_id)
                     if outcome.explanation is not None:
                         self.publish(Kind.STEP_EXPLANATION, outcome.explanation, op_id=op.op_id)
+                    self._guarded(
+                        ctx,
+                        "Progression",
+                        lambda: self._submit_facts(list(outcome.facts), op.op_id),
+                    )
             return OpResult(op.op_id, code if ok else None, projection)
         finally:
             with self._lock:

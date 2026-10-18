@@ -195,7 +195,7 @@ def test_etape_reussie_quelle_que_soit_la_commande(make_box, command: tuple[str,
     box = make_box()
     events = box.run(*command)
     kinds = _kinds(events)
-    # Ordre fixe (AD-1) : sortie, fin, projection, verdict, explication, retour au repos.
+    # Ordre fixe (AD-1) : sortie, fin, projection, verdict, explication, progression, repos.
     assert kinds == [
         Kind.ENGINE_STATE,
         Kind.OP_STARTED,
@@ -204,6 +204,7 @@ def test_etape_reussie_quelle_que_soit_la_commande(make_box, command: tuple[str,
         Kind.STATE_PROJECTED,
         Kind.STEP_VERDICT,
         Kind.STEP_EXPLANATION,
+        Kind.PROGRESS_UPDATED,
         Kind.ENGINE_STATE,
     ]
     verdict = next(e for e in events if e.kind == Kind.STEP_VERDICT).payload
