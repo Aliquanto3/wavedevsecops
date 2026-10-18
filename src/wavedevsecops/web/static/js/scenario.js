@@ -341,7 +341,11 @@ export function createScenarioView({
         const panel = state.stepPanel;
         const step = panel && panel.steps.find((s) => s.step_id === panel.current_step_id);
         const active = step && step.designate ? step : null;
-        designation.sync(active ? { stepId: active.step_id, slots: active.designate.slots } : null);
+        designation.sync(
+          active
+            ? { stepId: active.step_id, slots: active.designate.slots, accept: active.designate.accept }
+            : null,
+        );
         designateBlock.update(state, active);
       }
       const changed =

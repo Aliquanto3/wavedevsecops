@@ -36,3 +36,13 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 5.3 » ; c
 - Désignation au clavier d'une ref (étiquette dans un bouton de nœud) : seule la souris la atteint pour l'instant ; 5.4 la couvre par la liste.
 - Vues Code, lignes de diff, en-têtes de fichier, lignes du terminal : leurs vues posent les attributs ci-dessus quand elles existent (2.8, suivantes).
 - Contrôles dans un navigateur réel pour Anaël : tirets et curseur `crosshair`, contraste du bouton armé en clair et en sombre, annonce au lecteur d'écran, ordre de Tab (✕, SHA, Valider) en mode armé, Échap depuis le terminal.
+
+## Revue
+
+- medium · second avis M1 · corrigé · « Valider » sans garde synchrone : un double clic envoyait deux `answer_submit` (le second en 409, affiché en `role="alert"`). Garde posée au clic (« Réponse en cours d'envoi. ») ; levée si l'envoi échoue, sinon au changement d'étape ou au retour du moteur au repos. Test `test_double_clic_sur_valider_n_envoie_qu_une_reponse`.
+- medium · second avis M2 · corrigé · conflits du rebase sur `story/4-6-indices-paliers` (bilan 4.7, onglets d'indices 4.6) : tout est gardé ; ordre du panneau progression, bilan, consigne, désignation, indices, quiz (le bloc de désignation, inséré par l'auto-fusion après le quiz, est remonté sous la consigne comme le dit la spec) ; CSS de 5.3 remis en fin de fichier après celui de 4.6.
+- low · second avis L3 · corrigé · un SHA résolu après un changement d'étape tombait dans la nouvelle étape ; un commit était placé même si l'étape n'accepte pas `commit`. La résolution est ignorée si l'étape a changé ; un type non attendu affiche « Cette question n'attend pas de commit. » (le serveur l'aurait refusé en 409 sans consommer l'essai). Doublons dans deux cases : rejeté, le serveur juge la réponse et une question peut attendre deux fois le même élément.
+- low · second avis L4 · reporté (5.4) · refs non désignables au clavier, déjà dans les reports.
+- low · second avis L5 · rejeté · abonnements cumulés par `renderRepo` : même schéma borné que `selectionFor`, un abonnement par vue ouverte, sans croissance pendant l'exécution.
+- low · second avis L6 · reporté · armé avec la chaîne ouverte, le premier Échap désarme puis le second ferme la chaîne ; acceptable (deux Échap, aucun état perdu), à revoir avec la priorité globale des Échap.
+- Complexité : 0 constat (`markDesignated` et `drawSlots` sont O(éléments affichés) par notification, structures bornées par la vue).

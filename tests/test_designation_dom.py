@@ -241,3 +241,71 @@ console.log(JSON.stringify({ block: !!$(".designate-block"), armed: workspace().
 """,
     )
     assert out == {"block": False, "armed": False}
+
+
+def test_double_clic_sur_valider_n_envoie_qu_une_reponse(tmp_path: Path) -> None:
+    """Revue M1 : la garde est posée au clic, avant la réponse du serveur ; un échec la lève."""
+    out = _js(
+        tmp_path,
+        """
+const submit = $(".designate-submit");
+$(".designate-button").click();
+$$(".graph-node")[0].click();
+submit.click();
+submit.click();
+const during = submit.getAttribute("aria-disabled");
+await tick(); await tick();
+const afterOk = [posts.length, submit.getAttribute("aria-disabled")];
+// Le moteur passe occupé puis revient au repos sans changer d'étape (refus dans la file) : la garde tombe.
+let seq = 2;
+store.applyEvent({ kind: "engine_state", boot_id: "b", seq: seq++, epoch: 0, payload: { state: "running", reason_text: "" } });
+store.applyEvent({ kind: "engine_state", boot_id: "b", seq: seq++, epoch: 0, payload: { state: "idle", reason_text: "" } });
+const released = submit.getAttribute("aria-disabled");
+// Un envoi refusé (409) lève aussi la garde.
+globalThis.fetch = async (url, init) => {
+  posts.push([url, JSON.parse(init.body)]);
+  return { ok: false, status: 409, json: async () => ({ reason_text: "Refusé." }) };
+};
+submit.click();
+await tick(); await tick(); await tick();
+console.log(JSON.stringify({ during, afterOk, released, refused: [posts.length, submit.getAttribute("aria-disabled")] }));
+""",
+    )
+    assert out["during"] == "true"
+    assert out["afterOk"] == [1, "true"]
+    assert out["released"] is None
+    assert out["refused"] == [2, None]
+
+
+def test_sha_resolu_hors_type_ou_apres_changement_d_etape_ne_remplit_rien(tmp_path: Path) -> None:
+    """Revue L3 : un commit non attendu est signalé ; une résolution tardive ne remplit pas l'étape suivante."""
+    out = _js(
+        tmp_path,
+        """
+const field = $(".sha-field");
+let release;
+resolver = () => new Promise((r) => { release = () => r({ ok: true, status: 200, json: async () => ({ element_id: A, short_sha: "aaaaaaa", subject: "Add config" }) }); });
+field.value = "aaaaaaa";
+press("Enter", { target: field });
+await tick();
+const panel2 = structuredClone(PANEL);
+panel2.steps[0].step_id = "q2";
+panel2.current_step_id = "q2";
+panel2.steps[0].designate.accept = ["diffline"];
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 5, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: VIEWS, step_panel: panel2 });
+release();
+await tick(); await tick(); await tick();
+const stale = slotText();
+resolver = async () => ({ ok: true, status: 200, json: async () => ({ element_id: A, short_sha: "aaaaaaa", subject: "Add config" }) });
+const f2 = $(".sha-field");
+f2.value = "aaaaaaa";
+press("Enter", { target: f2 });
+await tick(); await tick(); await tick();
+console.log(JSON.stringify({ stale, typed: [slotText(), $(".sha-error").textContent, f2.getAttribute("aria-invalid")] }));
+""",
+    )
+    assert "Aucun élément choisi" in out["stale"]
+    assert "Aucun élément choisi" in out["typed"][0]
+    assert out["typed"][1] == "Cette question n'attend pas de commit."
+    assert out["typed"][2] == "true"

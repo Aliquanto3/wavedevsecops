@@ -18,6 +18,8 @@ export const ONCE_TEXT = "1 seul essai";
 export const NOTHING_CHOSEN = "Choisissez d'abord un élément.";
 export const BUSY_TEXT = "Une action est en cours.";
 export const SHA_FAILED_TEXT = "Le SHA n'a pas pu être résolu. Réessayez.";
+export const NOT_ACCEPTED_TEXT = "Cette question n'attend pas de commit.";
+export const SENDING_TEXT = "Réponse en cours d'envoi.";
 
 const registry = new WeakMap();
 
@@ -37,6 +39,7 @@ export function designationFor(store) {
   let armed = false;
   let stepId = null;
   let slots = []; // [{slot_id, label_text}] de l'étape courante
+  let accept = null; // types d'element_id acceptés par l'étape, null : inconnus
   let picks = new Map();
   let last = null; // dernière case remplie : un nouveau choix la remplace quand toutes sont pleines
   let button = null;
@@ -54,6 +57,10 @@ export function designationFor(store) {
     get slots() {
       return slots;
     },
+    /** Le type d'`element_id` (« commit », « ref »…) est-il attendu par l'étape ? */
+    accepts(kind) {
+      return !accept || accept.includes(kind);
+    },
     pickOf(slotId) {
       return picks.get(slotId) || null;
     },
@@ -66,6 +73,7 @@ export function designationFor(store) {
       if (nextId === stepId) return;
       stepId = nextId;
       slots = next ? next.slots : [];
+      accept = next && Array.isArray(next.accept) ? next.accept : null;
       picks = new Map();
       last = null;
       armed = false;
@@ -242,7 +250,13 @@ export function createDesignateBlock({ designation, onIntent }) {
   async function resolve() {
     const prefix = sha.value.trim();
     if (!prefix) return;
+    const askedFor = designation.stepId;
     const found = await designation.resolveSha(prefix);
+    if (designation.stepId !== askedFor) return; // l'étape a changé pendant la résolution
+    if (found.ok && found.element_id && !designation.accepts(String(found.element_id).split(":")[0])) {
+      found.ok = false;
+      found.reason_text = NOT_ACCEPTED_TEXT;
+    }
     if (found.ok && found.element_id) {
       shaError.textContent = "";
       sha.removeAttribute("aria-invalid");
@@ -266,9 +280,30 @@ export function createDesignateBlock({ designation, onIntent }) {
     sha.removeAttribute("aria-invalid");
     sha.setAttribute("aria-describedby", helpId);
   });
+  // Garde d'envoi : posée au clic, avant tout redessin, pour qu'un double clic n'envoie pas une
+  // seconde réponse (refusée en 409). Elle tombe si l'envoi échoue ; acceptée, elle dure jusqu'au
+  // changement d'étape ou au retour du moteur au repos après l'opération.
+  let sending = null; // null, ou {step, sawBusy}
+
   submit.addEventListener("click", () => {
-    if (submit.getAttribute("aria-disabled") === "true" || !designation.complete()) return;
-    onIntent("answer_submit", designation.body());
+    if (sending || submit.getAttribute("aria-disabled") === "true" || !designation.complete()) return;
+    const guard = { step: designation.stepId, sawBusy: false };
+    sending = guard;
+    refresh();
+    Promise.resolve(onIntent && onIntent("answer_submit", designation.body())).then(
+      (ok) => {
+        if (ok === false && sending === guard) {
+          sending = null;
+          refresh();
+        }
+      },
+      () => {
+        if (sending === guard) {
+          sending = null;
+          refresh();
+        }
+      },
+    );
   });
 
   let wasArmed = false;
@@ -328,7 +363,8 @@ export function createDesignateBlock({ designation, onIntent }) {
       (again || button).focus();
     }
     let reason = null;
-    if (state && state.engineState !== "idle") reason = BUSY_TEXT;
+    if (sending) reason = SENDING_TEXT;
+    else if (state && state.engineState !== "idle") reason = BUSY_TEXT;
     else if (!designation.complete()) reason = NOTHING_CHOSEN;
     bindAction(submit, reason);
   }
@@ -341,6 +377,11 @@ export function createDesignateBlock({ designation, onIntent }) {
     /** `step` : l'étape courante portant `designate`, ou null. */
     update(next, step) {
       state = next;
+      if (sending) {
+        if (!step || sending.step !== step.step_id) sending = null;
+        else if (next.engineState !== "idle") sending.sawBusy = true;
+        else if (sending.sawBusy) sending = null;
+      }
       const sameStep = step && drawnStep === step.step_id;
       if (step && !sameStep) {
         richText(question, step.designate.question_text);
