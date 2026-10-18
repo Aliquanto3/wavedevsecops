@@ -268,6 +268,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 23:39 · 4.7 · dev · lancé (dev-story Sonnet ; ouvre 6.5) ; 7.2 garde son tour (toolrun touché par 2.8) · —
 - 2026-10-18 23:44 · 2.8 · second-avis · aucun high, 6 medium (CRLF perdus à la sauvegarde, open_external exécute .bat/.exe via os.startfile, bit x perdu sous POSIX, restore_failed non gardé avant 4.5, fichiers créés absents du diff, aria-label sur div sans role), 4 low ; reviewer Opus lancé · —
 - 2026-10-18 23:45 · 5.2 · second-avis · aucun high, 3 medium (answer_submit sans step_id vise la désignation suivante, writes=False contourne la garde quiz_altered, branche partie avant 4.5 : rebase de fond sur steps.py et operations.py), 3 low (test de rejeu instable, assertions, annonce relancée) ; reviewer Opus lancé avec rebase soigné · —
+- 2026-10-19 00:00 · 6.1 · dev · fini, 952 passed / 41 skipped, CI verte sur 6 jobs ; GET /api/catalogue?track=, états depuis ProgressStore, mode indisponible (409 sur /api/open), path-menu ; parcours en localStorage ; SOCLE_ORDER impose les scenario_id de 6.2 et 6.3 ; contrôles navigateur pour Anaël · fc7aafe
+- 2026-10-19 00:00 · 6.1 · second-avis · lancé · —
+- 2026-10-19 00:00 · 7.2 · dev · lancé (dev-story Sonnet ; reprend uv sync non interruptible reporté par 6.6) · —
+- 2026-10-19 00:01 · 3.4 · review · rebase sans conflit, aucun medium réel : M1 ramené à low (spec et docstring corrigées, 5.1 ajoutera parent explicite et update-ref de réécriture), L2 écarté (appelant dans la file ; report pour 7.4), L3 confirmé (CI trois OS), L4 corrigé (empreinte d'avant 3.4 épinglée) ; 954 passed / 41 skipped, CI branche verte sur 6 jobs · cf4cb79
+- 2026-10-19 00:03 · 3.4 · fusion · rebase sur le suivi (sans code), tests ciblés 32 passed, ff sur main, story done ; 3.3, 3.5, 7.4 ★ et 5.1 éligibles (créneaux pleins : 4.6, 4.7, 7.2) · ffb753f
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

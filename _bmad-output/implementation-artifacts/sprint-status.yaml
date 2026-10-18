@@ -63,7 +63,7 @@ development_status:
   3-1-tenir-un-modèle-de-pr-complet-prêt-pour-les-stations: done
   3-2-ouvrir-une-pr-et-la-merger: done
   3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: backlog
-  3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: review
+  3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: done
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: backlog
   epic-3-retrospective: optional
 
@@ -89,7 +89,7 @@ development_status:
   epic-5-retrospective: optional
 
   epic-6: in-progress
-  6-1-choisir-son-parcours-et-parcourir-le-catalogue: in-progress
+  6-1-choisir-son-parcours-et-parcourir-le-catalogue: review
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: backlog
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
@@ -100,7 +100,7 @@ development_status:
 
   epic-7: in-progress
   7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: done
-  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: backlog
+  7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: in-progress
   7-3-être-protégé-par-le-hook-pre-commit-gitleaks: backlog
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: backlog
   7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: backlog
