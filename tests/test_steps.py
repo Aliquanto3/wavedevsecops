@@ -520,7 +520,8 @@ def test_lint_type_d_etape_alias_cle_d_explication_et_step_id() -> None:
     parse_scenario(head + ok, "etapes.A.yaml", explain_keys=EXPLAIN_REFS)
 
     unknown = _lint_errors(head + ok.replace("repo_state", "quiz_choix"))
-    assert unknown["steps[0].type"].startswith("type d'étape inconnu")
+    # Depuis le type `quiz`, l'union est discriminée : l'erreur porte sur l'étape entière.
+    assert unknown["steps[0]"].startswith("type d'étape inconnu « quiz_choix »")
 
     alias = _lint_errors(head + step.format(id="a", type="repo_state", extra="", at="@absent"))
     assert alias["steps[0].expect.head.at"].startswith("l'alias « @absent »")
@@ -626,8 +627,8 @@ def test_lint_avertit_d_une_etape_sans_etat_prevu() -> None:
 def test_type_absent_d_une_etape_nomme_le_champ_type() -> None:
     text = SCENARIO.replace("    type: repo_state\n", "", 1)
     errors = _lint_errors(text)
-    # Un seul type : pydantic signale le champ ; à plusieurs, `union_tag_not_found` le nomme.
-    assert errors == {"steps[0].type": "champ obligatoire absent"}
+    # Plusieurs types (repo_state, quiz) : `union_tag_not_found` nomme le champ `type`.
+    assert errors == {"steps[0]": "champ `type` absent"}
     from wavedevsecops.scenarios.loader import french_message
 
     assert french_message({"type": "union_tag_not_found", "loc": ("steps", 0)}) == (

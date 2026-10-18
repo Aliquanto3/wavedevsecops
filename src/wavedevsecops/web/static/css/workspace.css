@@ -294,6 +294,78 @@ main.is-workspace {
   border-radius: var(--radius-sm);
 }
 
+/* Quiz à exécution réelle (UX-DR9, UX-DR10) : cartes de commandes, bandeau d'état modifié. */
+.quiz-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.quiz-legend {
+  padding: 0;
+  font-weight: 700;
+}
+
+.quiz-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit-target-dense);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.quiz-card:has(.quiz-radio:checked) {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.quiz-command {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-code);
+  overflow-wrap: anywhere;
+}
+
+.quiz-explanation {
+  padding: var(--space-3);
+  background: var(--color-warning-soft);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+}
+
+.quiz-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-soft);
+  border: var(--stroke-min) solid var(--color-warning);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.quiz-banner[hidden] {
+  display: none;
+}
+
+.quiz-banner-text {
+  flex: 1 1 auto;
+  margin: 0;
+  font-weight: 700;
+}
+
+.views-grid[inert],
+.chips[inert] {
+  cursor: progress;
+}
+
 /* Contenu du panneau Scénario : mode, progression, consigne, explication, encart (UX-DR8/11). */
 .scenario-body {
   display: flex;

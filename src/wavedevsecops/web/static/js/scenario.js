@@ -3,6 +3,7 @@
 // invente aucun hors des libellés fixes de l'interface, et ne calcule aucun verdict. Il ne garde
 // que des choix d'affichage : l'étape rouverte par un segment, l'encart écarté par « Continuer ».
 import { el, richText } from "./dom.js";
+import { alteredExplanation, quizChoices, restoreFailedNotice } from "./quiz.js";
 
 export const UNEXPECTED_TITLE = "État inattendu";
 export const CONTINUE_LABEL = "Continuer";
@@ -10,6 +11,12 @@ export const PASSED_TEXT = "Étape réussie.";
 export const SEES_LABEL = "Ce que l'étape voit :";
 
 let counter = 0;
+
+/** L'état du moteur ne redessine le panneau que s'il montre un quiz (bouton « Exécuter »). */
+function quizEngine(state) {
+  const panel = state.stepPanel;
+  return panel && panel.steps.some((step) => step.quiz) ? state.engineState : null;
+}
 
 /** « Étape n sur N » : n suit l'étape courante (la dernière quand toutes sont réussies). */
 export function progressLabel(panel) {
@@ -37,12 +44,13 @@ export function statusFor(state) {
 }
 
 /** Monte le contenu du panneau ; `update(state)` le redessine depuis le magasin. */
-export function createScenarioView({ onSelect } = {}) {
+export function createScenarioView({ onSelect, onIntent } = {}) {
   const root = el("div", "scenario-body", { "data-zone": "scenario-body" });
   root.hidden = true;
   let shownId = null; // étape rouverte par un segment terminé
   let dismissed = null; // verdict dont l'encart a été écarté par « Continuer »
   let infoOpen = false;
+  let chosen = null; // commande cochée du quiz en cours
   let lastState = null;
   const uid = ++counter;
 
@@ -186,6 +194,31 @@ export function createScenarioView({ onSelect } = {}) {
     instruction.append(heading, chat);
 
     const children = [...modeRow(panel), progress(panel, view), instruction];
+    // Quiz : les commandes proposées, puis l'explication de la mauvaise réponse et, si le
+    // rétablissement échoue, l'encart d'erreur (UX-DR9, UX-DR11).
+    if (shown === current && current.quiz && !panel.restore_failed) {
+      const known = current.quiz.choices.some((c) => c.choice_id === chosen);
+      if (!known) chosen = null;
+      children.push(
+        quizChoices(current, {
+          state,
+          chosen,
+          onChoose(choiceId) {
+            chosen = choiceId;
+            render(lastState);
+            const again = root.querySelector(`.quiz-radio[value="${choiceId}"]`);
+            if (again) again.focus();
+          },
+          onRun(choiceId) {
+            if (choiceId && onIntent) onIntent("quiz_choice", { choice_id: choiceId });
+          },
+        }),
+      );
+    }
+    if (shown === current && panel.quiz_altered) children.push(alteredExplanation(panel.quiz_altered));
+    if (panel.restore_failed) {
+      children.push(restoreFailedNotice(() => onIntent && onIntent("restart", {})));
+    }
     const verdict = state.verdict;
     if (verdict && verdict.status === "unexpected" && verdict !== dismissed && shown === current) {
       children.push(notice(verdict));
@@ -210,6 +243,8 @@ export function createScenarioView({ onSelect } = {}) {
       return `.step-segment[data-step="${active.dataset.step}"]`;
     }
     if (active.classList.contains("mode-info")) return ".mode-info";
+    if (active.classList.contains("quiz-radio")) return `.quiz-radio[value="${active.getAttribute("value")}"]`;
+    if (active.classList.contains("quiz-run")) return ".quiz-run";
     if (active.dataset && active.dataset.elementId) {
       return `.element-link[data-element-id="${active.dataset.elementId}"]`;
     }
@@ -227,7 +262,8 @@ export function createScenarioView({ onSelect } = {}) {
       const changed =
         !lastState ||
         state.stepPanel !== lastState.stepPanel ||
-        state.verdict !== lastState.verdict;
+        state.verdict !== lastState.verdict ||
+        quizEngine(state) !== quizEngine(lastState);
       if (lastState && state.verdict !== lastState.verdict) shownId = null;
       if (changed) render(state);
       else lastState = state; // rien à redessiner : le focus du panneau reste en place

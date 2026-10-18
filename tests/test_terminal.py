@@ -317,7 +317,7 @@ def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None
     for line in ("git add .", "git commit -m x", "git branch feature", "git stash", "git push"):
         with pytest.raises(OperationRefused) as refused:
             space.start(line)
-        assert "état du quiz" in refused.value.reason_text
+        assert "état modifié par le quiz" in refused.value.reason_text
     # Une ligne refusée par la garde s'affiche toujours (aucune écriture).
     assert space.run("git status ; ls").streams == ["refused"]
 

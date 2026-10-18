@@ -47,6 +47,16 @@ def _state_from_views(views: dict[str, Any] | None) -> RepoState | None:
         return None
 
 
+def _public_quiz(quiz: Any) -> dict[str, Any] | None:
+    """Ce que le panneau montre d'un quiz en attente de rétablissement (pas l'instantané)."""
+    if not isinstance(quiz, dict):
+        return None
+    return {
+        key: str(quiz.get(key) or "")
+        for key in ("step_id", "choice_id", "command_text", "explanation_text")
+    }
+
+
 class StepRunner:
     """Valide l'étape courante des espaces et décrit leur panneau Scénario."""
 
@@ -183,18 +193,26 @@ class StepRunner:
         steps = []
         for i, step in enumerate(scenario.steps):
             done = i < position
-            steps.append(
-                {
-                    "step_id": step.step_id,
-                    "title_text": step.title_text,
-                    "instruction_text": step.instruction_text,
-                    "state": "done" if done else ("current" if i == position else "todo"),
-                    # L'explication n'est révélée qu'une fois l'étape réussie.
-                    "explanation_text": step.explanation_text if done else "",
-                    "explain_ref": step.explain_ref if done else "",
-                }
-            )
+            entry = {
+                "step_id": step.step_id,
+                "title_text": step.title_text,
+                "instruction_text": step.instruction_text,
+                "state": "done" if done else ("current" if i == position else "todo"),
+                # L'explication n'est révélée qu'une fois l'étape réussie.
+                "explanation_text": step.explanation_text if done else "",
+                "explain_ref": step.explain_ref if done else "",
+            }
+            extra = STEP_TYPES[step.type].panel
+            if i == position and extra is not None:
+                entry.update(extra(step))  # champs propres au type, pour l'étape courante
+            steps.append(entry)
+        altered = run.get("quiz") if engine.rest_state == "quiz_altered" else None
+        failed = run.get("restore_failed")
         return {
+            "quiz_altered": _public_quiz(altered),
+            "restore_failed": {"reason_text": str(failed.get("reason_text") or "")}
+            if isinstance(failed, dict)
+            else None,
             "title_text": scenario.title_text,
             "mode": scenario.mode,
             "mode_text": MODE_TEXTS[scenario.mode],

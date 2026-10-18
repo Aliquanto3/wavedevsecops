@@ -39,6 +39,8 @@ class StepType:
     args: type[StepArgs]
     check: Callable[[RepoState | None, StepContext], Verdict]
     summary: str
+    panel: Callable[[Any], dict[str, Any]] | None = None
+    """Champs que le type ajoute à l'étape courante du panneau Scénario (optionnel)."""
 
 
 def _discover() -> dict[str, StepType]:
@@ -58,7 +60,9 @@ def _discover() -> dict[str, StepType]:
                 f"type d'étape {info.name} : Args.type doit valoir Literal[{info.name!r}]"
             )
         summary = (module.__doc__ or "").strip().splitlines()[0] if module.__doc__ else ""
-        registry[info.name] = StepType(info.name, args, check, summary)
+        registry[info.name] = StepType(
+            info.name, args, check, summary, getattr(module, "panel", None)
+        )
     return registry
 
 

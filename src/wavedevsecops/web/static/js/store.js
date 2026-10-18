@@ -24,6 +24,7 @@ function initial() {
     stepPanel: null, // panneau Scénario écrit par le serveur (étapes, étape courante)
     verdict: null, // dernier step_verdict de l'espace ; null après un rechargement
     announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
+    restored: false, // vrai entre un rétablissement réussi et la commande suivante
   };
 }
 
@@ -144,6 +145,7 @@ export function createStore() {
       if (envelope.kind === "engine_state") {
         patch.engineState = payload.state;
         patch.reasonText = payload.reason_text || "";
+        if (payload.state === "command") patch.restored = false;
       } else if (envelope.kind === "state_projected") {
         const problems = [];
         patch.views = acceptViews(payload.views, problems);
@@ -170,6 +172,16 @@ export function createStore() {
         }
       } else if (envelope.kind === "step_explanation") {
         patch.stepPanel = explainStep(state.stepPanel, payload);
+      } else if (envelope.kind === "quiz_altered" && state.stepPanel) {
+        const { first_attempt: _first, ...altered } = payload;
+        patch.stepPanel = { ...state.stepPanel, quiz_altered: altered, restore_failed: null };
+      } else if (envelope.kind === "restore_ended" && state.stepPanel) {
+        // Le serveur dit si l'état est rétabli ; l'échec garde le quiz et pose l'encart d'erreur.
+        patch.stepPanel =
+          payload.status === "ok"
+            ? { ...state.stepPanel, quiz_altered: null, restore_failed: null }
+            : { ...state.stepPanel, restore_failed: { reason_text: payload.reason_text || "" } };
+        patch.restored = payload.status === "ok";
       } else if (envelope.kind === "app_error") {
         patch.errorText = `${payload.cause_text} ${payload.action_text}`.trim();
       }

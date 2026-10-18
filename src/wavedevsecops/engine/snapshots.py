@@ -217,7 +217,7 @@ def _verify(layout: Layout, git: Git, snapshot: Snapshot) -> None:
     if digest != snapshot.fingerprint:
         raise _fail(layout, snapshot.snapshot_id, "l'état rétabli diffère de l'instantané")
     _discard(layout.snapshots / WORK_DIR)
-    _update_run(layout, restoring=None, restore_failed=None)
+    _update_run(layout, restoring=None, restore_failed=None, quiz=None)
 
 
 def _rollback(

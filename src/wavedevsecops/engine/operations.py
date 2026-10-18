@@ -72,6 +72,16 @@ _STATE_TEXTS: dict[str, str] = {
     "exporting": "Export en cours.",
     "quiz_altered": "Le dépôt est dans l'état du quiz : seules les commandes de lecture passent.",
 }
+QUIZ_REFUSED_TEXT = (
+    "Refusée pendant l'état modifié par le quiz : seules les commandes de lecture passent. "
+    "Cliquez sur « J'ai compris, rétablir l'état » pour reprendre."
+)
+RESTORE_FAILED_TEXT = (
+    "L'état n'a pas pu être rétabli : cette action est refusée pour ne pas vous laisser sur un "
+    "état faux. Recommencez le scénario."
+)
+RESTART_INTENT = "restart"
+"""Seule intention d'écriture admise après un rétablissement échoué (story 4.4)."""
 
 
 class OperationRefused(Exception):
@@ -293,7 +303,7 @@ class WorkspaceEngine:
         self._pending: list[tuple[Operation, Future[OpResult]]] = []
         self._closed = False
         self._state: EngineStateName = "idle"
-        self._rest: EngineStateName = "idle"
+        self._rest: EngineStateName = self._read_rest()
         self._reason_text = ""
         self.last_projection = Projection({}, "")
         self.epoch = self._read_epoch()
@@ -307,6 +317,28 @@ class WorkspaceEngine:
             return 0
         epoch = load_run(self.layout).get("epoch", 0)
         return epoch if isinstance(epoch, int) and epoch >= 0 else 0
+
+    def _read_rest(self) -> EngineStateName:
+        """`quiz_altered` si un quiz attend son rétablissement (`run.json.quiz`), sinon `idle`."""
+        if not self.layout.run_json.exists():
+            return "idle"
+        try:
+            return "quiz_altered" if load_run(self.layout).get("quiz") else "idle"
+        except AppError:
+            return "idle"
+
+    def _restore_failed(self) -> bool:
+        if not self.layout.run_json.exists():
+            return False
+        try:
+            return bool(load_run(self.layout).get("restore_failed"))
+        except AppError:
+            return False
+
+    @property
+    def rest_state(self) -> EngineStateName:
+        """État de repos : `idle` ou `quiz_altered`."""
+        return self._rest
 
     def _persist_epoch(self) -> None:
         if not self.layout.run_json.exists():
@@ -387,8 +419,15 @@ class WorkspaceEngine:
                     "Réessayez."
                 )
             self._check_epoch(op)
+            if (
+                op.writes
+                and op.state != "setup"
+                and op.intent != RESTART_INTENT
+                and self._restore_failed()
+            ):
+                raise OperationRefused(RESTORE_FAILED_TEXT)
             if op.writes and self._rest == "quiz_altered":
-                raise OperationRefused(_STATE_TEXTS["quiz_altered"])
+                raise OperationRefused(QUIZ_REFUSED_TEXT)
             if len(self._pending) >= self.settings.max_pending_ops:
                 raise OperationRefused(
                     "Trop d'actions sont en attente dans cet espace. Attendez la fin des "

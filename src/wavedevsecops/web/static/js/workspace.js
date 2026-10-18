@@ -7,6 +7,7 @@ import { el, richText } from "./dom.js";
 import * as L from "./layout.js";
 import { mountNetworkRun } from "./network-run.js";
 import { listPanes } from "./panes.js";
+import { createQuizBanner, postIntent, quizStatus } from "./quiz.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
@@ -43,7 +44,10 @@ export function mountWorkspace(
   panelTitle.textContent = title;
   const panelStatus = el("p", "scenario-status", { role: "status" });
   const panelError = el("p", "scenario-error", { role: "alert" });
-  const scenarioView = createScenarioView({ onSelect });
+  const scenarioView = createScenarioView({
+    onSelect,
+    onIntent: (intent, body) => postIntent(store, intent, body),
+  });
   panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
   // Seul le parcours LLM a du code d'exercice à lancer ; le serveur revérifie le parcours.
   const networkRun = track === "llm" ? mountNetworkRun(panel, { store, fetchImpl }) : null;
@@ -56,7 +60,13 @@ export function mountWorkspace(
   });
   const grid = el("div", "views-grid");
   const announce = el("p", "visually-hidden", { role: "status", id: "layout-status" });
-  zone.append(chipBar, grid, announce);
+  // Bandeau du quiz (UX-DR10) : au-dessus des vues, qui deviennent `inert` pendant le rétablissement.
+  const quizBanner = createQuizBanner({
+    store,
+    inertTargets: [chipBar, grid],
+    onRestored: () => panel.focus(),
+  });
+  zone.append(quizBanner.root, chipBar, grid, announce);
   // Bandeau de la chaîne : première rangée de la grille ; seule la rangée des vues rétrécit.
   let chainView = null;
   if (chain) {
@@ -73,6 +83,7 @@ export function mountWorkspace(
   const unsubscribe = store.subscribe((state) => {
     const preparing = state.engineState === LOADING || state.engineState === "setup";
     const stepStatus = scenarioView.update(state);
+    quizBanner.update(state);
     // Annonce de la commande d'abord, puis le statut d'étape : l'un n'écrase pas l'autre.
     let line = PREPARING_TEXT;
     if (!preparing) {
@@ -84,7 +95,8 @@ export function mountWorkspace(
             : state.announce.text,
         );
       }
-      if (stepStatus) parts.push(stepStatus);
+      const status = quizStatus(state) || stepStatus;
+      if (status) parts.push(status);
       line = parts.length ? parts.join(" ") : READY_TEXT;
     }
     if (state.announce !== announced) panelStatus.textContent = ""; // relit une annonce identique

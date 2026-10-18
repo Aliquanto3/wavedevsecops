@@ -168,3 +168,6 @@ def register_intents() -> None:
     """Enregistre `terminal_line` (idempotent : l'application peut être créée plusieurs fois)."""
     if INTENT not in INTENTS:
         register_intent(Intent(INTENT, TerminalLine, build_terminal_line))
+    from wavedevsecops.terminal import quiz  # importé ici : quiz réutilise `_run_git`
+
+    quiz.register_intents()
