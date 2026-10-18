@@ -107,7 +107,8 @@ files:
 
 # Outils de la chaîne (story 7.2, AD-4, AD-10) : acceptés seulement si le scénario les déclare
 # dans `tools`, lancés par `toolrun` dans l'environnement d'exercice, hors ligne. `barrier_id` :
-# la barrière de `chain.yaml` dont leur sortie est la preuve. Ni `-p`, ni `-c`, ni `--rootdir` :
+# la barrière de `chain.yaml` dont leur sortie est la preuve. Ni `-p`, ni `-c`, ni `--rootdir`,
+# ni le séparateur `--`, ni une valeur séparée qui commence par `-` (pytest cherche `-p` partout) :
 # aucune option ne charge un greffon ni ne change la racine ; `--fix` est la seule écriture.
 tools:
   ruff:

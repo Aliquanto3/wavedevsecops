@@ -59,8 +59,12 @@ def _existing(found: machine.Findings, repo) -> set[str]:  # noqa: ANN001 - Path
 def _prepare_environment(ctx: OpContext, command: ToolCommand, allow: Allowlist) -> bool:
     """Garantit `cache/venv/` ; faux (et message) si l'outil reste inutilisable."""
     venv = toolrun.venv_dir(ctx.layout.root)
-    if toolrun.venv_python(venv) is None:
-        # Secours : l'ouverture de l'espace crée normalement l'environnement (hors ligne).
+    usable = toolrun.venv_python(venv) is not None and (
+        toolrun.resolve(command.name, ctx.settings, venv=venv).ok
+    )
+    if not usable:
+        # Secours : l'ouverture de l'espace crée normalement l'environnement (hors ligne) ;
+        # un `uv sync` interrompu ou en échec (venv créé, outil absent) est retenté ici.
         synced = toolrun.sync_environment(
             ctx.layout.repo,
             venv,
@@ -120,8 +124,11 @@ def run(ctx: OpContext, command: ToolCommand, allow: Allowlist) -> int:
             cache=ctx.layout.cache,
             settings=settings,
             timeout=settings.tool_timeout_s,
+            on_start=lambda machine_handle: ctx.on_interrupt(machine_handle.terminate),
         )
-        if found.error:
+        if ctx.interrupted:
+            killed = True  # Ctrl+C pendant l'exécution machine : ni liens ni preuve.
+        elif found.error:
             log.warning("Sortie machine de %s : %s", command.name, found.error)
             notice = allow.message("tool_machine_failed", reason=found.error)
         else:

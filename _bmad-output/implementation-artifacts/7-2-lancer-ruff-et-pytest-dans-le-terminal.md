@@ -47,3 +47,18 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.2 » ; s
 3. Réseau coupé : les deux outils tournent (cache uv préchargé) ; ouverture du scénario sans cache : la première commande dit « L'environnement de l'exercice n'a pas pu être préparé ».
 4. Ctrl+C pendant `pytest` (test lent) : arrêt sous 2 s, code 130, aucune preuve vue.
 5. Lecteur d'écran : le bloc est annoncé « Sortie de ruff, groupe », les liens sont des boutons.
+
+## Revue
+
+Rebase sur `origin/main` (5.2, 6.1, 2.8) sans conflit.
+
+- Medium · second avis M1 · corrigé : pytest cherche `-p` dans tous ses arguments avant de les analyser (`consider_preparse`), donc `pytest -- -p x` ou `pytest -k -p x` chargeait un greffon. La garde refuse maintenant `--` et toute valeur séparée qui commence par `-` ; quatre cas de refus ajoutés.
+- Medium · second avis M2 · corrigé : Ctrl+C pendant la relance machine n'arrêtait rien (`run_tool` sans rappel). `findings.collect(..., on_start=)` lance par `spawn_tool` et le terminal y branche `ctx.on_interrupt` ; arrêt sans liens ni preuve, code 130 (test `test_ctrl_c_arrete_aussi_l_execution_machine`).
+- Medium · second avis M3 · corrigé : le secours ne resynchronisait que si le python du venv manquait. Il resynchronise aussi quand l'outil n'est pas résolu dans le venv (absent, version différente du `uv.lock`) ; test ajouté.
+- Low · second avis L4 · rejeté : `\` hors guillemets suit la règle POSIX du tokenizer commun avec git. `tests/test_x.py` marche sur tous les OS, et le confinement tient.
+- Low · second avis L5 · rejeté : le critère d'acceptation dit « soumis quand la sortie s'affiche ». Restreindre aux codes 0 et 1 reste possible (décision produit).
+- Low · second avis L6 · rejeté : la double exécution est le choix d'AD-10, et elle n'a lieu qu'en cas d'échec.
+- Low · second avis L7 · reporté : `uv sync` à l'ouverture (hors ligne, depuis le cache) n'est pas interruptible et son échec ne va qu'au journal ; le terminal le retente et l'explique. À vérifier sur poste réel : durée à l'ouverture d'un scénario de station 1.
+- Complexité : 0 constat (sortie collectée une fois, `link_spans` linéaire en la taille du texte).
+- Medium · relecteur (intégration avec 5.2) · corrigé : sans `section`, les deux scénarios de station 1 tombaient dans « Socle git » du catalogue, et la garde `test_scenarios_du_socle_livres_figurent_dans_l_ordre_conseille` échouait. Ils déclarent maintenant `section: stations`. La section « Stations » du catalogue arrive avec la story 9.3 (UX-DR29 : section d'un jalon non livré masquée) ; d'ici là, ils ne sont plus proposés dans le catalogue.
+- Low · relecteur · corrigé : `test_ctrl_c_arrete_l_outil_sans_preuve` était instable sous Windows (Ctrl+C envoyé après un délai fixe de 0,5 s, avant que l'outil soit lancé). Le test attend maintenant que l'outil ait écrit sa sortie.

@@ -11,11 +11,11 @@ from __future__ import annotations
 import json
 import uuid
 import xml.etree.ElementTree as ET  # noqa: S405 - fichier écrit par pytest dans cache/, pas du réseau
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from wavedevsecops import toolrun
+from wavedevsecops import procs, toolrun
 from wavedevsecops.config import Settings
 
 RUFF_HUMAN_ONLY = frozenset({"--fix", "--statistics", "--show-fixes", "--diff"})
@@ -105,12 +105,31 @@ def collect(
     cache: Path,
     settings: Settings,
     timeout: float,
+    on_start: Callable[[procs.Handle], None] | None = None,
 ) -> Findings:
-    """Relance `tool_id` en mode machine sur le même arbre et en tire les constats."""
+    """Relance `tool_id` en mode machine sur le même arbre et en tire les constats.
+
+    `on_start` reçoit le `Handle` dès le lancement : Ctrl+C arrête aussi cette exécution.
+    """
+
+    def run_machine(argv: list[str]) -> procs.ProcResult:
+        try:
+            handle = toolrun.spawn_tool(
+                tool_id, argv, cwd=repo, venv=venv, timeout=timeout, settings=settings
+            )
+        except toolrun.ToolUnavailable as exc:
+            return procs.ProcResult(None, error=exc.status.reason or f"{tool_id} indisponible")
+        except OSError as exc:
+            return procs.ProcResult(None, error=f"{tool_id} n'a pas démarré ({type(exc).__name__})")
+        if on_start is not None:
+            on_start(handle)
+        result = toolrun.collect(handle)
+        if handle.interrupted:
+            return procs.ProcResult(None, error="interrompu")
+        return result
+
     if tool_id == "ruff":
-        ran = toolrun.run_tool(
-            "ruff", machine_ruff_args(args), cwd=repo, timeout=timeout, settings=settings, venv=venv
-        )
+        ran = run_machine(machine_ruff_args(args))
         if ran.error or ran.timed_out or ran.returncode not in (0, 1):
             return Findings(error=ran.error or "ruff n'a pas donné de sortie machine")
         return parse_ruff(ran.stdout, repo)
@@ -118,9 +137,7 @@ def collect(
         report = cache / f"junit-{uuid.uuid4().hex[:8]}.xml"
         cache.mkdir(parents=True, exist_ok=True)
         extra = ["--junitxml", str(report), "--tb=no", "-q"]
-        ran = toolrun.run_tool(
-            "pytest", [*args, *extra], cwd=repo, timeout=timeout, settings=settings, venv=venv
-        )
+        ran = run_machine([*args, *extra])
         try:
             if ran.error or ran.timed_out:
                 return Findings(error=ran.error or "pytest n'a pas donné de rapport machine")

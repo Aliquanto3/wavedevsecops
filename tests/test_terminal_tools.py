@@ -96,6 +96,11 @@ def test_la_garde_accepte_ruff_et_pytest(line: str, write: bool) -> None:
         ("pytest C:\\Windows", "n'est pas un chemin du dépôt"),
         ("pytest .git/config", "n'est pas un chemin du dépôt"),
         ("pytest -k", "attend une valeur"),
+        # pytest cherche `-p` dans tous ses arguments avant de les analyser (revue 7.2).
+        ("pytest -- -p evil_plugin", "n'est pas acceptée"),
+        ("pytest -k -p evil_plugin", "attend une valeur"),
+        ("pytest -m -pevil_plugin", "attend une valeur"),
+        ("ruff check -- -x", "n'est pas acceptée"),
         ("pytest | cat", "n'y a aucun effet"),
         ("ruff check . > sortie.txt", "n'y a aucun effet"),
         ("pytest && ls", "n'y a aucun effet"),
@@ -234,8 +239,18 @@ def lint_box(tmp_path: Path, git_path: Path, no_sync: None) -> Iterator[Box]:
         box.manager.close()
 
 
-def _fake_tool(monkeypatch: pytest.MonkeyPatch, text: str, code: int, *, sleep: float = 0.0):
-    """`toolrun.spawn_tool` remplacé par un Python qui imprime `text` puis sort avec `code`."""
+def _fake_tool(
+    monkeypatch: pytest.MonkeyPatch,
+    text: str,
+    code: int,
+    *,
+    sleep: float = 0.0,
+    marker: Path | None = None,
+):
+    """`toolrun.spawn_tool` remplacé par un Python qui imprime `text` puis sort avec `code`.
+
+    `marker` : fichier créé une fois le texte écrit (le test sait alors que la sortie existe).
+    """
     calls: list[tuple[str, tuple[str, ...], Path, Path]] = []
     real_spawn = procs.spawn
 
@@ -243,7 +258,10 @@ def _fake_tool(monkeypatch: pytest.MonkeyPatch, text: str, code: int, *, sleep: 
         calls.append((tool_id, tuple(args), cwd, venv))
         # Octets UTF-8 tels quels : pas de conversion des fins de ligne propre à Windows.
         script = f"import sys, time; sys.stdout.buffer.write({text.encode()!r}); "
-        script += f"sys.stdout.flush(); time.sleep({sleep}); sys.exit({code})"
+        script += "sys.stdout.flush(); "
+        if marker is not None:
+            script += f"open({str(marker)!r}, 'w').close(); "
+        script += f"time.sleep({sleep}); sys.exit({code})"
         return real_spawn([PYTHON, "-c", script], env=dict(os.environ), cwd=cwd, timeout=timeout)
 
     monkeypatch.setattr(toolrun, "spawn_tool", fake)
@@ -357,21 +375,63 @@ def test_outil_indisponible_renvoie_au_diagnostic(
     assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
 
 
-def test_ctrl_c_arrete_l_outil_sans_preuve(lint_box: Box, monkeypatch: pytest.MonkeyPatch) -> None:
-    _fake_tool(monkeypatch, "début\n", 0, sleep=60)
+def test_ctrl_c_arrete_l_outil_sans_preuve(
+    lint_box: Box, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    printed = tmp_path / "printed"
+    _fake_tool(monkeypatch, "début\n", 0, sleep=60, marker=printed)
     started = time.monotonic()
     op, future = lint_box.start("ruff check .")
     deadline = time.monotonic() + WAIT
-    while lint_box.engine.state != "command" and time.monotonic() < deadline:
-        time.sleep(0.02)
-    time.sleep(0.5)
-    assert lint_box.engine.interrupt()
+    # Le lancement d'un Python peut dépasser une demi-seconde sous Windows : on attend que
+    # l'outil ait écrit sa sortie, au lieu d'un délai fixe.
+    while not printed.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    while not lint_box.engine.interrupt() and time.monotonic() < deadline:
+        time.sleep(0.05)  # `on_interrupt` posé juste après le lancement
+    assert printed.exists() and time.monotonic() < deadline
     future.result(WAIT)
     mine = [e for e in lint_box.events if e.op_id == op.op_id]
     code = [e.payload["code"] for e in mine if e.kind == Kind.OP_EXIT][-1]
     assert code == terminal.EXIT_INTERRUPTED and time.monotonic() - started < 30
     text = "".join(e.payload["text"] for e in mine if e.kind == Kind.TERMINAL_OUTPUT)
     assert "début" in text and "Commande interrompue." in text
+    assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
+
+
+def test_ctrl_c_arrete_aussi_l_execution_machine(
+    lint_box: Box, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revue 7.2 : Ctrl+C pendant la relance machine arrête son arbre, sans liens ni preuve."""
+    real_spawn = procs.spawn
+    spawned: list[procs.Handle] = []
+
+    def fake(tool_id, args, *, cwd, venv, timeout, settings=None):  # noqa: ANN001, ANN202
+        # Première exécution : sortie humaine et échec ; seconde (machine) : très lente.
+        script = (
+            "import sys; print('src/inventory/rapport.py:3:8: F401'); sys.exit(1)"
+            if not spawned
+            else "import time; time.sleep(60)"
+        )
+        handle = real_spawn([PYTHON, "-c", script], env=dict(os.environ), cwd=cwd, timeout=timeout)
+        spawned.append(handle)
+        return handle
+
+    monkeypatch.setattr(toolrun, "spawn_tool", fake)
+    started = time.monotonic()
+    op, future = lint_box.start("ruff check .")
+    deadline = time.monotonic() + WAIT
+    while len(spawned) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert len(spawned) == 2 and lint_box.engine.interrupt()
+    future.result(WAIT)
+    assert wait_dead(spawned[1].pid) and time.monotonic() - started < 30
+    mine = [e for e in lint_box.events if e.op_id == op.op_id]
+    code = [e.payload["code"] for e in mine if e.kind == Kind.OP_EXIT][-1]
+    assert code == terminal.EXIT_INTERRUPTED
+    outputs = [e.payload for e in mine if e.kind == Kind.TERMINAL_OUTPUT]
+    assert all(not payload.get("spans") for payload in outputs)
+    assert "Commande interrompue." in "".join(payload["text"] for payload in outputs)
     assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
 
 
@@ -497,3 +557,38 @@ def test_vrais_outils_dans_le_terminal(
         assert barrier in [f["barrier_id"] for f in box.facts() if f["kind"] == "evidence_seen"]
     finally:
         box.manager.close()
+
+
+def test_secours_resynchronise_un_environnement_sans_l_outil(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revue 7.2 : venv créé mais `uv sync` en échec (outil absent) -> le secours retente."""
+    from types import SimpleNamespace
+
+    synced: list[Path] = []
+    monkeypatch.setattr(toolrun, "venv_python", lambda venv, *a: Path(PYTHON))
+    broken = toolrun.ToolStatus("ruff", "missing", "", None, None, "environnement abîmé")
+    monkeypatch.setattr(toolrun, "resolve", lambda tool_id, *a, **k: broken)
+
+    def fake_sync(project, venv, settings=None, **kwargs):  # noqa: ANN001, ANN202
+        synced.append(venv)
+        return procs.ProcResult(0)
+
+    monkeypatch.setattr(toolrun, "sync_environment", fake_sync)
+    layout = Layout(tmp_path / "ws")
+    ctx = SimpleNamespace(
+        layout=layout,
+        settings=Settings(data_dir=tmp_path / "data"),
+        interrupted=False,
+        on_interrupt=lambda callback: None,
+        output=lambda *a, **k: None,
+    )
+    command = _parse("ruff check .")
+    assert tools._prepare_environment(ctx, command, get_allowlist(Settings()))
+    assert synced == [toolrun.venv_dir(layout.root)]
+    # Outil présent et à jour : pas de resynchronisation.
+    synced.clear()
+    ok = toolrun.ToolStatus("ruff", "ok", "0.13.1", Path(PYTHON), "environment")
+    monkeypatch.setattr(toolrun, "resolve", lambda tool_id, *a, **k: ok)
+    assert tools._prepare_environment(ctx, command, get_allowlist(Settings()))
+    assert synced == []

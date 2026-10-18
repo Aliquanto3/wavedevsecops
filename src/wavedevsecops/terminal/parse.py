@@ -389,35 +389,35 @@ def check_tool(name: str, tokens: list[Token], allow: Allowlist) -> ToolCommand:
     def missing(option: str) -> Refused:
         return _tool_refuse(allow, allow.message("tool_missing_value", tool=name, option=option))
 
+    def take_value(option: str, index: int) -> int:
+        # Valeur séparée : jamais une option. pytest relit tous ses arguments à la recherche
+        # de `-p` avant de les analyser (`consider_preparse`) : `-k -p greffon` chargerait un
+        # greffon, comme `-- -p greffon` (le séparateur `--` est donc refusé, lui aussi).
+        if index >= len(rest) or rest[index].startswith("-"):
+            raise missing(option)
+        return index + 1
+
     options: set[str] = set()
     positionals: list[str] = []
-    after_separator = False
     i = 1 if spec.subcommands else 0
     while i < len(rest):
         token = rest[i]
         i += 1
-        if after_separator or not token.startswith("-") or token == "-":
+        if not token.startswith("-") or token == "-":
             positionals.append(token)
             continue
-        if token == "--":
-            after_separator = True
-            continue
-        if token.startswith("--"):
+        if token.startswith("--"):  # `--` lui-même n'est pas dans la liste : refusé
             option, equals, _ = token.partition("=")
             if option not in allowed:
                 raise unknown(option)
             options.add(option)
             if option in valued and not equals:
-                if i >= len(rest):
-                    raise missing(option)
-                i += 1
+                i = take_value(option, i)
             continue
         if token in allowed:  # option courte exacte (`-q`, `-x`, `-k`)
             options.add(token)
             if token in valued:
-                if i >= len(rest):
-                    raise missing(token)
-                i += 1
+                i = take_value(token, i)
             continue
         if token[:2] in valued:  # valeur collée : `-kmot`, `-rA`
             options.add(token[:2])

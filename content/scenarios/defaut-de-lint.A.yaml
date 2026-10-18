@@ -5,6 +5,7 @@ schema_version: 1
 scenario_id: defaut-de-lint
 mode: A
 title_text: Trouver un défaut de lint avant de committer
+section: stations
 station: 1
 tracks: [llm, no_ai]
 tools: [git, ruff]
