@@ -249,24 +249,23 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-18 22:46 · 6.6 · fusion · CI branche verte sur 6 jobs, fusion sur main (commit de fusion avec 2.7), story done ; 4 vérifications Ollama réel en attente d'Anaël · 430c980
 - 2026-10-18 22:46 · 2.7 · fusion · CI branche verte sur 6 jobs, fusion sur main, story done ; 2.10 attend encore 2.8 et 3.3 · fbcb3ef
 - 2026-10-18 22:01 · 9.2 · fusion · rebase sur 6860667 sans conflit, suite complète en cours · —
+- 2026-10-18 22:47 · 4.5 · second-avis · liste à transmettre au reviewer (session suivante) : H1 operations.py:410-418 + snapshots.py:_run_restore Recommencer refusée après restore_failed (garde quiz_altered toujours active, _rest pas remis à idle ; test test_quiz.py:277-288 ne pose pas _rest) ; H2 operations.py:410-418,556 + terminal/quiz.py:392-413 deux quiz_choice soumis avant la fin du premier passent la garde (contrôle seulement à submit), le second écrase run.json.quiz → empreinte ≠ après restore_state (prouvé par sonde) ; M3 terminal/quiz.py:405-416 save_run(quiz) avant _run_git et set_rest_state après → run.json.quiz posé mais _rest idle si git lève ; M4 quiz.js:558-559 + terminal/quiz.py:322-324 « score du premier coup conservé » mais seul run.json.quiz_first est écrit → brancher sur ProgressStore de 4.2 (fusionnée) ; M5 tests : cas réel de restore_failed et soumissions concurrentes non testés ; L6 restore_state encore admis après restore_failed ; L7 exemption setup saine ; L8 un op d'écriture déclaré writes=False contournerait la garde · 9c3119a
+- 2026-10-18 22:47 · — · arrêt propre · fin de session d'orchestration avant /clear ; reprise par une nouvelle session, cf. section « Reprise » · 63d065e
 
+## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
-## Reprise (arrêt propre du 2026-10-18 au soir)
+État au moment de l'arrêt : 25 stories `done` (Epic 1 ; 2.1 à 2.7 et 2.11 ; 3.1, 3.2 ; 4.1, 4.2, 4.3 ; 6.6 ; 7.1 ; 8.2 ; 9.1, 9.2). Aucun agent en cours. `main` à jour et poussé (63d065e).
 
-État au moment de l'arrêt : 17 stories `done` (Epic 1 complet ; 2.1, 2.2, 2.3, 2.4, 2.6, 2.11 ; 3.1 ; 7.1 ; 8.2 ; 9.1). Aucun agent en cours. `main` à jour et poussé.
-
-Branches poussées, à reprendre dans cet ordre (worktrees existants sous `.claude/worktrees/`) :
+Branche à reprendre en premier (worktree existant sous `.claude/worktrees/`) :
 
 | Story | Branche · SHA · worktree | Étape suivante |
 |---|---|---|
-| 4.1 | `story/4-1-validation-etape` · 972570d · agent-a535fad1a825cae82 | revue faite ; rebase sur main en conflit (engine/manager.py, engine/operations.py, web/static/js/store.js) → `dev-story` Opus finit le rebase, puis suite, CI, fusion |
-| 4.3 ★ | `story/4-3-instantanes` · 6087374 · agent-a6b5533367c657190 | `reviewer` Opus avec la liste du second avis (journal, ligne 4.3 second-avis : 2 high) |
-| 2.7 | `story/2-7-graphe-index` · c260d5b · agent-a0febc08b7b0b16dc | `reviewer` avec la liste du second avis (journal) |
-| 9.2 | `story/9-2-carte-chaine` · 10764e2 · agent-a9bb99c06018afe87 | `reviewer` avec la liste du second avis (journal) |
-| 6.6 | `story/6-6-execution-llm` · 6aecf4d · agent-afa1f14616fad8ee5 | après fusion de 4.3 : `reviewer` Opus rebase sur l'API d'instantanés de 4.3 (retirer son `engine/snapshots.py`), corrige la liste du second avis (journal, 1 high + 4 medium) et branche `toolrun.run_module` sur `procs.spawn` (2.4 fusionnée) |
+| 4.5 | `story/4-5-quiz-retablir` · 9c3119a · agent-af869e12ac1ac0300 | `reviewer` Opus avec la liste du second avis (journal, 2 high prouvés) ; rebase sur main (contient 4.2 : brancher le premier essai sur ProgressStore, API dans la spec 4.2 ; conflits probables operations.py, steps.py, store.js, workspace.js) |
 
-Éligibles à lancer ensuite (dépendances done) : 3.2, 3.5, 7.4 ★, 7.2, 2.5. Puis suivre les vagues.
+Éligibles à lancer ensuite (dépendances done) : 4.4 (crée l'intention `restart` déjà postée par 4.5 ; efface restore_failed, quiz, quiz_first), 3.3, 3.4, 3.5, 7.2, 7.4 ★, 2.8, 4.6, 4.7. Attention aux modules partagés : 3.3/3.4/3.5/7.4 touchent `github_sim` (une à la fois ou presque) ; 7.2 et 2.8 le terminal/wsfs ; 4.4, 4.6, 4.7 le moteur d'étapes (attendre la revue de 4.5 pour 4.4). Puis suivre les vagues.
 
-Points ouverts pour Anaël (rien ne bloque aujourd'hui) : httpx dans la table Stack ; `diagnostic_seen` dans AD-5 ; `dismiss_stale_reviews` (défaut false) ; tests sur vrai poste des installeurs (1.6, 1.7) ; 4 vérifications Ollama réel (6.6) ; rendu navigateur (2.3, 9.1, puis 2.7, 4.1, 9.2).
+Méthode qui a bien marché ce soir pour tenir le rythme : empiler les branches revues (rebase de chacune sur la précédente), pousser toutes les branches pour leurs CI en parallèle, suite complète locale une seule fois sur le sommet de pile, puis fusions en série.
 
-Suivi : `/agent-cost-kit:avancement-run` (plugin 0.6.0, actif après redémarrage de Claude Code). Branchement restant noté : crochet `terminal.AFTER_COMMAND_HOOKS` (push/pull/fetch) → `github_sim.refresh` (2.4 et 3.1 fusionnées, à faire par 3.2).
+Points ouverts pour Anaël (rien ne bloque) : httpx dans la table Stack ; `diagnostic_seen` dans AD-5 ; `dismiss_stale_reviews` (défaut false) ; 9.2 disponibilité des outils de la carte par sonde réelle (défaut gardé) ; 2.5 garde sur `rm -rf *` à la racine (défaut : accepté) ; tests sur vrai poste des installeurs (1.6, 1.7) ; vérifications Ollama réel (6.6, dont Ctrl+C pendant une réponse lente) ; rendu navigateur (2.3, 9.1, 2.7 tracé des arêtes et troncature, 4.1, 9.2, 2.5).
+
+Suivi : `/agent-cost-kit:avancement-run` (plugin 0.6.4 : sans détail par story quand il y a des epics, barres █░ ; actif après redémarrage de Claude Code).
