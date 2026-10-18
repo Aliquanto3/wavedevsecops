@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ruff + pytest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Installer Python 3.14 et les dépendances (uv.lock figé)
+        run: uv sync --locked
+
+      - name: ruff
+        run: uv run ruff check .
+
+      # Contient les contrôles d'AD-13 (imports réseau, URL de static/, hook d'audit
+      # socket.connect), les règles de dépendance d'AD-1 et la cohérence des versions d'AD-16.
+      - name: pytest
+        run: uv run pytest -q --tb=short

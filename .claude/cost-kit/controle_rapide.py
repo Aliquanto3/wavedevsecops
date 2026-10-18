@@ -25,7 +25,7 @@ from pathlib import Path
 #   ["uv", "run", "mypy"],
 #   ["npm", "run", "lint"],
 COMMANDES: list[list[str]] = [
-    # À compléter une fois la stack choisie (lint, format, typage ; < 10 s, jamais la suite complète).
+    ["uv", "run", "ruff", "check", "."],
 ]
 MAX_LIGNES_PAR_COMMANDE = 40
 
