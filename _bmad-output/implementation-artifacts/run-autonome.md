@@ -419,6 +419,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 05:50 · 5.5, 6.4, 2.10 · fusion · empilées sur main dans cet ordre (2.10 : conflit projections/__init__.py, annotate + linker de 7.4, résolu par l'orchestrateur), ruff vert, trois branches poussées ; suite complète unique du sommet et CI en cours · —
 - 2026-10-19 05:50 · — · proposition · la suite complète locale dure maintenant ~60 min (7 min en début de soirée) et bride les fusions : pytest-xdist (accord d'Anaël sur la table Stack) ou un découpage des tests lents · —
 - 2026-10-19 05:51 · 7.5 · dev · lancé (dev-story Sonnet ; 7.4 done, premier scénario pipeline: true) · —
+- 2026-10-19 06:02 · 7.3 · review · rebase (fingerprints régénéré, 18 empreintes stables), M2 (--no-verify refusé), M3 et M4 (hooks.config_problem : seul repo local gitleaks ou uv, meta), medium trouvé en revue (entry quelconque) corrigés ; H1 : sans -v gitleaks n'affiche pas le secret, test rendu strict ; L5, L6 écartés ; M3 partiel reporté (condition de contenu) ; 1358 passed, CI branche verte · 1644ea3
+- 2026-10-19 06:02 · — · décision pour Anaël · 7.3 : --no-verify et config de hooks modifiée refusés ; un futur scénario où l'apprenant écrit sa config devra assouplir config_problem · —
+- 2026-10-19 06:02 · 7.3 · fusion · empilée sur 2.10 (conflits d'ajout toolrun imports et terminal.js markSpans/appendWithLinks, résolus par l'orchestrateur) ; suite complète unique relancée sur le sommet de pile 5.5 + 6.4 + 2.10 + 7.3 · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
