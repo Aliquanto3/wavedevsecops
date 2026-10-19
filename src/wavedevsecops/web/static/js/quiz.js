@@ -4,6 +4,7 @@
 // l'interface et ce que l'apprenant a coché.
 import { bindAction } from "./actions.js";
 import { el, richText } from "./dom.js";
+import { RESTARTING_TEXT } from "./restart.js";
 
 export const CHOOSE_TEXT = "Choisissez une commande.";
 export const RUN_LABEL = "Exécuter ma réponse";
@@ -125,7 +126,7 @@ export function restoreFailedNotice(onRestart) {
 /** Texte de la région `role="status"` pour le quiz ; "" quand il n'y a rien à dire. */
 export function quizStatus(state) {
   const altered = state.stepPanel && state.stepPanel.quiz_altered;
-  if (state.engineState === "restoring") return RESTORING_TEXT;
+  if (state.engineState === "restoring") return state.restarting ? RESTARTING_TEXT : RESTORING_TEXT;
   if (altered && !state.stepPanel.restore_failed) {
     return `${BANNER_PREFIX}${altered.command_text.replaceAll("`", "")}`;
   }
@@ -172,7 +173,7 @@ export function createQuizBanner({ store, inertTargets, onRestored }) {
       if (visible) {
         const command = altered ? altered.command_text : "";
         text.replaceChildren();
-        if (restoring) text.textContent = RESTORING_TEXT;
+        if (restoring) text.textContent = state.restarting ? RESTARTING_TEXT : RESTORING_TEXT;
         else {
           text.append(BANNER_PREFIX);
           const code = el("code", "quiz-command");

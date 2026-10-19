@@ -27,6 +27,8 @@ function initial() {
     announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
     projectedOp: null, // op_id de la dernière state_projected (seconde projection d'une op)
     restored: false, // vrai entre un rétablissement réussi et la commande suivante
+    restarted: false, // vrai entre un « Recommencer » réussi et la commande suivante
+    restarting: false, // vrai pendant l'opération « Recommencer » (texte d'attente propre)
     hintNotice: "", // annonce du serveur quand la solution se débloque ; vidée à l'action suivante
   };
 }
@@ -173,10 +175,14 @@ export function createStore() {
       if (envelope.kind === "engine_state") {
         patch.engineState = payload.state;
         patch.reasonText = payload.reason_text || "";
+        if (payload.state !== "restoring") patch.restarting = false;
         if (payload.state === "command") {
           patch.restored = false;
+          patch.restarted = false;
           patch.hintNotice = "";
         }
+      } else if (envelope.kind === "op_started") {
+        patch.restarting = payload.intent === "restart";
       } else if (envelope.kind === "state_projected") {
         const problems = [];
         const fingerprint = payload.fingerprint || "";
@@ -217,6 +223,14 @@ export function createStore() {
       } else if (envelope.kind === "progress_updated") {
         // Le bilan est écrit par le serveur : à la fin du scénario, on relit l'état pour l'avoir.
         if ((payload.facts || []).includes("scenario_completed")) return "resync";
+        if ((payload.facts || []).includes("scenario_restarted")) {
+          // Remise à zéro (4.4) : l'ancien verdict et l'ancien bilan n'ont plus cours ; le panneau
+          // est relu auprès du serveur (`connectWorkspace`), qui écrit l'étape 1 sans bilan.
+          patch.restarted = true;
+          patch.verdict = null;
+          patch.errorText = "";
+          patch.hintNotice = "";
+        }
       } else if (envelope.kind === "step_explanation") {
         patch.stepPanel = explainStep(state.stepPanel, payload);
       } else if (envelope.kind === "quiz_altered" && state.stepPanel) {
@@ -289,7 +303,16 @@ export function connectWorkspace(store, workspaceId, options = {}) {
    * indices de la suivante) et la fin d'une action (un essai peut débloquer la solution). */
   function needsRefresh(envelope) {
     const panel = store.state.stepPanel;
-    if (!panel || !panel.has_hints) return false;
+    if (!panel) return false;
+    // « Recommencer » (4.4) : le panneau repart de l'étape 1, sans bilan. Une seconde fin de
+    // scénario n'ajoute aucun fait (le premier passage fait foi) : le bilan se relit au verdict.
+    if (envelope.kind === "progress_updated") {
+      return (envelope.payload?.facts || []).includes("scenario_restarted");
+    }
+    if (envelope.kind === "step_verdict" && envelope.payload?.status === "passed") {
+      if (!envelope.payload.next_step_id) return true;
+    }
+    if (!panel.has_hints) return false;
     if (envelope.kind === "hint_opened") return true;
     if (envelope.kind === "step_verdict") return envelope.payload?.status === "passed";
     if (envelope.kind === "engine_state") {

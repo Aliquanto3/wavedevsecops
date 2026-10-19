@@ -41,6 +41,7 @@ from wavedevsecops.scenarios import (
     load_scenario,
     scenario_files,
 )
+from wavedevsecops.scenarios.loader import content_hash
 from wavedevsecops.scenarios.order import catalogue_rank, section_of
 from wavedevsecops.scenarios.steps import StepContext
 from wavedevsecops.wsfs import Layout
@@ -55,6 +56,11 @@ MODE_TEXTS = {
 
 
 NO_NEXT_TEXT = "Aucun autre scénario n'est disponible pour l'instant."
+CONTENT_CHANGED_TEXT = (
+    "Ce scénario a été mis à jour depuis l'ouverture de votre espace : ses étapes ne "
+    "correspondent plus. Recommencez-le pour repartir du contenu à jour ; votre score du "
+    "premier coup est conservé."
+)
 
 
 def _state_from_views(views: dict[str, Any] | None) -> RepoState | None:
@@ -84,6 +90,7 @@ class StepRunner:
         self._settings = settings
         self._progress = progress
         self._cache: dict[Path, tuple[tuple[int, int], Scenario | None]] = {}
+        self._hashes: dict[Path, tuple[tuple[int, int], str]] = {}
 
     def scenario(self, run: dict[str, Any]) -> Scenario | None:
         """Scénario de l'espace (relu quand son fichier change) ; `None` s'il n'existe plus ou
@@ -110,6 +117,34 @@ class StepRunner:
             cached = (stamp, scenario)
             self._cache[path] = cached
         return cached[1]
+
+    def _content_changed(self, run: dict[str, Any], scenario: Scenario) -> dict[str, str] | None:
+        """Encart « Recommencer » quand le contenu du scénario a changé de façon incompatible
+        depuis l'ouverture de l'espace (AD-20) : ses étapes ne sont plus celles de `run.json`.
+        Une retouche de texte qui garde les étapes ne déclenche rien."""
+        recorded = run.get("content_hash")
+        if not isinstance(recorded, str):
+            return None
+        path = self._settings.scenarios_path() / f"{scenario.scenario_id}.{scenario.mode}.yaml"
+        try:
+            info = path.stat()
+            stamp = (info.st_mtime_ns, info.st_size)
+            cached = self._hashes.get(path)
+            if cached is None or cached[0] != stamp:
+                cached = (stamp, content_hash(path.read_bytes().decode("utf-8")))
+                self._hashes[path] = cached
+        except (OSError, UnicodeDecodeError):
+            return None
+        if cached[1] == recorded:
+            return None
+        ids = [s.step_id for s in scenario.steps]
+        known = run.get("step_ids")
+        if isinstance(known, list):
+            incompatible = known != ids
+        else:  # espace antérieur à `step_ids` : les étapes citées par `run.json` doivent exister
+            cited = [run.get("step_id"), *(run.get("validated") or [])]
+            incompatible = any(c and c not in ids for c in cited)
+        return {"text": CONTENT_CHANGED_TEXT} if incompatible else None
 
     def _run(self, layout: Layout) -> dict[str, Any] | None:
         return load_run(layout) if layout.run_json.exists() else None
@@ -379,6 +414,7 @@ class StepRunner:
             "restore_failed": {"reason_text": str(failed.get("reason_text") or "")}
             if isinstance(failed, dict)
             else None,
+            "content_changed": self._content_changed(run, scenario),
             "title_text": scenario.title_text,
             "mode": scenario.mode,
             "mode_text": MODE_TEXTS[scenario.mode],

@@ -23,7 +23,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from wavedevsecops.progress import FILENAME, _read_json, ensure_progress, write_json_atomic
 
 FactKind = Literal[
-    "step_validated", "quiz_first_attempt", "hint_opened", "scenario_completed", "evidence_seen"
+    "step_validated",
+    "quiz_first_attempt",
+    "hint_opened",
+    "scenario_completed",
+    "scenario_restarted",
+    "evidence_seen",
 ]
 ScenarioState = Literal["todo", "in_progress", "done"]
 
@@ -64,6 +69,8 @@ class Fact(BaseModel):
             return (*base, self.barrier_id)
         if self.kind == "hint_opened":
             return (*base, self.step_id, self.tier)
+        if self.kind == "scenario_restarted":
+            return (*base, self.op_id)  # un fait par remise à zéro (story 4.4)
         return (*base, self.step_id)
 
 

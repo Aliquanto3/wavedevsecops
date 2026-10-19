@@ -75,8 +75,15 @@ console.log(JSON.stringify({ order, count: text(".step-count"), badge: text(".mo
         "scenario-body",
         "scenario-status",
         "scenario-error",
+        "scenario-error-link",
     ]
-    assert out["order"] == ["mode-row", "mode-text", "step-progress-nav", "step-instruction"]
+    assert out["order"] == [
+        "mode-row",
+        "mode-text",
+        "step-progress-nav",
+        "step-instruction",
+        "restart-foot",
+    ]
     assert out["count"] == "Étape 1 sur 2"
     assert out["badge"] == "Mode A"
     assert out["info"] == "false"
@@ -121,7 +128,7 @@ console.log(JSON.stringify({ afterVerdict, count: text(".step-count"), title: te
     assert out["count"] == "Étape 2 sur 2"
     assert out["title"] == "Faire un commit"
     assert out["explanation"] == "Une branche est un pointeur."
-    assert out["order"][-2:] == ["step-instruction", "step-explanation"]
+    assert out["order"][-3:] == ["step-instruction", "step-explanation", "restart-foot"]
     assert out["segments"] == [["done", None, None], ["current", None, "step"]]
     assert out["status"] == "Étape réussie. Étape 2 sur 2 : Faire un commit."
 
