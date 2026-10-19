@@ -407,6 +407,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:58 · 9.3 · second-avis · aucun high, 3 medium (STATION_ORDER en dur sans garde-fou, cartes de station sans Reprendre de 6.4, conflits avec 6.4), 7 low ; reviewer Opus lancé (rebase sur 6.4) · —
 - 2026-10-19 04:58 · 5.5 · fusion · rebase de fond par dev-story Opus sur 6.2 (scenario.js, workspace.css ; un seul Recommencer au pied du panneau via la confirmation de 4.4 ; test de correction sur la vraie intention restart), 71 tests ciblés, suite complète en lots 1342 passed / 46 skipped ; branche poussée, CI en cours · 99651a8
 - 2026-10-19 04:58 · 5.4 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction) · —
+- 2026-10-19 05:07 · 2.10 · review · rebase (workspace.js : deux imports gardés), M2 (tool-output allume le fichier cité et terminal-lit), L6, L7, L8 (4 explications corrigées), écouteur click fuyant corrigés ; M3, L4, L5, L9, L10 écartés ; « i » des étiquettes de refs du graphe reporté ; 1337 passed, CI branche verte · de70a74
+- 2026-10-19 05:07 · — · décision pour Anaël · 2.10 : placement du « i » des étiquettes de refs dans le graphe (pas de bouton dans le bouton du commit) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
