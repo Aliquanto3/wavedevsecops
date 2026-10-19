@@ -88,7 +88,8 @@ steps:
       ligne et la règle. Ouvrez aussi « Voir la sortie » pour lire le rapport complet de bandit.
     explanation_text: >-
       bandit est un outil d'analyse statique (SAST) : il lit le code sans l'exécuter et
-      reconnaît les appels dangereux. Ici, `eval` exécuterait n'importe quel texte saisi par
+      reconnaît les appels dangereux. Le job analyse le code de l'application, le dossier
+      `src/` (pas les tests), et refuse les exemptions `# nosec`. Ici, `eval` exécuterait n'importe quel texte saisi par
       l'utilisateur. Le check est obligatoire : tant qu'il échoue, la PR ne peut pas être
       mergée, et `main` reste protégée.
     head: feature

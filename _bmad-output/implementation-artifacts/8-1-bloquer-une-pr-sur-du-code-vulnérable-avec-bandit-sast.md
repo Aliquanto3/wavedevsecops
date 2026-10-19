@@ -35,3 +35,19 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 8.1 » ; F
 
 1. Pousser `feature`, ouvrir la PR : le check bandit passe à « Échec · Obligatoire », la ligne de détail désigne `src/inventory/alertes.py:6` et B307, « Merger » est inactif.
 2. Corriger (`ast.literal_eval`), committer, pousser : le check repasse au vert sans autre action.
+
+## Revue
+
+Rebasée sur `story/7-6-pipeline-trois-ci` (dee2751) ; seul conflit : `content/fingerprints.json`, régénéré.
+
+- High · second avis 1 · corrigé : `code-vulnerable` absent de `STATION_ORDER` (test du catalogue rouge). Ajouté en station 3, avec les identifiants de la station 2 de 7.5 (même écriture que 7.5 : la fusion se résout en gardant cette version) ; test du catalogue tolérant au nombre de stations (groupes triés, ordre interne, station 3 nommée).
+- High · second avis 2 · corrigé : job `bandit` absent des 6 fichiers CI des gabarits (test_pipeline_files rouge après rebase). Blocs `wds:job bandit` ajoutés (GitHub `needs: gitleaks`, Jenkins, GitLab avec son étape), en-têtes « quatre tâches ».
+- Medium · second avis 3 · corrigé : `# nosec` faisait passer le check (vérifié avec bandit 1.9.4 : code 0). `--ignore-nosec` dans la sortie humaine et machine, et dans les gabarits ; test sur le vrai bandit.
+- Medium · second avis 4 · corrigé : un fichier à la syntaxe cassée est sauté par bandit avec le code 0 (vérifié), check vert sans constat. `parse_bandit_json` lit `errors` (constat `unscanned_file`), l'exécution machine tourne aussi sur un succès (`when: always`), et `ci.run_job` change un succès portant ce constat en échec ; tests du lecteur et de `run_job` sur le vrai bandit.
+- Low · second avis 5 · corrigé : portée `-r src` expliquée dans pipeline.yaml, dans le commentaire des gabarits et dans l'explication de l'étape « lire le blocage ».
+- Low · second avis 6 · corrigé : empreintes régénérées après rebase (stables sur deux passes).
+- Low · second avis 7 · reporté : une exécution machine qui rend une liste vide sur un échec ne donne pas la ligne « détail non lu ». Sans effet ici (bandit en échec a toujours un résultat) ; la corriger dans `run_job` demande de compter sur l'ensemble des exécutions machine d'un job (8.3/8.4 en ajoutent plusieurs).
+- Low · revue · reporté : un fichier `src/.bandit` (`skips: B307` ou `exclude`) est lu par bandit et fait passer le check (vérifié). Le fermer demande un `--ini` hors de l'arbre (jeton à ajouter côté `ci`) ; geste peu probable pour l'apprenant. De même, déplacer le code hors de `src/` échappe à `-r src`.
+- Medium · revue · corrigé : après rebase, deux tests de 7.6 prenaient `bandit` pour un check hors du pipeline (test_pipeline_files, test_pipeline_tabs_dom) ; ils utilisent désormais un check `revue_manuelle` et comptent bandit parmi les tâches.
+- Low · revue · rejeté : supprimer `alertes.py` fait repasser le check au vert ; c'est un correctif légitime du défaut, pas un contournement du SAST.
+- Complexité : 0 constat (lecteur et règle `unscanned_file` linéaires sur les constats d'un job).

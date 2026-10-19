@@ -8,13 +8,14 @@ préparé par le scénario : il refuse `eval`, puis accepte la correction.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from wavedevsecops import ci, github_sim
+from wavedevsecops import ci, github_sim, procs, toolrun
 from wavedevsecops.ci import findings as parsers
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts.github import Check, GithubState, PullRequest
@@ -79,9 +80,15 @@ def test_le_lecteur_bandit_tire_fichier_ligne_regle_du_json(tmp_path: Path) -> N
         parsers.parse_bandit_json("[]", tmp_path)
 
 
-def _bandit(tree: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+JOB = ci.load_pipeline(Settings()).job("bandit")
+
+
+def _bandit(tree: Path, *, machine: bool = False) -> subprocess.CompletedProcess[str]:
+    """Le vrai bandit avec l'argv de content/pipeline.yaml (sortie humaine ou machine)."""
+    assert JOB is not None
+    argv = JOB.machine[0].argv if machine else JOB.human
     return subprocess.run(  # noqa: S603 - bandit épinglé de l'environnement de développement
-        [sys.executable, "-m", "bandit", "-r", "src", "-q", *extra],
+        [sys.executable, "-m", "bandit", *argv],
         cwd=tree,
         capture_output=True,
         text=True,
@@ -89,17 +96,21 @@ def _bandit(tree: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_le_vrai_bandit_refuse_eval_puis_accepte_la_correction(
-    tmp_path: Path, git_path: Path
-) -> None:
+def _prepared_tree(tmp_path: Path, git_path: Path) -> Path:
     prepared = prepare_workspace(
         load_scenario(SCENARIO, Settings()),
         "no_ai",
         settings=Settings(data_dir=tmp_path),
         git_path=git_path,
     )
-    tree = prepared.layout.repo
-    refused = _bandit(tree, "-f", "json")
+    return prepared.layout.repo
+
+
+def test_le_vrai_bandit_refuse_eval_puis_accepte_la_correction(
+    tmp_path: Path, git_path: Path
+) -> None:
+    tree = _prepared_tree(tmp_path, git_path)
+    refused = _bandit(tree, machine=True)
     assert refused.returncode == 1, refused.stderr
     (found,) = parsers.parse_bandit_json(refused.stdout, tree)
     assert (found.rule_id, found.path, found.line) == ("B307", FILE, 6)
@@ -111,9 +122,55 @@ def test_le_vrai_bandit_refuse_eval_puis_accepte_la_correction(
         "    return ast.literal_eval(texte)\n",
         "utf-8",
     )
-    accepted = _bandit(tree, "-f", "json")
+    accepted = _bandit(tree, machine=True)
     assert accepted.returncode == 0, accepted.stdout
     assert parsers.parse_bandit_json(accepted.stdout, tree) == []
+
+
+@pytest.mark.slow
+def test_une_exemption_nosec_ne_fait_pas_passer_le_check(tmp_path: Path, git_path: Path) -> None:
+    """Revue 8.1 : `# nosec` ferait sauter la ligne à bandit ; le job refuse les exemptions."""
+    tree = _prepared_tree(tmp_path, git_path)
+    text = (tree / FILE).read_text("utf-8").replace("eval(texte)", "eval(texte)  # nosec")
+    (tree / FILE).write_text(text, "utf-8")
+    assert _bandit(tree).returncode == 1
+    (found,) = parsers.parse_bandit_json(_bandit(tree, machine=True).stdout, tree)
+    assert found.rule_id == "B307"
+
+
+@pytest.mark.slow
+def test_un_fichier_illisible_fait_echouer_le_check(
+    tmp_path: Path, git_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Revue 8.1 : bandit saute un fichier à la syntaxe cassée et sort 0 ; `ci` en fait un échec,
+    avec un constat qui nomme le fichier."""
+    tree = _prepared_tree(tmp_path, git_path)
+    (tree / FILE).write_text("def seuil_depuis_texte(texte:\n", "utf-8")
+    assert _bandit(tree).returncode == 0  # le comportement de bandit que `ci` corrige
+    real_spawn = procs.spawn
+
+    def spawn_bandit(tool_id, args, *, cwd, venv, timeout, settings=None):  # noqa: ANN001, ANN202
+        assert tool_id == "bandit"
+        return real_spawn(
+            [sys.executable, "-m", "bandit", *args], env=dict(os.environ), cwd=cwd, timeout=timeout
+        )
+
+    monkeypatch.setattr(toolrun, "spawn_tool", spawn_bandit)
+    assert JOB is not None
+    result = ci.run_job(
+        JOB, tree=tree, venv=None, tokens={"repo": str(tree)}, settings=Settings(data_dir=tmp_path)
+    )
+    assert result.state == "failure"
+    assert [(f.rule_id, f.path) for f in result.findings] == [(parsers.UNSCANNED_RULE, FILE)]
+    assert "n'a pas pu analyser" in result.findings[0].message_text
+    # Le fichier corrigé : le check repasse au vert, sans constat.
+    (tree / FILE).write_text(
+        "def seuil_depuis_texte(texte: str) -> int:\n    return int(texte)\n", "utf-8"
+    )
+    result = ci.run_job(
+        JOB, tree=tree, venv=None, tokens={"repo": str(tree)}, settings=Settings(data_dir=tmp_path)
+    )
+    assert (result.state, result.findings) == ("success", [])
 
 
 # ------------------------------------------------------------------ étape de PR et checks
@@ -168,3 +225,22 @@ def test_l_etape_refuse_un_job_id_invalide() -> None:
             head="feature",
             checks={"Bandit-1": "failure"},
         )
+
+
+def test_le_lecteur_bandit_signale_les_fichiers_non_analyses(tmp_path: Path) -> None:
+    text = json.dumps(
+        {
+            "errors": [
+                {"filename": str(tmp_path / "src" / "b.py"), "reason": "syntax error"},
+                "inattendu",
+            ],
+            "results": [],
+        }
+    )
+    (found,) = parsers.parse_bandit_json(text, tmp_path)
+    assert (found.rule_id, found.path, found.severity) == (
+        parsers.UNSCANNED_RULE,
+        "src/b.py",
+        "error",
+    )
+    assert "syntax error" in found.message_text

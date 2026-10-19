@@ -27,8 +27,20 @@ absent du catalogue ; un scénario absent de cette liste vient après, par ordre
 STATIONS_SECTION = "stations"
 """Section des scénarios de station (Story 9.3) ; elle vient après le socle git."""
 
-STATION_ORDER: tuple[str, ...] = ("defaut-de-lint", "test-casse", "secret-dans-un-commit")
-"""Ordre conseillé des scénarios de station, à l'intérieur d'une station, par `scenario_id`."""
+STATION_ORDER: tuple[str, ...] = (
+    # Station 1 · Poste local
+    "defaut-de-lint",
+    "test-casse",
+    "secret-dans-un-commit",
+    # Station 2 · PR et CI (story 7.5)
+    "check-en-echec",
+    "pr-sans-revue",
+    "push-direct-main",
+    # Station 3 · Sécurité et qualité (story 8.1)
+    "code-vulnerable",
+)
+"""Ordre conseillé des scénarios de station, par `scenario_id` (station 1, puis 2, puis 3). Un
+identifiant pas encore livré est absent du catalogue."""
 
 
 def section_of(section: str | None) -> str:
