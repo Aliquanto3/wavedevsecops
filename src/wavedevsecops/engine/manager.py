@@ -50,7 +50,7 @@ from wavedevsecops.engine.workspace import prepare_workspace, resolve_git
 from wavedevsecops.events import EngineStateName, EventLog, ExternalChange, Kind
 from wavedevsecops.gitio import Git
 from wavedevsecops.progress.facts import ProgressStore
-from wavedevsecops.scenarios import LoadedScenario
+from wavedevsecops.scenarios import LoadedScenario, Scenario
 from wavedevsecops.scenarios.model import KEBAB_PATTERN, Mode, Track
 from wavedevsecops.wsfs import Layout
 
@@ -228,15 +228,17 @@ class WorkspaceManager:
         watch: bool = True,
         git_path: Path | None = None,
         osv_url: str = "",
+        blockers: Callable[[Scenario], dict[str, Any] | None] | None = None,
     ) -> None:
         """`watch=False` : aucun surveillant (tests) ; `watcher_factory` remplace `TreeWatcher`.
-        `osv_url` : point OSV local du serveur, jeton `{osv_url}` du pipeline (AD-11)."""
+        `osv_url` : point OSV local du serveur, jeton `{osv_url}` du pipeline (AD-11).
+        `blockers` : encart « Ce qui l'aurait bloqué » d'un scénario, fourni par le web (5.9)."""
         self.settings = settings
         self._osv_url = osv_url
         self.boot_id = boot_id or secrets.token_hex(8)
         self._git_path = git_path
         self._progress = ProgressStore.for_dir(settings.resolved_data_dir())
-        self._steps = StepRunner(settings, self._progress)
+        self._steps = StepRunner(settings, self._progress, blockers)
         self._projector = self._steps.designating(projector or repo_projector(settings, git_path))
         self._refresh_github = github_refresher(settings, git_path)
         self._validator = validator or self._steps.validate

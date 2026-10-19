@@ -1,6 +1,6 @@
 # Scénario B « add / commit » (Story 5.6) : l'agent a committé un fichier de secrets `.env`.
 # Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
-# L'encart « Ce qui l'aurait bloqué » (gitleaks) arrive avec les stories 8.x.
+# L'encart « Ce qui l'aurait bloqué » (gitleaks) est déclaré en fin de fichier (`blocked_by`).
 schema_version: 1
 scenario_id: add-commit
 mode: B
@@ -107,3 +107,10 @@ steps:
       solution_text: >-
         git reset --soft HEAD~1, puis git rm --cached .env, puis echo ".env" >> .gitignore,
         puis git add .gitignore, puis git commit -m "Ajoute la configuration de l'API"
+
+# Fin du scénario : l'encart « Ce qui l'aurait bloqué » (story 5.9).
+blocked_by:
+  - barrier_id: secret-scan
+    station: 1
+    scenario_id: secret-dans-un-commit
+    reason_text: "gitleaks lit les fichiers de l'index avant chaque commit et refuse celui qui contient une clé comme celle du fichier `.env`."

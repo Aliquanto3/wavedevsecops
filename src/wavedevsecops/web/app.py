@@ -34,6 +34,7 @@ from wavedevsecops.engine import (
     pr_intents,
     restart,
 )
+from wavedevsecops.web.blockers import blockers_body
 from wavedevsecops.web.catalogue import install_catalogue_routes
 from wavedevsecops.web.code import install_code_routes
 from wavedevsecops.web.exercise import register_exercise_intent
@@ -226,7 +227,11 @@ def create_app(
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
     register_exercise_intent()
-    workspaces = workspaces or WorkspaceManager(settings, osv_url=settings.osv_url(port))
+    workspaces = workspaces or WorkspaceManager(
+        settings,
+        osv_url=settings.osv_url(port),
+        blockers=lambda scenario: blockers_body(scenario, settings, milestone),
+    )
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)
     install_code_routes(app, workspaces)

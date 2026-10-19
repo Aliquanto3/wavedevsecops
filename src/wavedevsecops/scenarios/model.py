@@ -8,6 +8,7 @@ sans changer les scénarios existants.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,6 +49,21 @@ StepSpec = step_union()
 """Une étape : un type du registre `scenarios/steps/`, discriminé par `type` (AD-7)."""
 
 
+class Blocker(BaseModel):
+    """Une barrière qui aurait bloqué l'erreur de l'agent (encart de fin de scénario B, 5.9)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    barrier_id: str = Field(pattern=KEBAB_PATTERN)
+    """Barrière de `content/chain.yaml` (le lint de contenu refuse une barrière inconnue)."""
+    station: int = Field(ge=1, le=4)
+    """Station de la barrière ; le lint vérifie qu'elle est bien celle de la chaîne."""
+    scenario_id: str = Field(pattern=KEBAB_PATTERN)
+    """Scénario (mode A) qui fait jouer la barrière ; il doit exister au catalogue."""
+    reason_text: str = Field(min_length=1)
+    """Une phrase : pourquoi cette barrière aurait arrêté l'erreur (texte affiché)."""
+
+
 class Scenario(BaseModel):
     """Un scénario `content/scenarios/<scenario_id>.<mode>.yaml`."""
 
@@ -76,6 +92,9 @@ class Scenario(BaseModel):
     avec leurs stories."""
     setup: list[SetupOp] = Field(default_factory=list)  # type: ignore[valid-type]
     steps: list[StepSpec] = Field(default_factory=list)  # type: ignore[valid-type]
+    blocked_by: list[Blocker] = Field(default_factory=list)
+    """« Ce qui l'aurait bloqué » : barrières listées à la fin du scénario, après la correction.
+    Facultatif ; vide, aucun encart."""
 
     @property
     def key(self) -> str:
@@ -83,10 +102,48 @@ class Scenario(BaseModel):
         return f"{self.scenario_id}.{self.mode}"
 
     def semantic_errors(
-        self, tool_ids: set[str] | None = None, explain_keys: set[str] | None = None
+        self,
+        tool_ids: set[str] | None = None,
+        explain_keys: set[str] | None = None,
+        barriers: Mapping[str, int] | None = None,
+        scenario_ids: set[str] | None = None,
     ) -> list[tuple[tuple, str]]:
-        """Règles entre champs : `(chemin du champ, message)` pour chaque écart."""
+        """Règles entre champs : `(chemin du champ, message)` pour chaque écart.
+
+        `barriers` : barrière de la chaîne -> numéro de sa station ; `scenario_ids` : scénarios du
+        catalogue. Les deux vérifient `blocked_by` quand ils sont fournis."""
         errors: list[tuple[tuple, str]] = []
+        seen_barriers: set[str] = set()
+        for index, blocker in enumerate(self.blocked_by):
+            where = ("blocked_by", index)
+            if blocker.barrier_id in seen_barriers:
+                errors.append(
+                    ((*where, "barrier_id"), f"barrière « {blocker.barrier_id} » en double")
+                )
+            seen_barriers.add(blocker.barrier_id)
+            if barriers is not None:
+                if blocker.barrier_id not in barriers:
+                    errors.append(
+                        (
+                            (*where, "barrier_id"),
+                            f"barrière inconnue de la chaîne : « {blocker.barrier_id} »",
+                        )
+                    )
+                elif barriers[blocker.barrier_id] != blocker.station:
+                    errors.append(
+                        (
+                            (*where, "station"),
+                            f"la barrière « {blocker.barrier_id} » est en station "
+                            f"{barriers[blocker.barrier_id]}, non {blocker.station}",
+                        )
+                    )
+            if scenario_ids is not None and blocker.scenario_id not in scenario_ids:
+                errors.append(
+                    (
+                        (*where, "scenario_id"),
+                        f"scénario inconnu du catalogue : « {blocker.scenario_id} »",
+                    )
+                )
         seen_tracks: set[str] = set()
         for index, track in enumerate(self.tracks):
             if track in seen_tracks:

@@ -88,9 +88,16 @@ def _public_quiz(quiz: Any) -> dict[str, Any] | None:
 class StepRunner:
     """Valide l'étape courante des espaces et décrit leur panneau Scénario."""
 
-    def __init__(self, settings: Settings, progress: ProgressStore | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        progress: ProgressStore | None = None,
+        blockers: Callable[[Scenario], dict[str, Any] | None] | None = None,
+    ) -> None:
+        """`blockers` : encart « Ce qui l'aurait bloqué » d'un scénario (écrit côté web, AD-1)."""
         self._settings = settings
         self._progress = progress
+        self._blockers = blockers
         self._cache: dict[Path, tuple[tuple[int, int], Scenario | None]] = {}
         self._hashes: dict[Path, tuple[tuple[int, int], str]] = {}
 
@@ -395,6 +402,16 @@ class StepRunner:
         summary["next_none_text"] = NO_NEXT_TEXT
         return summary
 
+    def _blockers_of(self, scenario: Scenario) -> dict[str, Any] | None:
+        """Encart « Ce qui l'aurait bloqué » du scénario terminé ; `None` s'il n'en a pas."""
+        if self._blockers is None or not scenario.blocked_by:
+            return None
+        try:
+            return self._blockers(scenario)
+        except Exception:  # noqa: BLE001 - un encart illisible ne bloque pas le panneau
+            log.exception("Encart des barrières de %s", scenario.key)
+            return None
+
     # --------------------------------------------------------------- panneau
     def panel(self, engine: WorkspaceEngine) -> dict[str, Any] | None:
         """Panneau Scénario de l'espace : `None` si l'espace n'a pas d'étape."""
@@ -442,4 +459,5 @@ class StepRunner:
             "current_step_id": current if position < len(ids) else "",
             "steps": steps,
             "summary": self._summary(run, scenario) if not current else None,
+            "blockers": self._blockers_of(scenario) if not current else None,
         }
