@@ -35,7 +35,6 @@ class GlossaryUi(_Strict):
     play_text: str
     soon_text: str
     named_only_text: str
-    trace_title: str
     none_text: str
     close_text: str
 
@@ -120,6 +119,8 @@ def glossary_body(settings: Settings | None = None) -> dict[str, Any]:
         if term.barrier_id and barrier is None:
             log.warning("Terme %s : barrière %s inconnue de la chaîne", term.id, term.barrier_id)
         title = titles.get(term.scenario_id) if barrier else None
+        if term.scenario_id and titles and term.scenario_id not in titles:
+            log.warning("Terme %s : scénario %s absent du catalogue", term.id, term.scenario_id)
         terms.append(
             {
                 "id": term.id,

@@ -22,7 +22,9 @@ from test_remote_dom import BLOCKED, _views
 from test_repo_dom import MINIDOM
 from test_shell_js import NODE, _run
 
+from wavedevsecops.config import Settings
 from wavedevsecops.projections.diff import parse_diff
+from wavedevsecops.web.glossary import glossary_body
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="Node absent : comportement JS non exécuté")
 
@@ -43,6 +45,7 @@ def snaps(tmp_path_factory: pytest.TempPathFactory, git_path: Path) -> dict:
         "views": views,
         "sha": sha,
         "explanations": yaml.safe_load((CONTENT / "explanations.yaml").read_text("utf-8")),
+        "glossary": glossary_body(Settings(content_dir=CONTENT)),
         "diff": {
             **parse_diff(UNIFIED, sha).model_dump(mode="json"),
             "target_text": f"Commit {sha[:7]}",
@@ -61,6 +64,7 @@ globalThis.fetch = async (url) => {{
   const u = new URL(url, "http://x");
   calls.push(u.pathname + u.search);
   if (u.pathname === "/api/explanations") return json(200, snaps.explanations);
+  if (u.pathname === "/api/glossary") return json(200, snaps.glossary);
   if (u.pathname.endsWith("/code/tree")) return json(200, {{ files: ["src/app.py"], truncated: false }});
   if (u.pathname.endsWith("/code/diff")) return json(200, snaps.diff);
   return json(404, {{ reason_text: "absent" }});
@@ -510,3 +514,39 @@ def test_les_marques_de_lien_ne_gênent_pas_le_mode_designer() -> None:
                 )
     # Jamais d'opacité (règle du dépôt) : les décors du graphe sont estompés par la couleur.
     assert "opacity" not in css.replace("dimmed-decor-opacity", "")
+
+
+def test_un_terme_d_explication_ouvre_sa_definition_et_sa_barriere(
+    tmp_path: Path, snaps: dict
+) -> None:
+    """Story 9.4 : `glossary-term` dans une explication, puis « Voir la barrière » sans carte."""
+    out = _js(
+        tmp_path,
+        snaps,
+        """
+let term = null, trigger = null;
+for (const candidate of $$(".explain-trigger")) {
+  candidate.click();
+  await flush();
+  term = $('.explain-popover .glossary-term[data-term="quality-gate"]');
+  if (term) { trigger = candidate; break; }
+  press("Escape", { target: $(".explain-popover") });
+}
+const cls = term.className;
+term.click();
+await flush();
+const popover = $(".explain-popover");
+const see = popover.querySelector(".glossary-see");
+const region = document.getElementById(see.getAttribute("aria-controls"));
+const before = { title: popover.querySelector(".explain-title").textContent, expanded: see.getAttribute("aria-expanded"), live: region.getAttribute("aria-live"), detail: region.children.length };
+see.click();
+const after = { expanded: see.getAttribute("aria-expanded"), link: region.querySelector(".glossary-scenario-link").textContent };
+press("Escape", { target: popover });
+console.log(JSON.stringify({ cls, before, after, popovers: $$(".explain-popover").length, focusOnTrigger: document.activeElement === trigger }));
+""",
+    )
+    assert out["cls"] == "glossary-term"
+    assert out["before"] == {"title": "Quality gate", "expanded": "false", "live": "polite", "detail": 0}
+    assert out["after"]["expanded"] == "true"
+    assert out["after"]["link"].startswith("La voir jouer : scénario ")
+    assert out["popovers"] == 0 and out["focusOnTrigger"] is True

@@ -61,6 +61,24 @@ def test_les_termes_cites_dans_les_explications_existent() -> None:
         for match in re.findall(r"\[\[([a-z0-9-]+)\|[^\]]+\]\]", entry.body_text)
     }
     assert cited and cited <= known
+    # Une marque mal formée (majuscule, espace, sans `|`) s'afficherait telle quelle.
+    for key, entry in explanations.entries.items():
+        stripped = re.sub(r"\[\[([a-z0-9-]+)\|[^\]]+\]\]", "", entry.body_text)
+        assert "[[" not in stripped and "]]" not in stripped, key
+
+
+def test_chaque_scenario_du_vocabulaire_existe_au_catalogue() -> None:
+    from wavedevsecops.web.catalogue import load_catalogue
+
+    glossary = load_glossary(Settings(content_dir=CONTENT))
+    assert glossary is not None
+    catalogue = {
+        loaded.scenario.scenario_id
+        for loaded in load_catalogue(Settings(content_dir=CONTENT))
+        if loaded.scenario.catalogue
+    }
+    cited = {t.scenario_id for t in glossary.terms if t.scenario_id}
+    assert cited and cited <= catalogue, cited - catalogue
 
 
 def test_barrieres_livrees_ont_un_scenario_les_autres_se_degradent() -> None:
@@ -112,7 +130,6 @@ GLOSSARY = {
         "play_text": "La voir jouer : scénario {name}",
         "soon_text": "Scénario à venir",
         "named_only_text": "Nommé seulement",
-        "trace_title": "Où le retrouver",
         "none_text": "Le vocabulaire n'est pas disponible pour le moment.",
         "close_text": "Fermer",
     },

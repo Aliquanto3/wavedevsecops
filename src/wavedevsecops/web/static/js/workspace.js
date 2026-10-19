@@ -633,7 +633,7 @@ export function mountWorkspace(
   return {
     destroy() {
       unsubscribe();
-      chainView?.close(false);
+      chainView?.destroy(); // ferme la carte et désinscrit « Voir la barrière »
       crossViews.destroy();
       if (networkRun) networkRun.destroy();
       document.removeEventListener("keydown", onKeydown);

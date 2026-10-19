@@ -252,13 +252,22 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     popover.append(title, body);
     const actions = el("div", "explain-actions");
     if (term.barrier && !term.named_only && ui) {
-      const see = el("button", "explain-links-toggle glossary-see", { type: "button" });
+      const regionId = `explain-term-detail-${counter}`;
+      const region = el("div", "glossary-detail", { id: regionId, "aria-live": "polite" });
+      popover.append(region);
+      const see = el("button", "explain-links-toggle glossary-see", {
+        type: "button",
+        "aria-expanded": "false",
+        "aria-controls": regionId,
+      });
       see.textContent = ui.see_text;
       see.addEventListener("click", () => {
         // La barrière est dans la carte de l'espace : elle y est sélectionnée. Sinon, le détail
-        // (scénario qui la joue, ou « à venir ») s'affiche ici.
+        // (scénario qui la joue, ou « à venir ») s'affiche ici, annoncé par la région.
         if (showBarrier(term.barrier.id)) return close(false);
-        if (!popover.querySelector(".glossary-barrier")) popover.append(barrierDetail(term, ui));
+        const open = see.getAttribute("aria-expanded") === "true";
+        see.setAttribute("aria-expanded", String(!open));
+        region.replaceChildren(...(open ? [] : [barrierDetail(term, ui)]));
       });
       actions.append(see);
     }

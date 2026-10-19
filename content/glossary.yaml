@@ -12,7 +12,6 @@ ui:
   play_text: "La voir jouer : scénario {name}"
   soon_text: "Scénario à venir"
   named_only_text: "Nommé seulement"
-  trace_title: "Où le retrouver"
   none_text: "Le vocabulaire n'est pas disponible pour le moment."
   close_text: "Fermer"
 
