@@ -345,7 +345,10 @@ def test_pr_sans_revue_checks_verts_mais_merge_bloque_jusqu_a_la_revue(
     box.intent("pr_open", head="test-quantite")
     box.wait_step("demander_la_revue")
     pr = box.pr()
-    assert {c.job_id: c.state for c in pr.checks} == {
+    # Seuls les checks requis du scénario comptent : un job ajouté au pipeline (bandit, 8.1)
+    # peut encore être en file quand l'étape passe.
+    states = {c.job_id: c.state for c in pr.checks}
+    assert {job: states.get(job) for job in ("ruff", "pytest", "gitleaks")} == {
         "ruff": "success",
         "pytest": "success",
         "gitleaks": "success",
