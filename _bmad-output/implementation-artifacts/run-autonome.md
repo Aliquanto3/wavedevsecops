@@ -432,6 +432,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:32 · 6.3 · review · rebase sans conflit, 5 conditions ajoutées à repo_state (head/branches contains, commits merges, tree markers_absent/markers_present/contains), H1, H2, M3, M4, L5, L6, L8 corrigés avec 8 tests de contournement ; 2 contournements du même type corrigés dans 6.2 (push-pull, pr-merge) ; L7 écarté ; CI branche verte (suite complète en CI) · d091a4e
 - 2026-10-19 06:32 · — · décision pour Anaël · 6.3 : valider l'extension de repo_state (5 conditions) ; réécrire le même texte à la main en stash reste accepté (état identique, AD-7) · —
 - 2026-10-19 06:32 · 6.3 · fusion · empilée sur 7.3 (fingerprints.json régénéré, 26 empreintes stables) ; suite unique relancée sur le sommet de six stories ; CI 6.3 en cours · —
+- 2026-10-19 06:42 · 5.4 · dev · fini, 774 + 561 passed (timeout isolé de test_restart dû à la charge, rejoué seul vert), CI verte ; liste designate-list groupée par vue (refs désignables au clavier), aperçu du SHA dès 7 caractères, Placer dans la case, texte du 404 de resolve_sha aligné sur le critère · 18d6626
+- 2026-10-19 06:42 · 5.4 · second-avis · lancé · —
+- 2026-10-19 06:42 · 7.6 · dev · lancé (dev-story Sonnet ; 7.4 done) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
