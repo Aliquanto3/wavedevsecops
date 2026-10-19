@@ -299,11 +299,30 @@ def test_un_commit_au_meme_message_que_celui_du_collegue_ne_suffit_pas(make_box)
 def test_la_branche_origin_supprimee_est_signalee(make_box) -> None:
     box = make_box()
     _to_repair(box)
-    box.line("git push origin :main")
-    verdict = box.verdicts(STEP)[-1] if box.verdicts(STEP) else None
-    assert box.step_id() == STEP
-    if verdict is not None:
-        assert verdict["passed"] is False
+    # `git push origin :main` est refusé par origin (branche courante du dépôt nu) : la branche
+    # disparaît ici par un autre biais, puis `fetch --prune` fait bouger l'état observé.
+    box.git.internal("update-ref", "-d", "refs/heads/main", cwd=box.engine.layout.origin)
+    box.line("git fetch --prune")
+    verdict = _still_open(box)
+    assert "n'existe plus" in verdict["reason_text"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("removed", ["docs/guide.md", "tests/test_bonjour.py"])
+def test_fusionner_puis_retirer_un_fichier_ne_valide_pas(make_box, removed: str) -> None:
+    """Les deux commits sont ancêtres du sommet, mais leur travail n'y est plus."""
+    box = make_box()
+    sha = _to_repair(box)
+    box.line("git merge origin/main")
+    box.line(f"git merge {sha}")
+    box.line(f"git rm {removed}")
+    box.line('git commit -m "Retire un fichier"')
+    box.line("git push")
+    verdict = _still_open(box)
+    assert removed not in box.git.internal(
+        "ls-tree", "-r", "--name-only", "main", cwd=box.engine.layout.origin
+    )
+    assert "manque encore" in verdict["reason_text"]
 
 
 @pytest.mark.slow
