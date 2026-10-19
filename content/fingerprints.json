@@ -7,6 +7,7 @@
     "llm/gabarit-llm.A": "c7b3b99d93b7931197af61d7f673c1540d92bce875147e1ce75161937eba2b4b",
     "llm/pr-merge.A": "c63c25f28d4c24ed38db12afe2ba192b853034c1d8a56b8207a8815d5c46ef7d",
     "llm/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
+    "llm/secret-dans-un-commit.A": "888e525c04ada238ec6d6b393a21e421408bc2c1456ee6e088f68c6ef62ed1d6",
     "llm/test-casse.A": "00d679f63cd30f81433900b17f49d56eabd90653ab7c344727a67c144cfec168",
     "no_ai/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
     "no_ai/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
@@ -15,6 +16,7 @@
     "no_ai/gabarit-sans-ia.A": "ab1816d045e819f32c9e986a5c62d93cf95f4f4aee7c12ae8215e8ed684f1094",
     "no_ai/pr-merge.A": "c63c25f28d4c24ed38db12afe2ba192b853034c1d8a56b8207a8815d5c46ef7d",
     "no_ai/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
+    "no_ai/secret-dans-un-commit.A": "ef59057af8cf3c66cb360eb3ef1a72f0c376b7c5c7849c46a601c453bd355a58",
     "no_ai/test-casse.A": "73ffce7857cb098ca275f70afaaff543f6a02d2583d50a470a7279e0f18ec171"
   },
   "schema_version": 1

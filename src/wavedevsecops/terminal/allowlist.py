@@ -106,6 +106,9 @@ class Allowlist(BaseModel):
     forbidden_options: list[str]
     files: dict[str, FileCommandSpec] = Field(default_factory=dict)
     tools: dict[str, ToolSpec] = Field(default_factory=dict)
+    hook_barriers: dict[str, str] = Field(default_factory=dict)
+    """Barrière (`content/chain.yaml`) dont le refus d'un hook `pre-commit` est la preuve, par
+    outil en cause (story 7.3, AD-14)."""
     git: dict[str, GitSubcommand]
 
     def message(self, key: str, **values: object) -> str:

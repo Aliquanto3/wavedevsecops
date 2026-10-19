@@ -8,6 +8,7 @@ d'exception pour un outil absent ou abîmé : il en rend l'état et la raison.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import sys
@@ -537,7 +538,25 @@ def spawn_tool(
         raise ToolUnavailable(status)
     env = offline_environment(settings)
     env["NO_COLOR"] = "1"
+    if tool_id == "pre-commit":
+        env = hook_environment(env, venv, settings)
     return procs.spawn([status.path, *args], env=env, cwd=cwd, timeout=timeout)
+
+
+def hook_environment(env: dict[str, str], venv: Path, settings: Settings) -> dict[str, str]:
+    """Environnement de `pre-commit run` (story 7.3, AD-9) : ses hooks `language: system`
+    cherchent `gitleaks` et `uv` dans le PATH, que le registre résout (jamais le PATH du poste
+    pris tel quel). Le dossier de chacun passe en tête du PATH ; `uv run` vise `cache/venv/`."""
+    extra: list[str] = []
+    for tool_id in ("gitleaks", "uv"):
+        status = resolve(tool_id, settings)
+        if status.ok and status.path is not None:
+            extra.append(str(status.path.parent))
+    key = next((k for k in env if k.upper() == "PATH"), "PATH")
+    out = dict(env)
+    out[key] = os.pathsep.join([*extra, out.get(key, "")]).rstrip(os.pathsep)
+    out["UV_PROJECT_ENVIRONMENT"] = str(venv)
+    return out
 
 
 def venv_python(venv: Path, platform: str = sys.platform) -> Path | None:

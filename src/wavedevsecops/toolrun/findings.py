@@ -70,6 +70,26 @@ def parse_ruff(stdout: str, repo: Path) -> Findings:
     return Findings({path: frozenset(rows) for path, rows in lines.items()})
 
 
+def parse_gitleaks(report: str, repo: Path) -> Findings:
+    """Secrets du rapport JSON de gitleaks : fichier et ligne de chaque constat."""
+    try:
+        data = json.loads(report or "[]")
+    except ValueError:
+        return Findings(error="le rapport machine de gitleaks est illisible")
+    if not isinstance(data, list):
+        return Findings(error="le rapport machine de gitleaks est inattendu")
+    lines: dict[str, set[int]] = {}
+    for item in data:
+        try:
+            path = relative_posix(item["File"], repo)
+            row = int(item["StartLine"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if path is not None:
+            lines.setdefault(path, set()).add(row)
+    return Findings({path: frozenset(rows) for path, rows in lines.items()})
+
+
 def parse_junit(xml_text: str, repo: Path) -> Findings:
     """Fichiers des tests en échec ou en erreur d'un rapport JUnit de pytest."""
     try:
@@ -133,6 +153,24 @@ def collect(
         if ran.error or ran.timed_out or ran.returncode not in (0, 1):
             return Findings(error=ran.error or "ruff n'a pas donné de sortie machine")
         return parse_ruff(ran.stdout, repo)
+    if tool_id == "gitleaks":
+        # Comme le pipeline (7.4) : `--exit-code 3` distingue « secret trouvé » (3) d'un échec
+        # de l'outil (1). Rapport JSON dans cache/, expurgé (`--redact`) puis effacé.
+        report = cache / f"gitleaks-{uuid.uuid4().hex[:8]}.json"
+        cache.mkdir(parents=True, exist_ok=True)
+        extra = ["--exit-code", "3", "--redact", "--report-format", "json"]
+        ran = run_machine([*args, *extra, "--report-path", str(report)])
+        try:
+            if ran.error or ran.timed_out or ran.returncode not in (0, 3):
+                return Findings(error=ran.error or "gitleaks n'a pas donné de rapport machine")
+            if ran.returncode == 0:
+                return Findings()
+            try:
+                return parse_gitleaks(report.read_text("utf-8"), repo)
+            except OSError:
+                return Findings(error="gitleaks n'a pas écrit son rapport machine")
+        finally:
+            report.unlink(missing_ok=True)
     if tool_id == "pytest":
         report = cache / f"junit-{uuid.uuid4().hex[:8]}.xml"
         cache.mkdir(parents=True, exist_ok=True)
