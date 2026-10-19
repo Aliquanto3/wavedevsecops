@@ -344,6 +344,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:16 · 2.9 · second-avis · lancé · —
 - 2026-10-19 02:16 · 7.4 ★ · dev · lancé (dev-story Opus ; pivot Sprint 2, ouvre 7.5, 7.6, 8.1) · —
 - 2026-10-19 02:17 · 7.2 · fusion · suite complète du sommet de pile (7.2 + 5.3 + 3.3) 1173 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 7.3 attend 3.5 · 43c095b
+- 2026-10-19 02:20 · 2.9 · second-avis · aucun high, 2 medium (changement pendant la suspension écarté et jamais rejoué, prouvé ; test de latence qui ne contrôle que le dernier essai), 6 low ; reviewer Opus lancé · —
+- 2026-10-19 02:20 · 5.3 · fusion · CI branche verte sur 6 jobs, suite du sommet de pile 1173 passed, commit de fusion sur main, story done ; 5.4 et 5.5 éligibles · 9df9dbe
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
