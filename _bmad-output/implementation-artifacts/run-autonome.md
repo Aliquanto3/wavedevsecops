@@ -402,6 +402,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:48 · 7.4 ★ · fusion · rebase sur main (6.2) sans conflit, branche poussée, suite complète et CI en cours · —
 - 2026-10-19 04:53 · 9.3 · dev · fini, 1310 passed, CI verte ; section Stations (station n · nom depuis chain.yaml, cartes), description_text, STATION_ORDER et catalogue_rank (stations après le socle) ; 3e critère (encart .env) reporté à 8.x · 7f05670
 - 2026-10-19 04:53 · 9.3 · second-avis · lancé · —
+- 2026-10-19 04:56 · 6.4 · review · rebase sans conflit, H1 (contrôle d'empreinte vide remplacé par repo_broken : un écart d'empreinte est un changement externe selon AD-6 et 2.9), H2 et L6 (Recommencer de l'encart = intention restart de 4.4 dans la file, scenario_reset consigné), M3, M4 (plus de git dans le catalogue), L5, L7 (confirmation en ligne) corrigés ; 1320 passed, CI branche verte · 9d311b9
+- 2026-10-19 04:56 · — · décision pour Anaël · 6.4 : reformuler le critère « empreinte ne correspond plus à l'étape » en « bac à sable disparu ou inutilisable, ou content_hash incompatible » · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
