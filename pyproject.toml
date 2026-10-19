@@ -1,6 +1,6 @@
 [project]
 name = "wavedevsecops"
-version = "0.1.0"
+version = "0.2.0"
 description = "Application pédagogique locale pour apprendre git, GitHub, la CI/CD et le DevSecOps, hors ligne."
 readme = "README.md"
 license = "Apache-2.0"

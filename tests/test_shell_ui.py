@@ -75,19 +75,22 @@ def test_surfaces_livrees_servent_la_coquille(
 
 
 def test_surface_non_livree_absente(instance: cli.Instance, cookie: dict[str, str]) -> None:
-    for path in ("/vocabulaire", "/fiche"):
-        resp, _ = get(instance, path, cookie)
-        assert resp.status == 404
+    """Jalon v0.2 : Vocabulaire est servi, la fiche (v0.3) reste absente."""
+    resp, _ = get(instance, "/vocabulaire", cookie)
+    assert resp.status == 200
+    resp, _ = get(instance, "/fiche", cookie)
+    assert resp.status == 404
 
 
 def test_surfaces_declarees_par_le_serveur(instance: cli.Instance, cookie: dict[str, str]) -> None:
     resp, body = get(instance, "/api/shell", cookie)
     assert resp.status == 200
     data = json.loads(body)
-    assert data["milestone"] == "v0.1"
+    assert data["milestone"] == "v0.2"
     assert [(s["label"], s["path"]) for s in data["surfaces"]] == [
         ("Catalogue", "/"),
         ("Diagnostic", "/diagnostic"),
+        ("Vocabulaire", "/vocabulaire"),
     ]
 
 
