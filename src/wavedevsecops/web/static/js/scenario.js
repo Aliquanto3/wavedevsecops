@@ -146,6 +146,37 @@ export function createScenarioView({
     return block;
   }
 
+  /**
+   * « Ce qui l'aurait bloqué » (story 5.9, UX-DR8) : une ligne par barrière. Tous les textes viennent
+   * du serveur : station livrée, le scénario est un lien ; sinon, l'étiquette en tirets, sans lien.
+   */
+  function blockersBlock(blockers) {
+    const block = el("section", "step-explanation is-blockers", { "data-blockers": "" });
+    const title = el("h3", "step-explanation-title");
+    title.textContent = blockers.title_text;
+    const list = el("ul", "blocker-list");
+    for (const item of blockers.items) {
+      const row = el("li", "blocker-item", { "data-barrier": item.barrier_id });
+      const name = el("p", "blocker-name");
+      name.textContent = `${item.label} · ${item.station_text}`;
+      const reason = el("p", "blocker-reason");
+      richText(reason, item.reason_text);
+      row.append(name, reason);
+      if (item.scenario) {
+        const link = el("a", "blocker-scenario", { href: "/", "data-scenario": item.scenario.id });
+        link.textContent = item.scenario.title_text;
+        row.append(link);
+      } else if (item.soon_text) {
+        const soon = el("span", "blocker-soon is-dashed");
+        soon.textContent = item.soon_text;
+        row.append(soon);
+      }
+      list.append(row);
+    }
+    block.append(title, list);
+    return block;
+  }
+
   /** Ouvre un palier : l'onglet s'affiche tout de suite, le serveur confirme (ou refuse). */
   async function openHint(tier) {
     hintTier = tier;
@@ -384,6 +415,10 @@ export function createScenarioView({
     } else {
       if (designation) designation.setCorrection(null);
       if (explained && explained.explanation_text) children.push(explanationBlock(explained));
+    }
+    // Fin d'un scénario B : l'encart des barrières suit la correction (5.9).
+    if (panel.blockers && panel.blockers.items && panel.blockers.items.length) {
+      children.push(blockersBlock(panel.blockers));
     }
     // Pied du panneau : « Recommencer » et, une fois demandée, sa confirmation en ligne.
     children.push(

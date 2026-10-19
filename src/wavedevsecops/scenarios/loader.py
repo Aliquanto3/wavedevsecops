@@ -7,7 +7,7 @@ l'auteur du scénario la corrige sans lire de trace Python.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -210,6 +210,8 @@ def parse_scenario(
     tool_ids: Iterable[str] | None = None,
     expected_key: str | None = None,
     explain_keys: Iterable[str] | None = None,
+    barriers: Mapping[str, int] | None = None,
+    scenario_ids: Iterable[str] | None = None,
 ) -> Scenario:
     """Valide le texte d'un scénario ; `ScenarioError` avec champs et lignes sinon."""
     data, lines = _parse(text, source)
@@ -227,6 +229,8 @@ def parse_scenario(
     for loc, message in scenario.semantic_errors(
         None if tool_ids is None else set(tool_ids),
         None if explain_keys is None else set(explain_keys),
+        barriers,
+        None if scenario_ids is None else set(scenario_ids),
     ):
         field, line = locate(loc, data, lines)
         found.append(FieldError(field, line, message))
@@ -245,17 +249,30 @@ def parse_scenario(
 
 
 def load_scenario(
-    path: Path, settings: Settings | None = None, *, explain_keys: Iterable[str] | None = None
+    path: Path,
+    settings: Settings | None = None,
+    *,
+    explain_keys: Iterable[str] | None = None,
+    barriers: Mapping[str, int] | None = None,
+    scenario_ids: Iterable[str] | None = None,
 ) -> LoadedScenario:
     """Charge `content/scenarios/<scenario_id>.<mode>.yaml` ; outils vérifiés par le registre.
 
-    `explain_keys` : clés du catalogue d'explications (lint de contenu) ; `None` : non vérifiées."""
+    `explain_keys` : clés du catalogue d'explications (lint de contenu) ; `None` : non vérifiées.
+    `barriers` (barrière -> station de la chaîne) et `scenario_ids` (catalogue) : lint de
+    `blocked_by` ; `None` : non vérifiés."""
     settings = settings or get_settings()
     text = path.read_bytes().decode("utf-8")
     tool_ids = {tool.id for tool in load_registry(settings=settings).tool}
     expected = path.name.removesuffix(".yaml")
     scenario = parse_scenario(
-        text, path.name, tool_ids=tool_ids, expected_key=expected, explain_keys=explain_keys
+        text,
+        path.name,
+        tool_ids=tool_ids,
+        expected_key=expected,
+        explain_keys=explain_keys,
+        barriers=barriers,
+        scenario_ids=scenario_ids,
     )
     return LoadedScenario(scenario, path, content_hash(text))
 

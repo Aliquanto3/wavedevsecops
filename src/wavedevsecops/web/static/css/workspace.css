@@ -1183,3 +1183,31 @@ main.is-workspace {
   padding: 0;
   font-family: var(--font-family-code);
 }
+
+/* --- « Ce qui l'aurait bloqué » : encart de fin de scénario B (Story 5.9) --- */
+.step-explanation.is-blockers {
+  border-left: 4px solid var(--color-discipline-harness);
+}
+
+.blocker-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blocker-item p {
+  margin: 0 0 var(--space-1);
+}
+
+.blocker-name {
+  font-weight: var(--font-weight-strong, 600);
+}
+
+.blocker-soon {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  color: var(--color-ink-soft);
+  font-size: var(--font-size-body-sm);
+  border: 2px dashed var(--color-ink-soft);
+  border-radius: var(--radius-sm);
+}

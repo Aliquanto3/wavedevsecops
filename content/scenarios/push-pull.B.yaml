@@ -113,3 +113,10 @@ steps:
       solution_text: >-
         git merge origin/main, puis git merge (SHA du commit du collègue, lu par git
         reflog origin/main), puis git push
+
+# Fin du scénario : l'encart « Ce qui l'aurait bloqué » (story 5.9).
+blocked_by:
+  - barrier_id: protection
+    station: 2
+    scenario_id: push-direct-main
+    reason_text: "la protection de `main` refuse tout push direct sur la branche, y compris un `push --force` : le commit de votre collègue n'aurait pas été écrasé."

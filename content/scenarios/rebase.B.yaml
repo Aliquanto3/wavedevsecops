@@ -1,5 +1,6 @@
 # Scénario B « rebase » (Story 5.8) : un agent a lancé un rebase et l'a laissé en conflit.
 # Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+# Pas de `blocked_by` (story 5.9) : aucune barrière de la chaîne (content/chain.yaml) ne protège de cette erreur, donc aucun encart.
 schema_version: 1
 scenario_id: rebase
 mode: B
