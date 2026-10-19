@@ -55,8 +55,18 @@ export async function saveBlob(blob, filename, { win = window, doc = document } 
       throw err;
     }
     const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
+    try {
+      await writable.write(blob);
+      await writable.close();
+    } catch (err) {
+      // Écriture interrompue : le fichier partiel est abandonné, l'erreur remonte au Réessayer.
+      try {
+        await writable.abort();
+      } catch (ignored) {
+        // flux déjà fermé
+      }
+      throw err;
+    }
     return true;
   }
   const url = win.URL.createObjectURL(blob);
@@ -178,8 +188,13 @@ export function renderReportEntry(container, { fetchImpl, save } = {}) {
     alert.textContent = "";
     try {
       const report = await loadReport({ fetchImpl });
-      renderPreview(preview, report, { fetchImpl, save });
+      const panel = renderPreview(preview, report, { fetchImpl, save });
       button.setAttribute("aria-expanded", "true");
+      const title = panel.querySelector(".report-title");
+      if (title) {
+        title.setAttribute("tabindex", "-1");
+        title.focus();
+      }
     } catch (err) {
       alert.textContent = err.message;
     }

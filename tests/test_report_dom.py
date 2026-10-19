@@ -38,7 +38,7 @@ REPORT = {
 PRELUDE = f"""
 import {{ installDom, makeEvent }} from "{MINIDOM}";
 const {{ document, main }} = installDom();
-const {{ renderReportEntry, renderPreview, exportReport, failureText }} = await import("@JS@/report.js");
+const {{ renderReportEntry, renderPreview, exportReport, failureText, saveBlob }} = await import("@JS@/report.js");
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const REPORT = {json.dumps(REPORT)};
@@ -149,3 +149,31 @@ console.log(JSON.stringify({ error }));
 """,
     )
     assert out["error"] == "Le fichier progress.json est illisible."
+
+
+def test_ouverture_met_le_focus_sur_l_apercu(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+renderReportEntry(main, { fetchImpl: async () => okResponse(REPORT) });
+$(".report-entry button").dispatchEvent(makeEvent("click"));
+await tick(); await tick();
+console.log(JSON.stringify({ focused: document.activeElement.className }));
+""",
+    )
+    assert out["focused"] == "report-title"
+
+
+def test_ecriture_echouee_abandonne_le_flux(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const log = [];
+const writable = { write: async () => { throw new Error("Disque plein"); }, close: async () => log.push("close"), abort: async () => log.push("abort") };
+const win = { showSaveFilePicker: async () => ({ createWritable: async () => writable }) };
+let error = "";
+try { await saveBlob("B", "r.html", { win }); } catch (err) { error = err.message; }
+console.log(JSON.stringify({ log, error }));
+""",
+    )
+    assert out == {"log": ["abort"], "error": "Disque plein"}

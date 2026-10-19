@@ -88,6 +88,8 @@ def derive(
         f
         for f in facts
         if (f.get("track"), f.get("scenario_id"), f.get("mode")) == (track, scenario_id, mode)
+        # Une remise à zéro ne fait ni commencer ni avancer un scénario (premier passage = foi).
+        and f.get("kind") != "scenario_restarted"
     ]
     validated = [f["step_id"] for f in mine if f.get("kind") == "step_validated"]
     quizzes = [f for f in mine if f.get("kind") == "quiz_first_attempt"]
@@ -176,3 +178,9 @@ class ProgressStore:
             if all(isinstance(part, str) for part in key):
                 groups.setdefault(key, []).append(raw)  # type: ignore[arg-type]
         return {key: derive(group, *key) for key, group in groups.items()}
+
+
+RESTART_KIND = "scenario_restarted"
+"""Fait « remise à zéro » émis par Recommencer (story 4.4) : un fait par remise (`op_id` dans
+l'identité). Le rapport (6.5) les compte ; `derive` les ignore pour l'état, le score et les
+indices. Contrat partagé : ne pas renommer sans aligner `derive` et `progress.report`."""

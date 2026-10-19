@@ -15,7 +15,7 @@ import pytest
 from wavedevsecops import cli
 from wavedevsecops.config import Settings
 from wavedevsecops.progress import FILENAME, write_json_atomic
-from wavedevsecops.progress.facts import Fact, ProgressStore
+from wavedevsecops.progress.facts import RESTART_KIND, Fact, ProgressStore
 from wavedevsecops.progress.report import (
     EMPTY_TEXT,
     build_report,
@@ -71,7 +71,7 @@ def fill(data: Path) -> None:
     stored = json.loads(path.read_text(encoding="utf-8"))
     for n in range(2):
         stored["facts"].append(
-            {**stored["facts"][0], "kind": "scenario_reset", "op_id": f"r{n}", "step_id": ""}
+            {**stored["facts"][0], "kind": RESTART_KIND, "op_id": f"r{n}", "step_id": ""}
         )
     write_json_atomic(path, stored)
 
@@ -145,6 +145,62 @@ def test_csv_utf8_bom_point_virgule_et_accents(tmp_path: Path) -> None:
     cells = next(csv.reader([line], delimiter=";"))
     assert cells[1].startswith("'=")  # formule neutralisée
     assert cells[3] == "Terminé" and cells[7] == "2"
+
+
+FORMULAS = ("=HYPERLINK(\"x\")", "=cmd|' /C calc'!A0", "+1", "-1", "@SUM(A1)", "\tx")
+
+
+@pytest.mark.parametrize("payload", FORMULAS)
+@pytest.mark.parametrize(
+    "column",
+    [
+        "label",
+        "title",
+        "mode",
+        "state_text",
+        "quiz_correct",
+        "quiz_total",
+        "hints",
+        "resets",
+        "completed_text",
+    ],
+)
+def test_csv_chaque_colonne_neutralisee(column: str, payload: str) -> None:
+    row = {
+        "title": "t", "mode": "A", "state_text": "Terminé", "quiz_correct": 1, "quiz_total": 2,
+        "hints": 0, "resets": 0, "completed_text": "",
+    }
+    track = {"label": "Parcours"}
+    (track if column == "label" else row)[column] = payload
+    report = {"installed_text": "x", "first_launch_text": "y", "tracks": [{**track, "rows": [row]}]}
+    text = render_csv(report).decode("utf-8-sig")
+    *_, line = list(csv.reader(text.splitlines(), delimiter=";"))
+    assert any(cell == "'" + payload for cell in line), line
+    assert not any(cell[:1] in "=+-@\t" for cell in line if cell)
+
+
+@pytest.mark.parametrize("key", ["installed_at", "first_launch_at"])
+def test_csv_dates_brutes_neutralisees(tmp_path: Path, key: str) -> None:
+    base(tmp_path)
+    path = tmp_path / FILENAME
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    write_json_atomic(path, {**stored, key: "=HYPERLINK(\"http://x\")"})
+    text = render_csv(build_report(tmp_path, now=NOW)).decode("utf-8-sig")
+    rows = list(csv.reader(text.splitlines()[:2], delimiter=";"))
+    assert "'=HYPERLINK(\"http://x\")" in [cell for r in rows for cell in r]
+
+
+def test_remise_seule_ne_commence_pas_le_scenario(tmp_path: Path) -> None:
+    base(tmp_path)
+    path = tmp_path / FILENAME
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    raw = fact("step_validated").model_dump(mode="json", exclude_none=True)
+    stored["facts"].append({**raw, "kind": RESTART_KIND, "op_id": "r0", "step_id": ""})
+    write_json_atomic(path, stored)
+    (track,) = build_report(tmp_path, now=NOW)["tracks"]
+    (row,) = track["rows"]
+    assert row["state"] == "todo" and row["state_text"] == "À faire"
+    assert row["resets"] == 1 and row["hints"] == 0 and row["quiz_total"] == 0
 
 
 @pytest.fixture

@@ -18,12 +18,10 @@ from typing import Any
 from jinja2 import Environment, select_autoescape
 
 from wavedevsecops.progress import FILENAME, _read_json
-from wavedevsecops.progress.facts import ProgressStore
+from wavedevsecops.progress.facts import RESTART_KIND, ProgressStore
 from wavedevsecops.progress.summary import build_summary
 from wavedevsecops.scenarios.order import catalogue_rank
 
-RESET_KIND = "scenario_reset"
-"""Fait « remise à zéro » (story 4.4) : un par Recommencer réussi, consigné sans pénalité."""
 STATE_TEXTS = {"todo": "À faire", "in_progress": "En cours", "done": "Terminé"}
 PRIVACY_TEXT = "Rien n'est envoyé : vous choisissez à qui transmettre le fichier."
 EMPTY_TEXT = (
@@ -95,7 +93,7 @@ def build_report(
         key = (raw.get("track"), raw.get("scenario_id"), raw.get("mode"))
         if not all(isinstance(part, str) for part in key):
             continue
-        if raw.get("kind") == RESET_KIND:
+        if raw.get("kind") == RESTART_KIND:
             resets[key] = resets.get(key, 0) + 1  # type: ignore[index]
         elif raw.get("kind") == "scenario_completed":
             completed.setdefault(key, str(raw.get("at") or ""))  # type: ignore[arg-type]
@@ -206,23 +204,29 @@ def render_html(report: dict[str, Any], font_css: str = "") -> str:
 def _cell(value: object) -> str:
     """Texte sûr pour un tableur : une cellule qui ressemble à une formule est neutralisée."""
     text = str(value)
-    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else text
 
 
 def render_csv(report: dict[str, Any]) -> bytes:
-    """CSV UTF-8 avec BOM, séparateur `;` (accents corrects dans un tableur français)."""
+    """CSV UTF-8 avec BOM, séparateur `;` (accents corrects dans un tableur français).
+
+    Toutes les cellules passent par `_cell` : `progress.json` est modifiable à la main, aucune
+    valeur (mode, dates brutes, titres) n'est reprise telle quelle comme formule.
+    """
     out = io.StringIO()
     writer = csv.writer(out, delimiter=";", lineterminator="\r\n")
-    writer.writerow(["Installation", report["installed_text"]])
-    writer.writerow(["Premier lancement", report["first_launch_text"]])
-    writer.writerow([])
-    writer.writerow(CSV_HEADER)
+    rows: list[list[object]] = [
+        ["Installation", report["installed_text"]],
+        ["Premier lancement", report["first_launch_text"]],
+        [],
+        list(CSV_HEADER),
+    ]
     for track in report["tracks"]:
         for row in track["rows"]:
-            writer.writerow(
+            rows.append(
                 [
-                    _cell(track["label"]),
-                    _cell(row["title"]),
+                    track["label"],
+                    row["title"],
                     row["mode"],
                     row["state_text"],
                     row["quiz_correct"],
@@ -232,4 +236,5 @@ def render_csv(report: dict[str, Any]) -> bytes:
                     row["completed_text"],
                 ]
             )
+    writer.writerows([_cell(value) for value in line] for line in rows)
     return out.getvalue().encode("utf-8-sig")
