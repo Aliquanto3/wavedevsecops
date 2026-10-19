@@ -404,6 +404,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:53 · 9.3 · second-avis · lancé · —
 - 2026-10-19 04:56 · 6.4 · review · rebase sans conflit, H1 (contrôle d'empreinte vide remplacé par repo_broken : un écart d'empreinte est un changement externe selon AD-6 et 2.9), H2 et L6 (Recommencer de l'encart = intention restart de 4.4 dans la file, scenario_reset consigné), M3, M4 (plus de git dans le catalogue), L5, L7 (confirmation en ligne) corrigés ; 1320 passed, CI branche verte · 9d311b9
 - 2026-10-19 04:56 · — · décision pour Anaël · 6.4 : reformuler le critère « empreinte ne correspond plus à l'étape » en « bac à sable disparu ou inutilisable, ou content_hash incompatible » · —
+- 2026-10-19 04:58 · 9.3 · second-avis · aucun high, 3 medium (STATION_ORDER en dur sans garde-fou, cartes de station sans Reprendre de 6.4, conflits avec 6.4), 7 low ; reviewer Opus lancé (rebase sur 6.4) · —
+- 2026-10-19 04:58 · 5.5 · fusion · rebase de fond par dev-story Opus sur 6.2 (scenario.js, workspace.css ; un seul Recommencer au pied du panneau via la confirmation de 4.4 ; test de correction sur la vraie intention restart), 71 tests ciblés, suite complète en lots 1342 passed / 46 skipped ; branche poussée, CI en cours · 99651a8
+- 2026-10-19 04:58 · 5.4 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

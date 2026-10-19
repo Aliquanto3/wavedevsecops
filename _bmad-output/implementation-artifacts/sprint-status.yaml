@@ -81,7 +81,7 @@ development_status:
   5-1-rejouer-les-actes-de-l-agent-b-de-façon-déterministe: done
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: done
-  5-4-choisir-dans-une-liste-ou-par-sha: backlog
+  5-4-choisir-dans-une-liste-ou-par-sha: in-progress
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: review
   5-6-le-scénario-b-env-committé: backlog
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
