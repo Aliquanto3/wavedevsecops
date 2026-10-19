@@ -358,3 +358,101 @@ console.log(JSON.stringify({ busy, busyPosts, afterMerge, afterOpen }));
     assert out["busyPosts"] == 0
     assert out["afterMerge"] == "pr:1"
     assert out["afterOpen"] == "ref:refs/remotes/origin/feature"
+
+
+# ------------------------------------------------------------------ story 7.4 : sortie d'un check
+def _pipeline_snaps(snapshots: dict) -> dict:
+    """La vue « blocked » où deux checks portent ce que projette le pipeline simulé (7.4)."""
+    views = json.loads(json.dumps(snapshots["blocked"]))
+    for check in views["remote"]["pulls"][0]["checks"]:
+        if check["job_id"] == "bandit":  # échec : sortie, fichier:ligne lié
+            check["output_text"] = "agent/tools.py:27:1: B602 shell=True\n1 issue\n"
+            check["output_spans"] = [
+                {"start": 0, "end": 14, "text": "agent/tools.py", "element_id": "path:worktree:agent/tools.py"}
+            ]
+            check["details"] = [
+                {"rule_id": "B602", "message_text": "shell=True", "location_text": "agent/tools.py:27",
+                 "link": "path:worktree:agent/tools.py"},
+                {"rule_id": "B101", "message_text": "assert", "location_text": "hors/bac.py:3", "link": ""},
+            ]
+            check["output_element_id"] = "output:check-1-bandit-x"
+        if check["job_id"] == "audit":  # erreur de l'outil : texte, Relancer
+            check["output_text"] = "panic\n"
+            check["tool_error_text"] = (
+                "pip-audit s'est arrêté sans résultat (code 2). Ce n'est pas un défaut de votre code."
+            )
+            check["can_rerun"] = True
+            check["output_element_id"] = "output:check-1-audit-x"
+    return {**snapshots, "pipe": views}
+
+
+def test_voir_la_sortie_erreur_de_l_outil_et_relancer(tmp_path: Path, snapshots: dict) -> None:
+    out = _js(
+        tmp_path,
+        _pipeline_snaps(snapshots),
+        """
+load("pipe");
+const sel = selectionFor(store);
+const item = (job) => $$(".pr-check-item").find((i) => i.querySelector(".check-job").textContent === job);
+const before = {
+  toggles: texts('[data-action="toggle-output"]'),
+  outputs: $$(".check-output").length,
+  error: texts(".check-tool-error", item("audit")),
+  errorState: item("audit").querySelector(".check-state").textContent,
+  rerun: texts('[data-action="check-rerun"]'),
+  links: $$(".check-detail-link", item("bandit")).map((b) => [b.textContent, b.getAttribute("data-link")]),
+  plain: texts(".check-detail-where", item("bandit")),
+  rules: texts(".check-detail-rule", item("bandit")),
+  declared: texts('[data-action="toggle-output"]', item("lint")).length,
+};
+item("bandit").querySelector('[data-action="toggle-output"]').focus();
+item("bandit").querySelector('[data-action="toggle-output"]').dispatchEvent(makeEvent("click"));
+await new Promise((r) => setTimeout(r, 0));
+const block = item("bandit").querySelector(".check-output");
+const opened = {
+  label: block.querySelector(".tool-output-label").textContent,
+  text: block.querySelector(".tool-output-text").textContent,
+  link: block.querySelector(".terminal-link").getAttribute("data-link"),
+  expanded: item("bandit").querySelector('[data-action="toggle-output"]').getAttribute("aria-expanded"),
+  toggle: item("bandit").querySelector('[data-action="toggle-output"]').textContent,
+  roving: block.hasAttribute("data-roving"),
+  focus: document.activeElement && document.activeElement.getAttribute("data-key"),
+};
+block.querySelector(".terminal-link").dispatchEvent(makeEvent("click"));
+const linked = sel.value;
+block.dispatchEvent(makeEvent("click"));
+const designated = sel.value;
+// Un nouveau dessin (projection suivante) garde la sortie dépliée ; la preuve part une seule fois.
+load("pipe");
+const kept = $$(".check-output").length;
+item("bandit").querySelector('[data-action="toggle-output"]').dispatchEvent(makeEvent("click"));
+item("bandit").querySelector('[data-action="toggle-output"]').dispatchEvent(makeEvent("click"));
+item("audit").querySelector('[data-action="check-rerun"]').dispatchEvent(makeEvent("click"));
+await new Promise((r) => setTimeout(r, 0));
+console.log(JSON.stringify({ before, opened, linked, designated, kept, after: $$(".check-output").length,
+  posts, problems: store.state.problems }));
+""",
+    )
+    before = out["before"]
+    assert before["toggles"] == ["Voir la sortie", "Voir la sortie"] and before["outputs"] == 0
+    assert before["errorState"] == "Erreur de l'outil"
+    assert before["error"] == [
+        "pip-audit s'est arrêté sans résultat (code 2). Ce n'est pas un défaut de votre code."
+    ]
+    assert before["rerun"] == ["Relancer le check"]
+    assert before["links"] == [["agent/tools.py:27", "path:worktree:agent/tools.py"]]
+    assert before["plain"] == ["hors/bac.py:3"] and before["rules"] == ["B602", "B101"]
+    assert before["declared"] == 0  # un check sans sortie n'a pas de « Voir la sortie »
+    opened = out["opened"]
+    assert opened["label"] == "bandit" and opened["text"] == "agent/tools.py:27:1: B602 shell=True\n1 issue\n"
+    assert opened["link"] == "path:worktree:agent/tools.py"
+    assert opened["expanded"] == "true" and opened["toggle"] == "Masquer la sortie"
+    assert opened["roving"] and opened["focus"].startswith("toggle:check:1:bandit:")
+    assert out["linked"] == "path:worktree:agent/tools.py"
+    assert out["designated"] == "output:check-1-bandit-x"
+    assert out["kept"] == 1 and out["after"] == 1
+    assert out["posts"] == [
+        {"url": "/api/ws/w/check_output_seen", "body": {"number": 1, "job_id": "bandit"}},
+        {"url": "/api/ws/w/check_rerun", "body": {"number": 1, "job_id": "audit"}},
+    ]
+    assert out["problems"] == []

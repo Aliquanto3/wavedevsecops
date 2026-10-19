@@ -26,6 +26,7 @@ from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import hints
 from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.operations import (
+    EPOCH_STATES,
     SILENT_STATES,
     OpContext,
     Operation,
@@ -36,6 +37,7 @@ from wavedevsecops.engine.operations import (
     Validator,
     WorkspaceEngine,
 )
+from wavedevsecops.engine.pipeline import RUNNERS, PipelineRunner, scenario_enabled
 from wavedevsecops.engine.snapshots import (
     RESTORED_KEY,
     pending_restore,
@@ -198,6 +200,7 @@ class _Active:
     engine: WorkspaceEngine
     watcher: Any = None
     watch_options: dict[str, Any] = field(default_factory=dict)
+    pipeline: PipelineRunner | None = None
 
 
 WatcherFactory = Callable[[Path, Callable[[], None]], Any]
@@ -216,9 +219,12 @@ class WorkspaceManager:
         watcher_factory: WatcherFactory | None = None,
         watch: bool = True,
         git_path: Path | None = None,
+        osv_url: str = "",
     ) -> None:
-        """`watch=False` : aucun surveillant (tests) ; `watcher_factory` remplace `TreeWatcher`."""
+        """`watch=False` : aucun surveillant (tests) ; `watcher_factory` remplace `TreeWatcher`.
+        `osv_url` : point OSV local du serveur, jeton `{osv_url}` du pipeline (AD-11)."""
         self.settings = settings
+        self._osv_url = osv_url
         self.boot_id = boot_id or secrets.token_hex(8)
         self._git_path = git_path
         self._progress = ProgressStore.for_dir(settings.resolved_data_dir())
@@ -325,7 +331,16 @@ class WorkspaceManager:
             progress=self._progress,
             replay=self._steps.replay,
         )
-        active = _Active(engine)
+        runner = PipelineRunner(
+            engine,
+            self.settings,
+            enabled=lambda: scenario_enabled(engine, self._steps.scenario),
+            git_path=self._resolved_git,
+            osv_url=self._osv_url,
+        )
+        engine.after_op = runner.scan
+        RUNNERS[workspace_id] = runner
+        active = _Active(engine, pipeline=runner)
         holder["active"] = active
         self._active[workspace_id] = active
         evicted = []
@@ -357,7 +372,12 @@ class WorkspaceManager:
         return engine.submit(restore_operation(snapshot_id, self._resolved_git()))
 
     def _follow_state(self, active: _Active, state: EngineStateName) -> None:
-        """Suspend ou reprend le surveillant selon l'état (appelé par le fil de la file)."""
+        """Suspend ou reprend le surveillant selon l'état (appelé par le fil de la file).
+
+        Entrée en `setup` ou `restoring` (nouvel `epoch`) : les runs du pipeline sont arrêtés
+        avant que l'opération ne vide `ci/` (AD-10)."""
+        if state in EPOCH_STATES and active.pipeline is not None:
+            active.pipeline.cancel_all()
         if self._watcher_factory is None or active.engine.closed:
             return
         if state in STOP_WATCH_STATES:
@@ -400,11 +420,15 @@ class WorkspaceManager:
             active.engine.request_stop()
         deadline = time.monotonic() + self.settings.engine_stop_timeout_s
         for active in evicted:
+            # Les runs du pipeline de l'espace s'arrêtent avec lui (AD-10).
+            if active.pipeline is not None:
+                active.pipeline.stop()
+                if RUNNERS.get(active.engine.workspace_id) is active.pipeline:
+                    del RUNNERS[active.engine.workspace_id]
             active.engine.join(max(0.0, deadline - time.monotonic()))
             # Après la file : un changement d'état tardif ne relance plus le surveillant.
             if active.watcher is not None:
                 active.watcher.stop()
-            # Les runs du pipeline de l'espace s'arrêteront ici aussi (AD-10).
             with self._lock:
                 engine = active.engine
                 if not engine.alive and self._stopping.get(engine.workspace_id) is engine:

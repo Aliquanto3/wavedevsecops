@@ -30,6 +30,7 @@ from wavedevsecops.engine import (
     code_intents,
     designation,
     hints,
+    pipeline,
     pr_intents,
     restart,
 )
@@ -219,6 +220,7 @@ def create_app(
     code_intents.register_intents()
     hints.register_intents()
     restart.register_intents()
+    pipeline.register_intents()
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
     register_exercise_intent()

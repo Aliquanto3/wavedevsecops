@@ -331,6 +331,9 @@ class WorkspaceEngine:
         self._reason_text = ""
         self.last_projection = Projection({}, "")
         self.epoch = self._read_epoch()
+        self.after_op: Callable[[], None] | None = None
+        """Appelé par le fil de la file après chaque opération et après la projection
+        d'ouverture, au repos : le pipeline simulé y relit les PR à faire tourner (AD-10)."""
         self._thread = threading.Thread(
             target=self._run, name=f"wds-ops-{workspace_id}", daemon=True
         )
@@ -617,6 +620,7 @@ class WorkspaceEngine:
             op_id=None,
         )
         self._set_state(self._rest, "", None)
+        self._run_after_op()
 
     def _fail(self, ctx: OpContext, cause_text: str, action_text: str) -> None:
         self.publish(
@@ -726,3 +730,12 @@ class WorkspaceEngine:
             with self._lock:
                 self._current = None
             self._set_state(self._rest, "", op.op_id)
+            self._run_after_op()
+
+    def _run_after_op(self) -> None:
+        if self.after_op is None:
+            return
+        try:
+            self.after_op()
+        except Exception:  # noqa: BLE001 - le pipeline ne fait pas échouer la file
+            log.exception("Après l'opération dans %s", self.workspace_id)

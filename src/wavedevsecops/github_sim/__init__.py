@@ -70,6 +70,10 @@ class GithubSimError(AppError):
     """Le GitHub simulé refuse ou ne peut pas lire son état."""
 
 
+class StaleCheck(GithubSimError):
+    """Résultat d'un check calculé pour des SHA qui ne sont plus ceux de la PR (AD-10)."""
+
+
 @dataclass(frozen=True)
 class DeclaredCheck:
     """Check déclaré à l'ouverture d'une PR (scénario de test, station) : lié aux SHA courants."""
@@ -502,9 +506,13 @@ def set_check_state(
     *,
     output: str = "",
     findings: Iterable[Finding] = (),
+    duration_ms: int | None = None,
+    expected: tuple[str, str] | None = None,
 ) -> PullRequest:
-    """Fixe l'état d'un check d'une PR ouverte (le pipeline simulé, plus tard, ou un test).
+    """Fixe l'état d'un check d'une PR ouverte (le pipeline simulé depuis la file, ou un test).
 
+    `expected` : `(head_sha, base_sha)` du run qui écrit ; si le check a été recalculé pour
+    d'autres SHA entre-temps, le résultat tardif est refusé (`StaleCheck`, AD-10).
     Recalcule les PR et joue les réactions `checks_green` dues, dans la même écriture."""
     current = load(layout)
     pr = current.pull(number)
@@ -514,11 +522,17 @@ def set_check_state(
             f"La PR n°{number} n'a pas de check « {job_id} » à mettre à jour.",
             "Choisissez une PR ouverte et un check qu'elle déclare.",
         )
+    if expected is not None and expected != (check.head_sha, check.base_sha):
+        raise StaleCheck(
+            f"Le résultat du check « {job_id} » concerne un ancien commit de la PR n°{number}.",
+            "Il est ignoré : le check repasse sur le commit courant.",
+        )
     updated = check.model_copy(
         update={
             "state": state,
             "output": output,
             "findings": list(findings),
+            "duration_ms": duration_ms,
             "updated_at": now_iso(),
         }
     )
@@ -530,6 +544,33 @@ def set_check_state(
     result = written.state.pull(number)
     assert result is not None
     return result
+
+
+def ensure_checks(
+    git: Git, layout: Layout, number: int, jobs: Iterable[tuple[str, bool]]
+) -> PullRequest | None:
+    """Ajoute à une PR ouverte les checks `(job_id, obligatoire)` qu'elle n'a pas encore, à
+    `queued` pour ses SHA courants (pipeline simulé, AD-10). N'écrit que si un check manquait ;
+    rend la PR, ou None si elle n'est pas ouverte."""
+    current = load(layout)
+    pr = current.pull(number)
+    if pr is None or pr.state != "open":
+        return None
+    known = {c.job_id for c in pr.checks}
+    added = [
+        Check(job_id=job, head_sha=pr.head_sha, base_sha=pr.base_sha, required=required)
+        for job, required in jobs
+        if job not in known
+    ]
+    if not added:
+        return pr
+    pulls = [
+        p.model_copy(update={"checks": [*p.checks, *added]}) if p.number == number else p
+        for p in current.pulls
+    ]
+    return _commit(git, layout, current.model_copy(update={"pulls": pulls}), force=True).state.pull(
+        number
+    )
 
 
 def open_pr(

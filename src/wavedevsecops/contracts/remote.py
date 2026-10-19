@@ -45,6 +45,26 @@ class RemoteBranch(_Model):
     """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
 
 
+class CheckSpan(_Model):
+    """Passage liable de la sortie d'un check (positions UTF-16, comme `terminal_output`)."""
+
+    start: int
+    end: int
+    text: str
+    element_id: str
+
+
+class CheckDetail(_Model):
+    """Ligne de détail d'un check (story 7.4) : règle, message, fichier:ligne lié à Code."""
+
+    rule_id: str = ""
+    message_text: str = ""
+    location_text: str = ""
+    """« src/app.py:12 » ; vide si le constat ne nomme pas de fichier."""
+    link: str = ""
+    """`element_id` du fichier dans le bac à sable ; vide s'il n'y existe pas."""
+
+
 class CheckRow(_Model):
     """`pr-check` : un check de la PR."""
 
@@ -62,6 +82,17 @@ class CheckRow(_Model):
     links: list[str] = []
     designable: bool = True
     """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
+    output_text: str = ""
+    """Sortie humaine de l'outil, verbatim (bloc `tool-output` de « Voir la sortie », 7.4)."""
+    output_spans: list[CheckSpan] = []
+    details: list[CheckDetail] = []
+    """Constats de l'exécution machine (hors erreur de l'outil), dans l'ordre de l'outil."""
+    tool_error_text: str = ""
+    """« gitleaks s'est arrêté sans résultat (code 1). Ce n'est pas un défaut de votre code. »"""
+    can_rerun: bool = False
+    """« Relancer le check » (`check_rerun`) : erreur de l'outil sur les SHA courants."""
+    output_element_id: str = ""
+    """`output:check:<n>:<job_id>:<sha>` : le bloc `tool-output` déplié, désignable."""
 
 
 class ReviewEntry(_Model):

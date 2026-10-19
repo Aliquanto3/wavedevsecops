@@ -90,6 +90,10 @@ class Settings(BaseModel):
     tool_timeout_s: float = Field(default=120.0, gt=0)
     """Délai d'un outil de la chaîne (ruff, pytest) lancé depuis le terminal (AD-4, AD-12)."""
 
+    pipeline_job_timeout_s: float = Field(default=120.0, gt=0)
+    """Délai d'un job du pipeline simulé ; au-delà, l'arbre est arrêté et le check est en
+    erreur de l'outil (AD-10, AD-12)."""
+
     max_snapshots: int = Field(default=20, ge=2)
     """Instantanés gardés par espace ; le 0 et le dernier le sont toujours (AD-6)."""
 
@@ -110,6 +114,10 @@ class Settings(BaseModel):
     def scenarios_path(self) -> Path:
         """`content/scenarios/` : un YAML par scénario et par mode (AD-7)."""
         return self.content_path() / "scenarios"
+
+    def pipeline_path(self) -> Path:
+        """`content/pipeline.yaml` : le pipeline simulé, décrit une seule fois (AD-10)."""
+        return self.content_path() / "pipeline.yaml"
 
     def osv_path(self) -> Path:
         """`content/osv/` : l'extrait figé de la base de vulnérabilités (AD-11)."""

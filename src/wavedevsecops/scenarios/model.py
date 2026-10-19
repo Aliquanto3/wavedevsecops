@@ -66,6 +66,9 @@ class Scenario(BaseModel):
     """Parcours servis ; un espace par parcours (AD-5)."""
     tools: list[str] = Field(default_factory=list)
     """Outils requis, identifiants du registre `tools.toml` (AD-16)."""
+    pipeline: bool = False
+    """Vrai : le pipeline simulé (`content/pipeline.yaml`) tourne sur chaque PR ouverte de
+    l'espace, à chaque nouveau couple `(head_sha, base_sha)` (AD-10, story 7.4)."""
     template: Literal["empty"] = "empty"
     """Gabarit de départ du dépôt ; `empty` : dépôt vide. Les gabarits d'exercice arrivent
     avec leurs stories."""

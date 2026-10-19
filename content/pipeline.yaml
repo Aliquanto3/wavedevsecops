@@ -1,0 +1,75 @@
+# Pipeline simulé (AD-10, story 7.4) : décrit une seule fois, lu par `ci` (`ci.load_pipeline`).
+#
+# Le pipeline tourne sur chaque PR ouverte d'un scénario qui le déclare (`pipeline: true`),
+# à chaque nouveau couple (head_sha, base_sha) : clone `git clone --shared` de origin.git dans
+# `ci/<pr>-<sha7>/`, environnement hors ligne (AD-12), puis les jobs en série, dans l'ordre de
+# ce fichier. Chaque job donne un check du même `job_id` ; chaque changement d'état passe par
+# la file de l'espace (opération portant l'epoch), qui seule écrit github.json.
+#
+# Contrat d'un job (les stories 8.1, 8.3, 8.4 et 8.6 ajoutent ou complètent des jobs ici) :
+#
+#   job_id      identifiant du check (snake_case, motif JOB_ID_PATTERN) ; unique.
+#   label_text  libellé affiché du check.
+#   tool        identifiant de l'outil dans tools.toml (AD-16) : résolu par le registre, jamais
+#               par le PATH. Un outil de résolution `uv-lock` tourne dans l'environnement du run.
+#   required    check obligatoire pour merger (en plus des `required_checks` de la protection).
+#   barrier     barrière de content/chain.yaml que ce check prouve (preuve `evidence_seen`
+#               soumise quand l'apprenant lit la sortie : vue Distant + PR).
+#   human       argv de la sortie humaine (après l'outil) : sortie affichée verbatim, stdout puis
+#               stderr, jamais réécrite. Son code de sortie fixe l'état du check.
+#   machine     exécutions machine du même outil sur le même arbre, d'où viennent les constats
+#               (fichier, ligne, règle, dépendance, vulnérabilité, couverture et seuil), jamais
+#               du texte humain. Chacune : `argv`, `parse` (lecteur des constats, voir plus bas),
+#               `when` (`failure` : seulement si la sortie humaine a échoué, par défaut ;
+#               `always` : à chaque run, par exemple la quality gate qui affiche sa valeur).
+#   exit_codes  sens des codes de sortie de la sortie humaine : `success` et `failure` (listes) ;
+#               tout autre code, un dépassement de délai ou un outil introuvable donnent
+#               `error` (« ⚠ Erreur de l'outil », la PR reste bloquée, « Relancer le check »).
+#
+# Jetons remplacés par `ci` dans les argv (tout autre `{…}` est refusé au chargement) :
+#   {repo}      chemin de l'arbre testé (`ci/<pr>-<sha7>/`) ; c'est aussi le dossier courant.
+#   {base_sha}  SHA de la base de la PR (diff-cover --compare-branch={base_sha}, story 8.4).
+#   {osv_url}   point OSV local (Settings.osv_url, AD-11, story 8.3) ; vide : job en erreur.
+#   {report}    fichier de rapport de cette exécution machine, hors de l'arbre (machine seule).
+#
+# Lecteurs `parse` livrés : ruff_json (`ruff check --output-format json`), junit (rapport
+# `--junitxml` de pytest : fichier du test en échec), gitleaks_json (`--report-format json`).
+# 8.1 ajoute bandit_json, 8.3 pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
+# diff_cover_json : un lecteur par format, dans `ci/findings.py`, et sa valeur dans `ci.Parse`.
+schema_version: 1
+jobs:
+  - job_id: ruff
+    label_text: Lint (ruff)
+    tool: ruff
+    required: true
+    barrier: lint
+    human: [check, .]
+    machine:
+      - argv: [check, ., --output-format, json, --no-fix]
+        parse: ruff_json
+    exit_codes: {success: [0], failure: [1]}
+
+  - job_id: pytest
+    label_text: Tests (pytest)
+    tool: pytest
+    required: true
+    barrier: tests
+    human: [-q, --tb=short]
+    machine:
+      - argv: [-q, --tb=no, --junitxml, "{report}"]
+        parse: junit
+    # 5 : aucun test collecté, tenu pour un échec du code (les tests ont disparu).
+    exit_codes: {success: [0], failure: [1, 5]}
+
+  - job_id: gitleaks
+    label_text: Secrets (gitleaks)
+    tool: gitleaks
+    required: true
+    barrier: secret-scan
+    # `dir` analyse l'arbre du SHA de tête sans git du PATH ; `--exit-code 3` sépare une fuite
+    # trouvée (3) d'une erreur de l'outil (1).
+    human: [dir, --no-banner, --redact, --exit-code, "3", .]
+    machine:
+      - argv: [dir, --no-banner, --redact, --exit-code, "3", --report-format, json, --report-path, "{report}", .]
+        parse: gitleaks_json
+    exit_codes: {success: [0], failure: [3]}

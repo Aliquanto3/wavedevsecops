@@ -95,7 +95,8 @@ def project(
         previous = None
     views = build_views(state, previous, restored, previous_graph(previous_views))
     branch = state.head.ref.removeprefix("refs/heads/")
-    remote = build_remote(git, layout, branch)
+    linker = Linker(state)
+    remote = build_remote(git, layout, branch, linker)
     before = previous_remote(previous_views)
     news = announce_remote(before, remote) if before is not None else ""
     views = views.model_copy(
@@ -104,7 +105,7 @@ def project(
             "announce_text": f"{views.announce_text} {news}".strip(),
         }
     )
-    return Projected(views, Linker(state))
+    return Projected(views, linker)
 
 
 __all__ = [

@@ -7,6 +7,7 @@ d'exception pour un outil absent ou abîmé : il en rend l'état et la raison.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import sys
@@ -472,7 +473,32 @@ def sync_environment(
             stderr=result.stderr,
             error=f"environnement incomplet : site-packages introuvable dans {venv}",
         )
+    if result.ok and (digest := lock_digest(project)) is not None:
+        try:
+            (venv / LOCK_MARKER).write_text(digest + "\n", encoding="utf-8")
+        except OSError:
+            pass  # sans marque, le pipeline recrée son propre environnement (AD-12)
     return result
+
+
+LOCK_MARKER = ".wds-uv-lock.sha256"
+"""Fichier d'un environnement créé par `sync_environment` : sha256 du `uv.lock` d'origine."""
+
+
+def lock_digest(project: Path) -> str | None:
+    """sha256 du `uv.lock` de `project`, ou None s'il manque."""
+    try:
+        return hashlib.sha256((project / "uv.lock").read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def environment_digest(venv: Path) -> str | None:
+    """sha256 du `uv.lock` dont `venv` a été créé (marque de `sync_environment`), ou None."""
+    try:
+        return (venv / LOCK_MARKER).read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
 
 
 def needs_environment(tool_ids: Sequence[str], settings: Settings | None = None) -> bool:
