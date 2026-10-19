@@ -86,7 +86,7 @@ development_status:
   5-6-le-scénario-b-env-committé: done
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: done
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: done
-  5-9-encart-ce-qui-l-aurait-bloqué-dans-les-scénarios-b: backlog
+  5-9-encart-ce-qui-l-aurait-bloqué-dans-les-scénarios-b: in-progress
   epic-5-retrospective: optional
 
   epic-6: in-progress
@@ -112,7 +112,7 @@ development_status:
   8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: done
   8-2-servir-une-base-de-vulnérabilités-locale-et-figée: done
   8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: done
-  8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: backlog
+  8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: in-progress
   8-5-le-scénario-llm-outil-trop-puissant-flow-4: backlog
   8-6-la-clé-d-api-en-dur-le-test-de-config-llm-et-l-injection-de: backlog
   epic-8-retrospective: optional

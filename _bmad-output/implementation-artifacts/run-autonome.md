@@ -524,6 +524,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 12:38 · 8.3 · fusion · commit de fusion sur main (après le tag v0.1.0), story done · 04657d7
 - 2026-10-19 12:38 · docs · fusion · spine et epics.md alignés sur le code (arbitrages), stories 5.9 et 9.6 ajoutées en backlog · db75c3f
 - 2026-10-19 12:39 · — · arrêt propre · pause demandée par Anaël pour /clear ; aucun agent actif ; état dans « Reprise » · —
+- 2026-10-19 12:42 Â· â€” Â· reprise Â· run relancÃ© par AnaÃ«l aprÃ¨s /clear ; worktree prune ; 6.7 laissÃ©e en review (recette) Â· â€”
+- 2026-10-19 12:42 Â· chore/arbitrages-ui Â· rebase Â· rebasÃ©e sur main, poussÃ©e, CI 39238881035 (pÃ©rimÃ©e) annulÃ©e Â· 194acc6
+- 2026-10-19 12:42 Â· chore/arbitrages-ui Â· second-avis Â· lancÃ© Â· â€”
+- 2026-10-19 12:42 Â· 8.4 Â· dev Â· lancÃ© (dev-story Sonnet, avec bandit --ini hors de l'arbre et contrÃ´le uv lock --check) Â· â€”
+- 2026-10-19 12:42 Â· 5.9 Â· dev Â· lancÃ© (dev-story Sonnet) Â· â€”
 
 ## Reprise (arrêt propre du 2026-10-19 12:39)
 
