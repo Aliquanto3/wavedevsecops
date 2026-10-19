@@ -21,7 +21,7 @@ Source des statuts : `sprint-status.yaml` (même dossier). Source des stories : 
 2. **Ressource à activer par Anaël** (Ollama, GPU, compte externe, poste réel) : ne pas improviser. Notifier, noter dans le journal, passer à la story suivante éligible. Les tests du parcours LLM (2.11, 6.6, 8.5, 8.6) remplacent l'appel réseau ; une story qui exigerait un vrai modèle s'arrête là.
 3. **Modèle** : `dev-story` sur Sonnet, sauf les stories pivots marquées ★, sur Opus. Reviewer sur Opus. Deux échecs Sonnet sur une story : la reprendre sur Opus. Un échec Opus : story `blocked` dans le journal, notification, on continue.
 4. **Pas d'imbrication** : seul l'orchestrateur lance des agents. Tous les appels sont bloquants et attendus. Un agent lancé en arrière-plan sans être attendu fait reprendre la story.
-5. **Tests** : tests ciblés pendant le dev, suite complète une fois avant chaque fusion dans `main`, CI verte sur les trois OS avant de passer la story en `done`.
+5. **Tests** (révisée le 2026-10-19 avec l'accord d'Anaël) : ruff et tests ciblés en local, pour les agents comme pour l'orchestrateur ; **la CI de branche sur les trois OS est la seule suite complète** et la porte de fusion (avant : suite locale avant chaque fusion, passée de 7 à 60 min par saturation du poste). Une pile de branches se fusionne quand la CI du sommet est verte. Les tests marqués `slow` ne tournent qu'en CI. Attendre une CI avec `gh run watch <id> --interval 60` (quota API partagé).
 6. **Sorties externes** : push sur `main` et CI autorisés pendant le run. Tag et release GitHub seulement dans les stories de release (6.7, 9.5), suite complète verte sur les trois OS.
 
 ## Parallélisme à risque minimal
@@ -29,7 +29,7 @@ Source des statuts : `sprint-status.yaml` (même dossier). Source des stories : 
 - **Au plus 3 stories en développement à la fois**, chacune dans son worktree (`dev-story` travaille en worktree et ne fusionne pas).
 - **Une vague = des stories qui ne touchent ni le même module, ni le même fichier pivot.** Fichiers pivots : catalogue des `kind` et enveloppes (`contracts/`, `events/`), registre des ops de setup (`content`, AD-7), registre des volets du front (`web/static`), liste blanche des commandes (AD-4), `tools.toml`, `content/pipeline.yaml`, `content/explanations.yaml`, `config.py` (`Settings`). Un ajout d'une ligne dans un registre est toléré ; une refonte ne l'est pas.
 - **La dépendance commande** : une story ne part qu'une fois toutes ses dépendances en `done` (colonne « Après »).
-- **Intégration en série**, dans l'ordre de la vague : rebase de la branche sur `main`, tests ciblés, suite complète, fusion, push, CI. Puis seulement la branche suivante. Conflit trivial (ajout dans un registre) : l'orchestrateur le résout. Conflit de fond : `dev-story` sur Opus refait le rebase, puis nouveau `second-avis`.
+- **Intégration en série**, dans l'ordre de la vague : rebase de la branche sur `main` (ou empilement sur la branche précédente), tests ciblés, push, CI verte sur les trois OS, fusion. Puis seulement la branche suivante. Conflit trivial (ajout dans un registre) : l'orchestrateur le résout. Conflit de fond : `dev-story` sur Opus refait le rebase, puis nouveau `second-avis`.
 - **Chevauchement** : la revue d'une story peut tourner pendant que les autres de sa vague se développent. La vague suivante peut démarrer story par story, dès que les dépendances de chacune sont en `done`. Il n'y a pas besoin d'attendre la fin de la vague.
 - Une story en échec ne bloque que ses dépendantes. Les autres continuent.
 
@@ -441,21 +441,36 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 07:06 · 5.6 · dev · fini, 1362 passed, CI verte ; scénario add-commit.B (désignation du commit, de .env ou de la ligne API_KEY, puis history_clean), op diff_line, type d'étape history_clean, StepContext.git · 8e8d3e1
 - 2026-10-19 07:06 · 5.6 · second-avis · lancé · —
 - 2026-10-19 07:06 · 8.1 · dev · lancé (dev-story Sonnet ; job bandit dans pipeline.yaml, arrêt si bandit absent de la table Stack) · —
+- 2026-10-19 07:13 · — · décision Anaël · accord sur l'accélération des tests : règle 5 révisée (CI seule suite complète, tests ciblés en local, agents sans suite complète), marqueur slow et pytest-xdist (tâche d'outillage lancée), exclusions Defender (script à lancer par Anaël en administrateur) · —
+- 2026-10-19 07:13 · 5.6 · second-avis · 1 high prouvé (history_clean validé après reset --soft avec .env encore indexé : le commit suivant le réintroduit), 3 medium (refs/original bloque sans explication, lignes de diff non désignables dans la vue Code, encart gitleaks du critère 4 reporté), 5 low ; reviewer à lancer à la reprise · —
+- 2026-10-19 07:13 · 7.5 · dev · fini, 1376 passed, CI verte ; 3 scénarios de station 2 (check-en-echec, pr-sans-revue, push-direct-main), type d'étape push_refused, pr_state étendu, déclencheur review_requested et intention pr_request_review (bouton « Demander une revue ») · cbf1730
+- 2026-10-19 07:13 · — · décision pour Anaël · 7.5 : ajouter pr_request_review à AD-17 (ou approbation automatique sans critère observable) · —
+- 2026-10-19 07:13 · 5.5, 6.4, 9.3, 2.10, 7.3, 6.3 · fusion · CI verte sur les six branches de la pile, six commits de fusion sur main dans cet ordre (code identique au sommet testé), stories done · aeaef91
+- 2026-10-19 07:13 · — · outillage · agent-cost-kit PR #13 : docs/amelioration-continue.md (dix limites du run et leurs contournements) · —
+- 2026-10-19 07:13 · — · arrêt propre · pause demandée par Anaël pour /clear ; agents encore actifs listés dans « Reprise » · —
 
-## Reprise (arrêt propre du 2026-10-18, fin de soirée)
+## Reprise (arrêt propre du 2026-10-19, matin)
 
-État au moment de l'arrêt : 25 stories `done` (Epic 1 ; 2.1 à 2.7 et 2.11 ; 3.1, 3.2 ; 4.1, 4.2, 4.3 ; 6.6 ; 7.1 ; 8.2 ; 9.1, 9.2). Aucun agent en cours. `main` à jour et poussé (63d065e).
+État : 48 stories `done` (Epics 1, 3 et 4 complets ; 2.1 à 2.11 ; 5.1, 5.2, 5.3, 5.5 ; 6.1 à 6.6 sauf 6.7 ; 7.1 à 7.4 ; 8.2 ; 9.1 à 9.3). `main` poussé. Règle 5 révisée : la CI de branche est la seule suite complète.
 
-Branche à reprendre en premier (worktree existant sous `.claude/worktrees/`) :
+Agents encore actifs au moment de la pause (leur travail est poussé sur leur branche à la fin ; à la reprise, lire la spec de la story et la dernière CI de la branche plutôt que d'attendre leur rapport) :
 
-| Story | Branche · SHA · worktree | Étape suivante |
+| Story | Branche · worktree | État · étape suivante |
 |---|---|---|
-| 4.5 | `story/4-5-quiz-retablir` · 9c3119a · agent-af869e12ac1ac0300 | `reviewer` Opus avec la liste du second avis (journal, 2 high prouvés) ; rebase sur main (contient 4.2 : brancher le premier essai sur ProgressStore, API dans la spec 4.2 ; conflits probables operations.py, steps.py, store.js, workspace.js) |
+| 5.4 | `story/5-4-liste-sha` · agent-a770fc7ec4ac12d80 | reviewer Opus en cours (rebase sur le sommet de pile, M1 aperçu SHA). Si la section `## Revue` de la spec est remplie et la CI verte : rebase sur main, CI, fusion. |
+| 7.6 | `story/7-6-pipeline-trois-ci` · agent-a86fecb393c4f1485 | dev en cours. Fini quand la spec est en `review` et la CI verte : second avis, puis reviewer. |
+| 8.1 | `story/8-1-bandit-sast` · agent-a36487cfb1221a062 | dev en cours (arrêt prévu si bandit absent de la table Stack : décision d'Anaël). Puis second avis, reviewer. |
+| outillage | `chore/tests-rapides` · agent-afd00f6cf6816f025 | marqueur slow + pytest-xdist en cours. À fusionner en priorité dès sa CI verte (accélère tout le reste). |
 
-Éligibles à lancer ensuite (dépendances done) : 4.4 (crée l'intention `restart` déjà postée par 4.5 ; efface restore_failed, quiz, quiz_first), 3.3, 3.4, 3.5, 7.2, 7.4 ★, 2.8, 4.6, 4.7. Attention aux modules partagés : 3.3/3.4/3.5/7.4 touchent `github_sim` (une à la fois ou presque) ; 7.2 et 2.8 le terminal/wsfs ; 4.4, 4.6, 4.7 le moteur d'étapes (attendre la revue de 4.5 pour 4.4). Puis suivre les vagues.
+Revues prêtes à lancer (aucun agent) :
 
-Méthode qui a bien marché ce soir pour tenir le rythme : empiler les branches revues (rebase de chacune sur la précédente), pousser toutes les branches pour leurs CI en parallèle, suite complète locale une seule fois sur le sommet de pile, puis fusions en série.
+| Story | Branche · worktree | Étape suivante |
+|---|---|---|
+| 5.6 | `story/5-6-scenario-b-env` (8e8d3e1, base ancienne 5.5) · agent-ac66659daa05d0686 | reviewer Opus avec la liste du second avis (journal, ligne 5.6 second-avis ; 1 high prouvé) ; rebase sur main d'abord. |
+| 7.5 | `story/7-5-revue-protection` (cbf1730) · agent-a98e0dcdab815945c | second avis, puis reviewer ; rebase sur main (contient 6.3 : conditions de repo_state, fingerprints.json à régénérer). |
 
-Points ouverts pour Anaël (rien ne bloque) : httpx dans la table Stack ; `diagnostic_seen` dans AD-5 ; `dismiss_stale_reviews` (défaut false) ; 9.2 disponibilité des outils de la carte par sonde réelle (défaut gardé) ; 2.5 garde sur `rm -rf *` à la racine (défaut : accepté) ; tests sur vrai poste des installeurs (1.6, 1.7) ; vérifications Ollama réel (6.6, dont Ctrl+C pendant une réponse lente) ; rendu navigateur (2.3, 9.1, 2.7 tracé des arêtes et troncature, 4.1, 9.2, 2.5).
+Éligibles ensuite : 5.7 (← 5.6 et 3.5), 8.3 (← 8.1, 8.2), 9.4 (← 2.10, done). Puis 5.8 (← 5.7), 8.4, 8.5, 8.6. 6.7 (mixte, release v0.1.0) quand toutes les stories `dev` des Epics 1 à 6 sont `done` (restent 5.4, 5.6, 5.7, 5.8). 10.2 à 10.5 restent en backlog.
 
-Suivi : `/agent-cost-kit:avancement-run` (plugin 0.6.4 : sans détail par story quand il y a des epics, barres █░ ; actif après redémarrage de Claude Code).
+Méthode : empiler les branches revues, CI sur chaque branche, fusion de la pile quand toutes les CI sont vertes ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees des stories done en fin de run seulement (fichiers verrouillés sous Windows). Contrats partagés à rappeler dans les prompts : identifiants du socle et des stations (`scenarios/order.py`), `RESTART_KIND = "scenario_reset"`, `answer_submit` avec `step_id` obligatoire, conditions de `repo_state` ajoutées par 6.3.
+
+Pour Anaël : lancer le script d'exclusions Defender en administrateur ; décisions non bloquantes au journal (la plus utile : identifiants des scénarios du socle et des stations) ; contrôles navigateur listés dans les specs.

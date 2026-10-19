@@ -55,7 +55,7 @@ development_status:
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: done
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: done
-  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: review
+  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: done
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
   epic-2-retrospective: optional
 
@@ -82,7 +82,7 @@ development_status:
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: done
   5-4-choisir-dans-une-liste-ou-par-sha: review
-  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: review
+  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: done
   5-6-le-scénario-b-env-committé: review
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
@@ -91,8 +91,8 @@ development_status:
   epic-6: in-progress
   6-1-choisir-son-parcours-et-parcourir-le-catalogue: done
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: done
-  6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: review
-  6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: review
+  6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: done
+  6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: done
   6-5-exporter-mon-rapport-de-progression: done
   6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: done
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
@@ -101,9 +101,9 @@ development_status:
   epic-7: in-progress
   7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: done
   7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: done
-  7-3-être-protégé-par-le-hook-pre-commit-gitleaks: review
+  7-3-être-protégé-par-le-hook-pre-commit-gitleaks: done
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: done
-  7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: in-progress
+  7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: review
   7-6-lire-le-même-pipeline-en-github-actions-jenkins-et-gitlab-ci: in-progress
   epic-7-retrospective: optional
 
@@ -119,7 +119,7 @@ development_status:
   epic-9: in-progress
   9-1-se-situer-grâce-au-bandeau-de-la-chaîne: done
   9-2-déplier-la-carte-de-la-chaîne: done
-  9-3-trouver-les-scénarios-de-station-dans-le-catalogue: review
+  9-3-trouver-les-scénarios-de-station-dans-le-catalogue: done
   9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: backlog
   9-5-publier-la-release-v0-2-0: backlog
   epic-9-retrospective: optional
