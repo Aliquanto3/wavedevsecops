@@ -84,10 +84,13 @@ jobs:
     required: true
     barrier: secret-scan
     # `dir` analyse l'arbre du SHA de tête sans git du PATH ; `--exit-code 3` sépare une fuite
-    # trouvée (3) d'une erreur de l'outil (1).
-    human: [dir, --no-banner, --redact, --exit-code, "3", .]
+    # trouvée (3) d'une erreur de l'outil (1). Story 8.6 : `--config {config}/gitleaks.toml`
+    # (règles par défaut, fichier hors du dépôt : un `.gitleaks.toml` déposé n'écarte rien) et
+    # `--ignore-gitleaks-allow` (un commentaire `gitleaks:allow` n'écarte rien non plus). Un
+    # `.gitleaksignore` à la racine reste lu par gitleaks : les scénarios le refusent (étape).
+    human: [dir, --no-banner, --redact, --exit-code, "3", --ignore-gitleaks-allow, --config, "{config}/gitleaks.toml", .]
     machine:
-      - argv: [dir, --no-banner, --redact, --exit-code, "3", --report-format, json, --report-path, "{report}", .]
+      - argv: [dir, --no-banner, --redact, --exit-code, "3", --ignore-gitleaks-allow, --config, "{config}/gitleaks.toml", --report-format, json, --report-path, "{report}", .]
         parse: gitleaks_json
     exit_codes: {success: [0], failure: [3]}
 

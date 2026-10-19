@@ -44,6 +44,9 @@ STATION_ORDER: tuple[str, ...] = (
     "couverture-sous-le-seuil",
     # Station 3, parcours LLM (story 8.5)
     "outil-trop-puissant",
+    # Station 3, parcours LLM (story 8.6)
+    "cle-api-en-dur",
+    "donnees-vers-le-cloud",
 )
 """Ordre conseillé des scénarios de station, par `scenario_id` (station 1, puis 2, puis 3). Un
 identifiant pas encore livré est absent du catalogue."""

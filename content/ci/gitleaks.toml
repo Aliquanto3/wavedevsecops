@@ -1,0 +1,8 @@
+# Réglages de gitleaks pour le check « gitleaks » du pipeline simulé (story 8.6).
+# gitleaks est lancé avec `--config {config}/gitleaks.toml` : ce fichier, hors du dépôt de
+# l'apprenant, remplace tout `.gitleaks.toml` que l'arbre testé pourrait porter (par exemple une
+# liste d'exceptions `[allowlist]`). Les règles sont celles de gitleaks, sans exception.
+title = "WaveDevSecOps"
+
+[extend]
+useDefault = true

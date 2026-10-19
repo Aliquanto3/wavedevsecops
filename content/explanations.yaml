@@ -161,3 +161,11 @@ entries:
       Cette [[quality-gate|quality gate]] mesure la part du code nouveau couverte par les tests
       et la compare à un seuil. Sous le seuil, la PR reste bloquée. Ajoutez des tests sur les
       lignes nouvelles non couvertes que la sortie liste.
+
+  remote.review_llm:
+    title_text: "La revue humaine du code LLM"
+    body_text: >-
+      Sur du code qui appelle un modèle de langage, la revue humaine est aussi la barrière contre
+      l'injection de prompt : un texte reçu (document, message) peut contenir des instructions qui
+      détournent le modèle. Aucun outil automatique ne les repère, c'est la personne qui relit qui
+      vérifie ce que le modèle lit et ce qu'il a le droit de faire.
