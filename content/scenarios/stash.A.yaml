@@ -1,0 +1,148 @@
+# Scénario A « stash » (Story 6.3) : mettre son travail en cours de côté pour récupérer le
+# commit d'un collègue, puis le reprendre.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: stash
+mode: A
+title_text: Stash
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Le collègue a modifié le titre du README et l'a poussé.
+  - op: colleague_commit
+    branch: main
+    message: Complète le titre du README
+    files:
+      - path: README.md
+        content: |
+          # Mon projet (équipe)
+
+          Un petit projet pour s'entraîner avec git.
+    as: commit-collegue
+  # Vous, vous avez commencé à compléter le README, sans commiter.
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+      À compléter : la section d'installation.
+steps:
+  - step_id: mettre_de_cote
+    type: quiz
+    title_text: Ranger son travail sans le perdre
+    instruction_text: >-
+      Vous avez modifié `README.md` sans le commiter, et votre collègue a modifié le même
+      fichier sur l'origine. Quelle commande met votre travail de côté, sans le commiter ni le
+      jeter, pour pouvoir récupérer son commit ?
+    explanation_text: >-
+      `git stash` range les modifications en cours dans une pile, hors de toute branche, et
+      remet le dossier dans l'état du dernier commit. Vous pourrez les reprendre plus tard.
+    choices:
+      - choice_id: stash
+        command_text: git stash
+        correct: true
+      - choice_id: pull
+        command_text: git pull
+        effect_text: >-
+          git a refusé : le commit du collègue écraserait vos modifications de `README.md`. Il
+          faut d'abord les mettre de côté ou les commiter.
+      - choice_id: reset_dur
+        command_text: git reset --hard
+        effect_text: >-
+          `reset --hard` a effacé vos modifications de `README.md` : elles ne sont ni dans un
+          commit ni dans le reflog, elles sont perdues. Le dossier est propre, mais votre travail
+          n'a pas été mis de côté.
+    hints:
+      lead_text: >-
+        Il faut une commande qui range le travail en cours dans une pile pour le retrouver
+        ensuite : ni commit, ni suppression.
+      partial_text: git ___
+      solution_text: git stash
+
+  - step_id: recuperer
+    type: repo_state
+    title_text: Récupérer le commit du collègue
+    instruction_text: >-
+      Le dossier est propre : récupérez maintenant le commit du collègue dans `main`.
+    explanation_text: >-
+      Avec un dossier propre, `git pull` avance simplement `main` jusqu'au commit du collègue.
+      Vos modifications restent à l'abri dans la pile du stash.
+    explain_ref: graph.remote_ref
+    expect:
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+          subject_contains: titre
+      stash:
+        min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          stash:
+            min: 1
+          commits:
+            - "on": origin/main
+              ahead_of: "@depart"
+              min: 1
+        reason_text: >-
+          Le commit du collègue est dans `origin/main`, mais pas encore dans votre branche : il
+          reste à l'intégrer.
+    hints:
+      lead_text: >-
+        Récupérer et intégrer en un seul geste : la commande porte le nom de l'action.
+      partial_text: git ___
+      solution_text: git pull
+
+  - step_id: reprendre
+    type: repo_state
+    title_text: Reprendre son travail mis de côté
+    instruction_text: >-
+      Reprenez vos modifications : elles doivent revenir dans `README.md`, par-dessus le
+      commit du collègue, et la pile doit être vide.
+    explanation_text: >-
+      `git stash pop` réapplique la dernière entrée de la pile puis la supprime. Git fusionne
+      ses lignes avec celles du collègue : leurs changements ne se touchent pas, il n'y a pas
+      de conflit. (`git stash apply` réapplique sans supprimer l'entrée ; `git stash drop`
+      supprime l'entrée.)
+    expect:
+      stash:
+        count: 0
+      index:
+        unstaged: [README.md]
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+          subject_contains: titre
+    foreseen:
+      - when:
+          stash:
+            min: 1
+        reason_text: >-
+          Vos modifications sont toujours dans la pile du stash. Reprenez-les, en vidant la pile.
+    hints:
+      lead_text: >-
+        `git stash` a une sous-commande qui rend le travail et retire l'entrée de la pile en
+        un seul geste.
+      partial_text: git stash ___
+      solution_text: git stash pop
