@@ -474,6 +474,30 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 09:32 · 8.1 · review · lancé (reviewer Opus, rebase sur story/7-6, balisage bandit des 6 fichiers CI) · —
 - 2026-10-19 09:35 · 5.6 · CI · verte après relance du job Windows (instabilité github.json de 7.4) · c2b72b9
 - 2026-10-19 09:35 · 5.6 · fusion · commit de fusion sur main, story done ; 5.7 se rebasera dessus · 9071c05
+- 2026-10-19 09:44 · 7.5 · CI · rouge sur Windows : même instabilité github.json illisible (test_pipeline::test_relancer_un_check_reste_en_cours_sans_run) ; job relancé · af67e0c
+- 2026-10-19 09:44 · 7.6 · CI · rouge sur Ubuntu et Windows : test_exercise_intent::test_parcours_sans_ia_refuse (KeyError run_exercise_code : dépend d'une application déjà créée dans le worker -n auto ; défaut latent de main révélé par la répartition) · dee2751
+- 2026-10-19 09:44 · outillage · fix · branche fix/lecture-github-json par l'orchestrateur : lecture de github.json réessayée sous Windows (comme l'écriture de wsfs), intention d'exercice enregistrée par son test ; tests ciblés verts, CI en cours ; à fusionner avant 7.5, 7.6, 9.4 · a73a84e
+- 2026-10-19 09:44 · 9.4 · review · M1, M2 (jalon remis à v0.1, test de masquage v0.1/v0.2), M4 (scenario_id inconnu journalisé et testé), L6, L8, L10 corrigés, L9 partiel ; L7 écarté ; M3 (traçabilité sans lien) et L5 (scénarios de station 2 après 7.5) reportés ; CI en cours · d6a1a5e
+- 2026-10-19 09:44 · — · décision pour Anaël · 9.4 : story pour le lien actif « traçabilité » vers PR et checks ? 9.5 passe CURRENT_MILESTONE à v0.2 · —
+- 2026-10-19 09:45 · 5.7 · dev · fini, 1228 passed (rapides), 17 tests dédiés, CI 39217898721 en cours ; push-pull.B (deux parcours), op fetch, étape origin_contains (ancêtre ou patch équivalent), 7 contournements refusés ; encart du critère 4 reporté comme 5.6 · d4b78c1
+- 2026-10-19 09:45 · 5.7 · second-avis · lancé · —
+- 2026-10-19 09:49 · 5.7 · second-avis · aucun high ni medium, 5 low (test branche supprimée vacueux, « sans forcer » non vérifié, cherry ignore les espaces, erreur silencieuse, pas d'AD-8 sur origin) ; reviewer Opus lancé · —
+- 2026-10-19 09:49 · 5.8 · dev · lancé (dev-story Sonnet, base story/5-7-scenario-b-push-force ; dernière story dev de la v0.1) · —
+- 2026-10-19 10:11 · fix · CI · verte sur les trois OS · a73a84e
+- 2026-10-19 10:11 · 9.4 · CI · rouge Windows, même instabilité github.json (corrigée par fix/lecture-github-json) · d6a1a5e
+- 2026-10-19 10:11 · 7.5 · CI · verte après relance du job Windows · af67e0c
+- 2026-10-19 10:11 · 8.1 · review · rebase sur 7.6 (fingerprints), H1 (code-vulnerable en station 3 de STATION_ORDER, test du catalogue à n stations), H2 (blocs wds:job bandit dans les 6 fichiers CI), M3 (--ignore-nosec), M4 (clé errors de bandit : constat unscanned_file, succès changé en échec), 2 tests de 7.6 réalignés, L5 corrigés ; L7 et contournement src/.bandit reportés ; 1 low rejeté · cffeb27
+- 2026-10-19 10:11 · — · décision pour Anaël · 8.1 : fermer le contournement src/.bandit (--ini hors de l'arbre, dans 8.1 ou 8.3) ou accepter le risque ; règle générale unscanned_file = échec · —
+- 2026-10-19 10:11 · fix, 7.6, 7.5, 9.4 · fusion · pile d'intégration integ/pile-1 sur main par l'orchestrateur (merges --no-ff) : conflits code.js (5.6 désignation du diff + 7.6 pipeline, deux côtés gardés), projections/remote.py (pipeline_jobs + can_request), chain.yaml (barrières review/protection de 7.5 gardées, celles de 9.4 retirées ; glossaire relié à pr-sans-revue et push-direct-main) ; empreintes en régénération · —
+- 2026-10-19 10:37 · 5.7 · review · rebase sur main, M (restaurer validé après git rm d'un fichier gardé : contrôle _kept du contenu), L1 (test branche supprimée probant), L3 corrigés ; L2, L4, L5 écartés ; 1228 passed (rapides), 19/19 ciblés · b87c904
+- 2026-10-19 10:37 · 8.1, 7.5 · fusion · conflit de fond résolu par l'orchestrateur : pr_state avait deux champs (check_states de 7.5, checks de 8.1) : check_states gardé avec la validation des job_id de 8.1, code-vulnerable et ses tests alignés ; STATION_ORDER et test du catalogue à trois stations ; empreintes régénérées (15 changements, blocs bandit des gabarits), stables · 69fdb68
+- 2026-10-19 10:37 · 5.7 · fusion · ajoutée à la pile integ/pile-1 sans conflit (37 empreintes stables) · 5aca1cd
+- 2026-10-19 10:37 · pile · intégration · pr-sans-revue attend aussi bandit: success (le job bandit de 8.1 restait en file et bloquait la fusion) ; 63 tests ciblés verts ; CI de la pile en cours (fix + 7.6 + 7.5 + 9.4 + 8.1 + 5.7) · bf717fc
+- 2026-10-19 10:37 · 5.8 · dev · fini, 1235 passed (1 échec isolé sous charge), 26 tests dédiés ; stash.B, rebase.B, groupe stash dans la vue staging, étape relancer après le quiz --abort · bcfe4f8
+- 2026-10-19 10:37 · 5.8 · second-avis · 1 high et 1 medium dus à la base (5.7 avant revue : _kept et tests perdus), 1 medium (stash décrit par son SHA), 4 low ; reviewer Opus lancé (rebase --onto integ/pile-1) · —
+- 2026-10-19 10:37 · — · décision pour Anaël · 5.8 : stash rendu visible et désignable dans la vue staging ; étape relancer ajoutée après le quiz --abort (quatre étapes) · —
+- 2026-10-19 10:38 · 8.3 · dev · lancé (dev-story Sonnet, base integ/pile-1) · —
+- 2026-10-19 10:50 · fix, 7.6, 7.5, 9.4, 8.1, 5.7 · fusion · CI de la pile verte sur les trois OS (6 jobs), main avancée en avance rapide sur integ/pile-1, stories done · bf717fc
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
 

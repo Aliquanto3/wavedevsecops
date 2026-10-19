@@ -84,8 +84,8 @@ development_status:
   5-4-choisir-dans-une-liste-ou-par-sha: done
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: done
   5-6-le-scénario-b-env-committé: done
-  5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
-  5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
+  5-7-le-scénario-b-push-force-qui-écrase-un-collègue: done
+  5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: review
   epic-5-retrospective: optional
 
   epic-6: in-progress
@@ -103,14 +103,14 @@ development_status:
   7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: done
   7-3-être-protégé-par-le-hook-pre-commit-gitleaks: done
   7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: done
-  7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: review
-  7-6-lire-le-même-pipeline-en-github-actions-jenkins-et-gitlab-ci: review
+  7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: done
+  7-6-lire-le-même-pipeline-en-github-actions-jenkins-et-gitlab-ci: done
   epic-7-retrospective: optional
 
   epic-8: in-progress
-  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: review
+  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: done
   8-2-servir-une-base-de-vulnérabilités-locale-et-figée: done
-  8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: backlog
+  8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: in-progress
   8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: backlog
   8-5-le-scénario-llm-outil-trop-puissant-flow-4: backlog
   8-6-la-clé-d-api-en-dur-le-test-de-config-llm-et-l-injection-de: backlog
@@ -120,7 +120,7 @@ development_status:
   9-1-se-situer-grâce-au-bandeau-de-la-chaîne: done
   9-2-déplier-la-carte-de-la-chaîne: done
   9-3-trouver-les-scénarios-de-station-dans-le-catalogue: done
-  9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: backlog
+  9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: done
   9-5-publier-la-release-v0-2-0: backlog
   epic-9-retrospective: optional
 
