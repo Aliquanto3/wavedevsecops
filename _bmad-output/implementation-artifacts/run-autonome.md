@@ -582,6 +582,13 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 16:08 Â· â€” Â· dÃ©cision AnaÃ«l Â· 8.5 : liste des noms interdits gardÃ©e (getattr compris), second relecteur Â« NoÃ© LefÃ¨vre Â» gardÃ© Â· 8.6 : test Ã©cartÃ© par la config de pytest et clÃ© dÃ©coupÃ©e gardÃ©s comme limites nommÃ©es au dÃ©brief ; vÃ©rification des tests rÃ©ellement exÃ©cutÃ©s (constat junit) et refus de .gitleaksignore dÃ¨s l'Ã©tape de PR (head_files) en suites aprÃ¨s v0.2.0 Â· â€”
 - 2026-10-19 16:17 Â· 9.6, 8.5, 8.6 Â· fusion Â· CI de integ/pile-3 verte sur les trois OS (6 jobs), main avancÃ©e en avance rapide, stories done ; Epics 7 Ã  9 en done hors 9.5 Â· ae3f265
 - 2026-10-19 16:17 Â· 9.5 (mixte) Â· dev Â· lancÃ© (dev-story Sonnet : prÃ©paration seule, version 0.2.0, CURRENT_MILESTONE v0.2, README, notes ; tag et release aprÃ¨s accord d'AnaÃ«l) Â· â€”
+- 2026-10-19 16:35 Â· 9.5 (mixte) Â· dev Â· prÃ©paration finie (0.2.0, CURRENT_MILESTONE v0.2, README, docs/releases/v0.2.0.md avec mesure 45 s et SM-9 Ã  remplir ; Ã©tape unshare -n Ã©tendue Ã  5 fichiers de scÃ©narios de station) ; rien publiÃ© ; CI 39270159707 Â· 05dce41
+- 2026-10-19 16:35 Â· 9.5 Â· second-avis Â· lancÃ© Â· â€”
+- 2026-10-19 16:38 Â· 9.5 Â· second-avis Â· 1 high (test_outil_trop_puissant sous unshare -n dÃ©marre un serveur OSV sur 127.0.0.1, lo Ã©teint : Ã©tape Linux rouge probable), 1 medium (notes Â« aucun socket Â» fausses), 4 low ; reviewer Opus lancÃ© (relever lo dans l'espace pour couvrir tous les scÃ©narios de station) ; CI 39270159707 annulÃ©e (pÃ©rimÃ©e) Â· â€”
+- 2026-10-19 17:01 Â· 9.5 Â· review Â· rebase sur main ; H (lo relevÃ© dans l'espace unshare -n : ip link set lo up, et test_blockers, test_dependance_vulnerable, test_quality_gate, test_llm_scenarios ajoutÃ©s : toutes les stations 1 Ã  3 des deux parcours rÃ©seau coupÃ©, 362 tests sans saut), M (affirmation Â« aucun serveur local Â» corrigÃ©e), L (limite Â« total, pas chaque fichier Â» non encore au dÃ©brief, dit dans les notes), L (puce du README) corrigÃ©s ; durÃ©es CI vÃ©rifiÃ©es ; diagnostic (v0.2+) Ã©cartÃ© Â· d5f81d6
+- 2026-10-19 17:01 Â· 9.5 Â· CI Â· verte sur les trois OS (1819 passed sous Ubuntu) Â· d5f81d6
+- 2026-10-19 17:01 Â· 9.5 Â· fusion Â· prÃ©paration fusionnÃ©e sur main (sans tag) ; story en review Â· 62a1583
+- 2026-10-19 17:01 Â· 9.5 Â· attente humaine Â· mesure des 45 s sur le poste de rÃ©fÃ©rence, recette SM-9 (12 scÃ©narios, deux parcours, rÃ©seau coupÃ©, sans indice) Ã  consigner dans docs/releases/v0.2.0.md ; accord d'AnaÃ«l pour le tag v0.2.0 et la release Â· â€”
 
 ## Reprise (arrêt propre du 2026-10-19 12:39)
 
