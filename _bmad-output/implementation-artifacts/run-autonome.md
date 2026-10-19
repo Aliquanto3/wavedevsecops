@@ -429,6 +429,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:23 · 5.5, 6.4, 9.3 · fusion · 9.3 rebasée sur la 6.4 actuelle (contient 5.5), branche poussée ; suite unique sur 9.3 (couvre les trois) en cours à la place de celle de 6.4 ; CI 9.3 en cours · 42784c7
 - 2026-10-19 06:24 · 2.10 · fusion · correctif d'intégration par dev-story Opus (clic sur la sortie de check traité deux fois par remote.js et linking.js : preventDefault et defaultPrevented), 119 tests ciblés · 09e307c
 - 2026-10-19 06:24 · 5.5, 6.4, 9.3, 2.10, 7.3 · fusion · pile de cinq dans cet ordre sur main (2.10 sur 9.3, 7.3 sur 2.10, sans conflit) ; suite unique sur le sommet en cours, CI 2.10 et 7.3 relancées (5.5, 6.4 vertes ; 9.3 en cours) · 57e6d96
+- 2026-10-19 06:32 · 6.3 · review · rebase sans conflit, 5 conditions ajoutées à repo_state (head/branches contains, commits merges, tree markers_absent/markers_present/contains), H1, H2, M3, M4, L5, L6, L8 corrigés avec 8 tests de contournement ; 2 contournements du même type corrigés dans 6.2 (push-pull, pr-merge) ; L7 écarté ; CI branche verte (suite complète en CI) · d091a4e
+- 2026-10-19 06:32 · — · décision pour Anaël · 6.3 : valider l'extension de repo_state (5 conditions) ; réécrire le même texte à la main en stash reste accepté (état identique, AD-7) · —
+- 2026-10-19 06:32 · 6.3 · fusion · empilée sur 7.3 (fingerprints.json régénéré, 26 empreintes stables) ; suite unique relancée sur le sommet de six stories ; CI 6.3 en cours · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
