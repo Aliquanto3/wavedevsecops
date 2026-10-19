@@ -23,7 +23,7 @@ function explainable(node) {
   return node.tagName === "BUTTON" || EXPLAINABLE_CLASSES.some((name) => node.classList.contains(name));
 }
 
-export function installExplain(root, { store, linking, selection, fetchImpl, grid, nodesOf, observeWith }) {
+export function installExplain(root, { store, linking, selection, fetchImpl, grid, nodesOf, observeWith, relatedOf }) {
   const fetcher = fetchImpl || ((...args) => fetch(...args));
   let catalogue = null; // Promise du catalogue, relu une fois
   const decorated = new WeakSet();
@@ -95,7 +95,7 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
       if (other && !labels.has(other)) labels.set(other, node.getAttribute("aria-label") || "");
     }
     const items = [];
-    for (const other of linking.linksOf(id)) {
+    for (const other of relatedOf ? relatedOf(id) : linking.linksOf(id)) {
       const name = linking.nameOf(other) || labels.get(other);
       if (name && !items.some((item) => item.name === name)) items.push({ id: other, name });
     }
@@ -217,12 +217,13 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     if (returnFocus && trigger.isConnected) trigger.focus();
   }
 
-  document.addEventListener("click", (event) => {
+  function onDocumentClick(event) {
     if (!current) return;
     const target = event.target;
     if (current.popover.contains(target) || current.trigger.contains(target)) return;
     close(false);
-  });
+  }
+  document.addEventListener("click", onDocumentClick);
 
   const unsubscribe = linking.subscribe(() => observeWith());
   decorate();
@@ -235,6 +236,7 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     catalogue: entries,
     destroy() {
       unsubscribe();
+      document.removeEventListener("click", onDocumentClick);
       close(false);
     },
   };

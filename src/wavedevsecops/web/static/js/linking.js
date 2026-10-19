@@ -176,6 +176,23 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
     return grid.querySelectorAll(ELEMENT);
   }
 
+  /**
+   * Correspondants de `id` : les arêtes déclarées, plus, pour un bloc de sortie d'outil, les
+   * éléments que ses passages citent (`spans` du serveur, notés en `data-span-ids`). Ainsi le
+   * bloc allume le fichier cité comme le fichier allume le bloc.
+   */
+  function related(id) {
+    const out = linking.linksOf(id);
+    if (!String(id).startsWith("output:")) return out;
+    for (const node of grid.querySelectorAll("[data-span-ids]")) {
+      if (node.getAttribute("data-element-id") !== id) continue;
+      for (const span of (node.getAttribute("data-span-ids") || "").split(" ")) {
+        if (span && !out.includes(span)) out.push(span);
+      }
+    }
+    return out;
+  }
+
   function setClass(node, name, on) {
     if (on) node.classList.add(name);
     else node.classList.remove(name);
@@ -184,7 +201,7 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
   /** Marque les correspondants de l'élément actif dans toutes les vues. */
   function apply() {
     const id = active();
-    const lit = new Set(id ? [id, ...linking.linksOf(id)] : []);
+    const lit = new Set(id ? [id, ...related(id)] : []);
     let others = 0;
     for (const node of nodes()) {
       const nid = idOf(node);
@@ -213,10 +230,12 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
   }
 
   function set(patch) {
+    const before = `${hover}|${focus}|${held}`;
     if ("hover" in patch) hover = patch.hover;
     if ("focus" in patch) focus = patch.focus;
     if ("held" in patch) held = patch.held;
-    apply();
+    // Le survol passe d'un nœud à l'autre du même élément : rien ne change, rien à reparcourir.
+    if (`${hover}|${focus}|${held}` !== before) apply();
   }
 
   const inChips = (node) => Boolean(chipBar && node && chipBar.contains(node));
@@ -274,7 +293,7 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
       if (other && !labels.has(other)) labels.set(other, node.getAttribute("aria-label") || "");
     }
     const out = [];
-    for (const other of linking.linksOf(id)) {
+    for (const other of related(id)) {
       const name = linking.nameOf(other) || labels.get(other);
       if (name && !out.includes(name)) out.push(name);
     }
@@ -341,7 +360,7 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
   function syncChips() {
     if (!chipBar) return;
     const id = active();
-    const lit = id ? [id, ...linking.linksOf(id)] : [];
+    const lit = id ? [id, ...related(id)] : [];
     for (const chip of chipBar.querySelectorAll("[data-pane]")) {
       const pane = getPane(chip.getAttribute("data-pane"));
       if (!pane) continue;
@@ -362,7 +381,7 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
   function reveal(paneId, anchorId = active()) {
     const section = grid.querySelector(`[data-pane="${paneId}"]`);
     if (!section || !anchorId) return null;
-    const lit = new Set([anchorId, ...linking.linksOf(anchorId)]);
+    const lit = new Set([anchorId, ...related(anchorId)]);
     apply();
     let target = null;
     for (const node of section.querySelectorAll(ELEMENT)) {
@@ -397,7 +416,7 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
     observer.observe(grid, { childList: true, subtree: true });
   }
 
-  const explain = installExplain(root, { store, linking, selection, fetchImpl, grid, nodesOf: nodes, observeWith: schedule });
+  const explain = installExplain(root, { store, linking, selection, fetchImpl, grid, nodesOf: nodes, observeWith: schedule, relatedOf: related });
 
   apply();
   return {

@@ -43,7 +43,10 @@ def snaps(tmp_path_factory: pytest.TempPathFactory, git_path: Path) -> dict:
         "views": views,
         "sha": sha,
         "explanations": yaml.safe_load((CONTENT / "explanations.yaml").read_text("utf-8")),
-        "diff": {**parse_diff(UNIFIED, sha).model_dump(mode="json"), "target_text": f"Commit {sha[:7]}"},
+        "diff": {
+            **parse_diff(UNIFIED, sha).model_dump(mode="json"),
+            "target_text": f"Commit {sha[:7]}",
+        },
     }
 
 
@@ -124,7 +127,9 @@ console.log(JSON.stringify({{ lit: marked(), wrong, linking: ws.getAttribute("da
     assert branch in out["lit"]
 
 
-def test_la_ref_du_graphe_et_celle_du_distant_s_allument_ensemble(tmp_path: Path, snaps: dict) -> None:
+def test_la_ref_du_graphe_et_celle_du_distant_s_allument_ensemble(
+    tmp_path: Path, snaps: dict
+) -> None:
     branch = snaps["views"]["remote"]["branches"][0]["element_id"]
     out = _js(
         tmp_path,
@@ -172,7 +177,9 @@ console.log(JSON.stringify({ first, kept, second, cleared: selection.value, link
     )
     assert out["first"] == {"value": f"commit:{snaps['sha']}", "pressed": "true", "selected": 1}
     assert out["kept"]["lit"] > 1 and out["kept"]["linking"] == "on"
-    assert out["second"]["graphSelected"] == 0 and out["second"]["value"].startswith("ref:refs/remotes/origin/")
+    assert out["second"]["graphSelected"] == 0 and out["second"]["value"].startswith(
+        "ref:refs/remotes/origin/"
+    )
     assert out["cleared"] is None and out["linking"] is None and out["lit"] == 0
 
 
@@ -340,9 +347,16 @@ console.log(JSON.stringify({ hovered, opened, closed, fetched: calls.filter((c) 
     assert out["opened"]["body"].startswith("Un commit est une photo")
     assert out["opened"]["ref"] == "graph.commit" and out["opened"]["expanded"] == "true"
     assert out["opened"]["focusInside"] and out["opened"]["labelled"] == expected["title_text"]
-    assert out["opened"]["label"].startswith("Expliquer commit ") and out["opened"]["tabindex"] == "-1"
+    assert (
+        out["opened"]["label"].startswith("Expliquer commit ") and out["opened"]["tabindex"] == "-1"
+    )
     assert out["opened"]["selection"] is None  # le « i » ne sélectionne pas l'élément
-    assert out["closed"] == {"popovers": 0, "focusOnTrigger": True, "expanded": "false", "escapes": 0}
+    assert out["closed"] == {
+        "popovers": 0,
+        "focusOnTrigger": True,
+        "expanded": "false",
+        "escapes": 0,
+    }
     assert out["fetched"] == 1
 
 
@@ -390,6 +404,31 @@ console.log(JSON.stringify({ ref: block.getAttribute("data-explain-ref"), has: B
     assert out["ref"] == "terminal.output" and out["has"]
     assert out["title"] == snaps["explanations"]["entries"]["terminal.output"]["title_text"]
     assert out["selection"] is None
+
+
+def test_une_sortie_d_outil_allume_ce_qu_elle_cite_dans_les_deux_sens(
+    tmp_path: Path, snaps: dict
+) -> None:
+    out = _js(
+        tmp_path,
+        snaps,
+        """
+const short = snaps.sha.slice(0, 7);
+output(`src/app.py:1:1 voir ${short}\n`, [{ start: 20, end: 27, text: short, element_id: commitId }], { op: "o8", tool: "ruff", explain: "terminal.output" });
+await flush();
+const block = $(".tool-output");
+over(block);
+const hovered = { graph: marked().includes(commitId), lit: block.classList.contains("terminal-lit"), linking: ws.getAttribute("data-linking") };
+over($(".views-grid"));
+block.querySelector(".explain-trigger").click();
+await flush();
+$(".explain-links-toggle").click();
+const names = $$(".explain-link").map((b) => b.getAttribute("data-link-id"));
+console.log(JSON.stringify({ hovered, names }));
+""",
+    )
+    assert out["hovered"] == {"graph": True, "lit": True, "linking": "on"}
+    assert f"commit:{snaps['sha']}" in out["names"]
 
 
 def test_sans_catalogue_le_i_le_dit_au_lieu_de_rester_muet(tmp_path: Path, snaps: dict) -> None:
@@ -440,7 +479,9 @@ console.log(JSON.stringify({ plain, hovered, unhovered, selected, shown: Boolean
     }
 
 
-def test_le_defilement_vers_le_correspondant_n_a_lieu_que_sur_clic(tmp_path: Path, snaps: dict) -> None:
+def test_le_defilement_vers_le_correspondant_n_a_lieu_que_sur_clic(
+    tmp_path: Path, snaps: dict
+) -> None:
     out = _js(
         tmp_path,
         snaps,
@@ -464,6 +505,8 @@ def test_les_marques_de_lien_ne_gênent_pas_le_mode_designer() -> None:
     for selector in rules:
         for part in selector.split(","):
             if "is-linked" in part or "data-linking" in part:
-                assert ":not(.is-designating)" in part or part.strip().startswith(".pane-chip"), part
+                assert ":not(.is-designating)" in part or part.strip().startswith(".pane-chip"), (
+                    part
+                )
     # Jamais d'opacité (règle du dépôt) : les décors du graphe sont estompés par la couleur.
     assert "opacity" not in css.replace("dimmed-decor-opacity", "")

@@ -55,18 +55,19 @@ entries:
       nouveau commit ne sera retenu par aucun nom : créez une branche pour ne pas le perdre.
 
   index.path:
-    title_text: "Un fichier de l'index"
+    title_text: "Un fichier et ses trois zones"
     body_text: >-
-      Un fichier existe à trois endroits : le dernier commit, l'index (ce que `git add` a
-      préparé) et votre arbre de travail. `git status` montre les écarts entre eux.
-      Seul ce qui est dans l'index entre dans le prochain commit.
+      Git compare chaque fichier à trois endroits : le dernier commit, l'index (ce que
+      `git add` a préparé) et votre arbre de travail. `git status` montre les écarts entre eux,
+      dont les fichiers que git ne suit pas encore. Seul ce qui est dans l'index entre dans le
+      prochain commit.
 
   remote.pr:
     title_text: "Une pull request"
     body_text: >-
       Une PR propose de fusionner une branche dans une autre, ici dans `main`. Elle réunit la
       discussion, la revue, les contrôles automatiques et la décision de fusionner.
-      C'est le point de passage obligé avant que le code n'atteigne `main`.
+      Quand `main` est protégée, c'est le seul chemin pour y faire entrer du code.
 
   remote.check:
     title_text: "Un check"
@@ -79,8 +80,8 @@ entries:
     title_text: "Une revue"
     body_text: >-
       Une revue est l'avis d'une autre personne sur la PR : approuvée, modifications demandées
-      ou simple commentaire. Le principe des quatre yeux impose qu'au moins une autre personne
-      relise avant la fusion.
+      ou simple commentaire. Une règle de protection peut exiger qu'une autre personne approuve
+      avant la fusion : c'est le principe des quatre yeux.
 
   code.file:
     title_text: "Un fichier du diff"
@@ -93,5 +94,5 @@ entries:
     title_text: "La sortie d'un outil"
     body_text: >-
       Voici ce que l'outil a affiché, sans retouche. Un échec y est nommé avec le fichier et la
-      ligne en cause, que vous pouvez suivre dans les autres vues. La même commande, lancée par
-      la CI, donne le même verdict.
+      ligne en cause, que vous pouvez suivre dans les autres vues. Lancée par la CI avec la même
+      configuration et les mêmes versions, la même commande devrait donner le même verdict.

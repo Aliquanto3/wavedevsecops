@@ -76,3 +76,21 @@ entries:
 - `tests/test_links.py` : arêtes déclarées (PR, branche, commit, checks, revues, fichiers dans leurs trois zones), noms et clés d'explication de chaque élément projeté, `element_id` valides et sans doublon, `links` du diff d'un commit et de l'arbre de travail, catalogue d'explications (égalité avec `EXPLAIN_REFS`, 2 à 3 phrases, vouvoiement, pas de lien externe, `barrier_id` connu), catalogue absent ou invalide, `GET /api/explanations`.
 - `tests/test_linking_dom.py` (Node, vraies projections) : survol et mêmes `element_id` entre graphe et Distant, sélection unique persistante et effacée, sélections `pr:`, `check:`, `output:` qui survivent au redessin, sélection périmée, diff lié au commit et cible conservée, Entrée sur une ligne, ligne disparue, `terminal-lit`, `aria-describedby`, « i » (jamais au survol, focus, Échap, liste des éléments liés, sortie d'outil sans sélection du bloc, catalogue vide), puces « · lié » et mise en évidence, défilement sur clic seulement, CSS (marques sous `:not(.is-designating)`, aucune `opacity`).
 - `tests/test_designation_dom.py` : le mode armé n'est pas gêné (liens posés, clic qui désigne sans sélectionner). `tests/test_terminal_tools.py` : `explain_ref` du bloc d'outil.
+
+## Revue
+
+Revue Opus (une passe), après rebase sur `origin/main` (4.4, 6.5, 2.9, 3.5). Second avis : Haiku.
+
+- M1 · second avis · corrigé · conflit d'import dans `workspace.js` (`diagnosticLink` de 6.5 et `mountLinking`) : les deux gardés.
+- M2 · second avis · corrigé · un bloc `tool-output` survolé, focalisé ou sélectionné n'allumait rien (aucune arête `output:`). `linking.js::related` ajoute aux arêtes déclarées les `element_id` que ses `spans` (serveur) citent ; même source pour le résumé, les puces, `reveal` et « Voir les éléments liés ». Test `test_une_sortie_d_outil_allume_ce_qu_elle_cite_dans_les_deux_sens` (échoue sans le correctif).
+- M3 · second avis · écarté · le focus posé sur le conteneur du dialogue : Tab y mène au premier bouton du popover (on n'en sort pas), Maj+Tab depuis le conteneur ou le premier bouton et Tab depuis le dernier ferment. Conforme à « Tab hors du popover le ferme ».
+- L4 · second avis · écarté · `links` répétés sur chaque `DiffLine` : diff borné à 3000 lignes, servi en boucle locale ; le contrat déclaratif (AD-2) prime sur quelques centaines de Ko.
+- L5 · second avis · écarté · le résumé ne compte que les éléments nommés : voulu, il annonce ce que le lecteur peut trouver (une cible absente de l'écran n'est pas comptée).
+- L6 · second avis · corrigé (complexité) · `set()` ne reparcourt plus les nœuds quand survol, focus et ancre n'ont pas changé (chaque `pointerover` d'un enfant du même élément). Le parcours par redessin reste un O(n) regroupé par microtâche, borné par `MAX_LINES` du terminal.
+- L7 · second avis · corrigé · `remote.pr`, `remote.review`, `terminal.output` : affirmations ramenées à ce qui est vrai (protection de branche, « devrait » avec même configuration et mêmes versions).
+- L8 · second avis · corrigé · `index.path` : titre « Un fichier et ses trois zones » ; le texte couvre aussi les fichiers non suivis.
+- L9 · second avis · écarté · sélection `path:` d'un fichier disparu gardée : voulu par la spec (seule la vue qui la montre l'efface).
+- L10 · second avis · écarté · `.explain-host` en `position: relative` : aucun parent d'élément expliqué n'est en `absolute`/`sticky` dans les CSS, un seul « i » par parent sur les vraies projections (vérifié sous Node).
+- Low · reviewer · corrigé · `explain.js` laissait un écouteur `click` sur `document` après `destroy()` (cumul à chaque remontage de l'espace).
+- Medium · reviewer · reporté · les étiquettes de refs du graphe (`data-ref`, des `span` dans la ligne du commit) n'ont pas de « i » : les clés `graph.branch`, `graph.tag`, `graph.head`, `graph.head_detached` ne s'affichent jamais (les refs distantes en ont un, dans le volet Distant). Demande une décision de placement (plusieurs « i » par ligne du graphe) à vérifier dans un navigateur.
+- Relecture des 13 explications : vouvoiement partout, pas d'erreur git relevée hors L7/L8.
