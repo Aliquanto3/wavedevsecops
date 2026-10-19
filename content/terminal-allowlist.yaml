@@ -71,6 +71,10 @@ messages:
   hook_refused_secret: >-
     Refusé par le hook pre-commit : gitleaks a trouvé un secret. Le commit n'a pas été créé.
   hook_refused: "Refusé par le hook pre-commit. Le commit n'a pas été créé."
+  no_verify: >-
+    « git commit --no-verify » est refusé ici : il saute le hook pre-commit, donc la recherche
+    de secrets. Retirez le secret du fichier, ajoutez-le de nouveau et committez sans cette
+    option.
   pre_commit_install: >-
     « pre-commit {sub} » est refusé : les hooks sont posés par le scénario, pas par vous. Le
     hook pre-commit se lance tout seul à chaque « git commit ».

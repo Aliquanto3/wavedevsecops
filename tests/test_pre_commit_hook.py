@@ -29,6 +29,7 @@ from wavedevsecops.toolrun import findings as machine
 SCENARIO = Path(__file__).resolve().parent.parent / "content" / "scenarios"
 SECRET = SCENARIO / "secret-dans-un-commit.A.yaml"
 FILE = "src/inventory/reappro.py"
+KEY = "AKIAQ3XTR7WUDNB4HK6P"
 SENTENCE = (
     "Refusé par le hook pre-commit : gitleaks a trouvé un secret. Le commit n'a pas été créé."
 )
@@ -184,13 +185,15 @@ def test_un_commit_qui_passe_garde_la_sortie_de_git_et_les_refus_ne_collent_pas(
     assert len(_commits_ahead(box)) == 1  # le premier commit refusé n'existe pas
 
 
-def test_no_verify_contourne_le_hook_comme_avec_git(box: Box, tmp_path: Path) -> None:
-    _fake_hook(
-        box.layout, tmp_path, exit_code=1, refusal={"tool": "gitleaks", "lines": {FILE: [3]}}
-    )
+def test_no_verify_est_refuse_quand_le_hook_est_pose(box: Box, tmp_path: Path) -> None:
+    """Revue 7.3 : `--no-verify` validait l'étape avec la clé committée."""
+    _fake_hook(box.layout, tmp_path, exit_code=0, refusal=None)
     assert box.run(f"git add {FILE}")[1] == 0
     _op, code, events = box.run("git commit --no-verify -m x")
-    assert code == 0 and not [o for o in _outputs(events) if o["tool"]]
+    assert code != 0
+    (alert,) = [o for o in _outputs(events) if o["stream"] == "refused"]
+    assert "« git commit --no-verify » est refusé ici" in alert["text"]
+    assert _commits_ahead(box) == []
 
 
 # ------------------------------------------------------------------ hook : outil manquant
@@ -219,12 +222,55 @@ def test_gitleaks_absent_refuse_en_francais(box: Box, monkeypatch: pytest.Monkey
     assert "Ouvrez le diagnostic" in err.getvalue()
 
 
-def test_le_hook_ne_fait_rien_hors_de_repo_ou_sans_configuration(box: Box, tmp_path: Path) -> None:
+def test_le_hook_ne_fait_rien_hors_de_repo(box: Box) -> None:
     err = io.StringIO()
     assert hooks.pre_commit(box.layout.origin, io.StringIO(), err) == 0  # dépôt nu
-    (box.layout.repo / ".pre-commit-config.yaml").unlink()
-    assert hooks.pre_commit(box.layout.repo, io.StringIO(), err) == 0
     assert err.getvalue() == ""
+
+
+GITLEAKS_HOOK = (
+    "repos:\n  - repo: local\n    hooks:\n      - id: gitleaks\n        name: gitleaks\n"
+    "        entry: gitleaks git --pre-commit --staged\n        language: system\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (None, "ne trouve plus `.pre-commit-config.yaml`"),
+        ("repos: []\n", "ne déclare plus aucun hook"),
+        ("repos:\n  - repo: local\n    hooks: []\n", "ne déclare plus aucun hook"),
+        ("repos: [\n", "ne peut pas lire"),
+        ("- a\n", "ne peut pas lire"),
+        (
+            "repos:\n  - repo: https://github.com/gitleaks/gitleaks\n    rev: v8.30.1\n"
+            "    hooks:\n      - id: gitleaks\n",
+            "« https://github.com/gitleaks/gitleaks » n'est pas accepté",
+        ),
+        (GITLEAKS_HOOK.replace("entry: gitleaks", "entry: curl"), "lance « curl »"),
+        (GITLEAKS_HOOK.replace("language: system", "language: python"), "lance « gitleaks »"),
+    ],
+)
+def test_configuration_retiree_videe_ou_distante_refusee(
+    box: Box, content: str | None, expected: str
+) -> None:
+    """Revue 7.3 : une configuration retirée, vidée ou distante désactivait le hook en silence
+    (ou faisait cloner `pre-commit` hors ligne, AD-13) ; le hook refuse et l'explique."""
+    config = box.layout.repo / ".pre-commit-config.yaml"
+    if content is None:
+        config.unlink()
+    else:
+        config.write_text(content, encoding="utf-8")
+    err = io.StringIO()
+    assert hooks.pre_commit(box.layout.repo, io.StringIO(), err) == hooks.EXIT_REFUSED
+    assert expected in err.getvalue() and "Le commit n'a pas été créé." in err.getvalue()
+    assert hooks.read_refusal(box.layout) == hooks.Refusal("pre-commit", {})
+
+
+def test_configurations_du_gabarit_et_du_scenario_acceptees(box: Box) -> None:
+    root = Path(__file__).resolve().parent.parent / "content" / "exercise"
+    for config in [box.layout.repo, root / "no_ai", root / "llm"]:
+        assert hooks.config_problem(config / ".pre-commit-config.yaml") is None, config
 
 
 # ------------------------------------------------------------------ toolrun : environnement
@@ -334,7 +380,8 @@ def test_vrai_hook_pre_commit(git_path: Path, track: str) -> None:
         (block,) = [o for o in outputs if o["tool"]]
         assert block["tool"] == "gitleaks"
         assert "gitleaks" in block["text"] and "Failed" in block["text"]
-        assert "AKIA" not in block["text"] or "REDACTED" in block["text"] or FILE in block["text"]
+        # Revue 7.3 : la clé n'apparaît dans aucune sortie émise (ni journal, ni bloc).
+        assert all(KEY not in o["text"] for o in outputs)
         (alert,) = [o for o in outputs if o["stream"] == "refused"]
         assert alert["text"].startswith(SENTENCE) and f"{FILE}:3" in alert["text"]
         assert [s["element_id"] for s in alert["spans"]] == [element_id("path", "worktree", FILE)]

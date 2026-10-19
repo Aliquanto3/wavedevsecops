@@ -101,11 +101,11 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     if command.sub == "push":
         # Le chemin de Python porté par les hooks suit l'application (environnement recréé).
         hooks.refresh(ctx.layout.hooks)
-    guarded = (
-        command.sub == "commit"
-        and "--no-verify" not in command.options
-        and hooks.pre_commit_installed(ctx.layout.hooks)
-    )
+    guarded = command.sub == "commit" and hooks.pre_commit_installed(ctx.layout.hooks)
+    if guarded and "--no-verify" in command.options:
+        # Story 7.3 : contourner la barrière que le scénario fait voir ne valide rien.
+        ctx.output(allow.message("no_verify"), "refused")
+        return EXIT_REFUSED
     if command.sub == "commit":
         hooks.clear_refusal(ctx.layout)
     try:
