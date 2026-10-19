@@ -1022,4 +1022,77 @@ main.is-workspace {
 .scenario-error-link {
   display: inline-block;
   margin-top: var(--space-2);
+/* --- Correction d'une désignation (story 5.5) --------------------------------------------- */
+/* Préséance des marques : verdict > sélection > désignable > lié. Le verdict l'emporte sur les
+   tirets du mode armé et sur le contour de sélection ; le sens ne repose jamais sur la couleur
+   seule (✓ ✗ ≡ dans le texte de la marque). */
+.workspace [data-designable].has-verdict:not(tr) {
+  outline: var(--stroke-min) solid var(--color-discipline-context);
+  outline-offset: 1px;
+}
+
+.workspace [data-designable].has-verdict.is-verdict-wrong:not(tr) {
+  outline: var(--stroke-min) dashed var(--color-danger);
+  outline-offset: 1px;
+}
+
+.verdict-mark {
+  flex: none;
+  margin-left: auto;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-discipline-context-soft);
+  color: var(--color-ink);
+  font: var(--font-weight-code) var(--font-size-label) / 1.4 var(--font-family-chat);
+  white-space: nowrap;
+}
+
+.verdict-mark + .verdict-mark {
+  margin-left: var(--space-1);
+}
+
+.verdict-mark.is-choice-wrong {
+  background: var(--color-danger-soft);
+}
+
+.graph-branch > .verdict-mark,
+.graph-head > .verdict-mark,
+.graph-remote-ref > .verdict-mark,
+.graph-tag > .verdict-mark {
+  margin-left: var(--space-1);
+}
+
+.answer-slot.is-validated {
+  border-style: solid;
+}
+
+.correction-summary,
+.correction-text {
+  margin: 0 0 var(--space-1);
+}
+
+.correction-list {
+  margin: 0 0 var(--space-1);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.correction-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.correction-item .verdict-mark {
+  margin-left: 0;
+}
+
+.correction-see {
+  text-decoration: underline;
+  color: var(--color-primary-deep);
+  cursor: pointer;
 }

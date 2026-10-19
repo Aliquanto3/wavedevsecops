@@ -402,6 +402,10 @@ class StepRunner:
                 "explanation_text": step.explanation_text if done else "",
                 "explain_ref": step.explain_ref if done else "",
             }
+            record = (run.get("answers") or {}).get(step.step_id) if done else None
+            if step.type == "designate" and isinstance(record, dict) and record.get("payload"):
+                # La correction relue après un rechargement ou une réouverture (story 5.5).
+                entry["correction"] = record["payload"]
             extra = STEP_TYPES[step.type].panel
             if i == position and extra is not None:
                 entry.update(extra(step))  # champs propres au type, pour l'étape courante

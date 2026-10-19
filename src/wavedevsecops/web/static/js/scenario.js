@@ -3,6 +3,7 @@
 // invente aucun hors des libellés fixes de l'interface, et ne calcule aucun verdict. Il ne garde
 // que des choix d'affichage : l'étape rouverte par un segment, l'encart écarté par « Continuer ».
 import { bindAction } from "./actions.js";
+import { correctionBlock } from "./correction.js";
 import { createDesignateBlock } from "./designation.js";
 import { el, richText } from "./dom.js";
 import { OPEN_HINT_LABEL, defaultTier, hintTabs, nextTier } from "./hints.js";
@@ -41,7 +42,10 @@ export function statusFor(state) {
   const current = panel.steps.find((step) => step.step_id === panel.current_step_id);
   const parts = [];
   if (state.restarted) parts.push(RESTARTED_TEXT);
-  if (verdict && verdict.status === "passed") parts.push(PASSED_TEXT);
+  const corrected = verdict && panel.steps.find((step) => step.step_id === verdict.step_id);
+  if (verdict && verdict.status === "passed" && corrected && corrected.correction) {
+    parts.push(corrected.correction.summary_text || PASSED_TEXT); // une désignation fausse ferme aussi l'étape
+  } else if (verdict && verdict.status === "passed") parts.push(PASSED_TEXT);
   else if (verdict && verdict.status === "failed" && verdict.reason_text) {
     parts.push(verdict.reason_text.replaceAll("`", ""));
   } else if (verdict && verdict.status === "unexpected") parts.push(`${UNEXPECTED_TITLE}.`);
@@ -64,6 +68,7 @@ export function createScenarioView({
   root.hidden = true;
   let shownId = null; // étape rouverte par un segment terminé
   let dismissed = null; // verdict dont l'encart a été écarté par « Continuer »
+  const doneCorrections = new Set(); // corrections dont « Continuer » a retiré les marques (5.5)
   let infoOpen = false;
   let chosen = null; // commande cochée du quiz en cours
   let hintTier = null; // palier d'indice affiché ; null : le plus avancé des paliers ouverts
@@ -248,12 +253,27 @@ export function createScenarioView({
     return card;
   }
 
+  /**
+   * Étape de désignation dont la correction est à lire : celle qu'on a rouverte, sinon celle qui
+   * précède l'étape courante tant que « Continuer » ne l'a pas fermée (aussi après un rechargement).
+   */
+  function correctionOf(panel, shown, current) {
+    if (shown.state === "done" && shown.correction) return { step: shown, reopened: true };
+    if (shown !== current) return null;
+    const prev = panel.steps[panel.steps.indexOf(current) - 1];
+    if (prev && prev.state === "done" && prev.correction && !doneCorrections.has(prev.step_id)) {
+      return { step: prev, reopened: false };
+    }
+    return null;
+  }
+
   function render(state) {
     lastState = state;
     const panel = state.stepPanel;
     if (!panel || !panel.steps.length) {
       root.hidden = true;
       root.replaceChildren();
+      if (designation) designation.setCorrection(null);
       return;
     }
     root.hidden = false;
@@ -341,7 +361,30 @@ export function createScenarioView({
     if (!explained && shown === current && verdict && verdict.status === "passed") {
       explained = byId.get(verdict.step_id) || null;
     }
-    if (explained && explained.explanation_text) children.push(explanationBlock(explained));
+    // Correction d'une désignation (story 5.5) : la liste, puis l'explication ; les vues portent les marques.
+    // « Recommencer » reste le seul bouton, au pied (4.4) : confirmation en ligne et garde anti-double envoi.
+    for (const step of panel.steps) if (!step.correction) doneCorrections.delete(step.step_id);
+    const corrected = correctionOf(panel, shown, current);
+    if (corrected) {
+      const step = corrected.step;
+      children.push(
+        correctionBlock(step, {
+          onSelect,
+          onContinue: corrected.reopened
+            ? null
+            : () => {
+                doneCorrections.add(step.step_id);
+                render(lastState);
+                const title = root.querySelector(".step-title");
+                if (title) title.focus();
+              },
+        }),
+      );
+      if (designation) designation.setCorrection(step.correction);
+    } else {
+      if (designation) designation.setCorrection(null);
+      if (explained && explained.explanation_text) children.push(explanationBlock(explained));
+    }
     // Pied du panneau : « Recommencer » et, une fois demandée, sa confirmation en ligne.
     children.push(
       restartFoot({

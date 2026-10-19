@@ -86,6 +86,15 @@ function explainStep(panel, payload) {
   return { ...panel, steps };
 }
 
+/** Joint la correction publiée par le serveur à son étape (story 5.5). */
+function correctStep(panel, payload) {
+  if (!panel) return panel;
+  const steps = panel.steps.map((step) =>
+    step.step_id === payload.step_id ? { ...step, correction: payload } : step,
+  );
+  return { ...panel, steps };
+}
+
 /** Étape courante du panneau, ou null. */
 function currentStep(panel) {
   return (panel && panel.steps.find((step) => step.step_id === panel.current_step_id)) || null;
@@ -233,6 +242,8 @@ export function createStore() {
         }
       } else if (envelope.kind === "step_explanation") {
         patch.stepPanel = explainStep(state.stepPanel, payload);
+      } else if (envelope.kind === "answer_corrected") {
+        patch.stepPanel = correctStep(state.stepPanel, payload);
       } else if (envelope.kind === "quiz_altered" && state.stepPanel) {
         const { first_attempt: _first, ...altered } = payload;
         patch.stepPanel = { ...state.stepPanel, quiz_altered: altered, restore_failed: null };
