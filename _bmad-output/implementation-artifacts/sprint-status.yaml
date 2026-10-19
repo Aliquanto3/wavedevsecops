@@ -62,7 +62,7 @@ development_status:
   epic-3: in-progress
   3-1-tenir-un-modèle-de-pr-complet-prêt-pour-les-stations: done
   3-2-ouvrir-une-pr-et-la-merger: done
-  3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: review
+  3-3-voir-le-distant-et-les-pr-dans-la-vue-distant-pr: done
   3-4-recevoir-la-revue-et-les-commits-d-un-collègue-simulé: done
   3-5-protéger-une-branche-pour-de-vrai-par-un-hook-pre-receive: review
   epic-3-retrospective: optional
