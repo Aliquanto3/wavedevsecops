@@ -449,6 +449,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 07:13 · — · outillage · agent-cost-kit PR #13 : docs/amelioration-continue.md (dix limites du run et leurs contournements) · —
 - 2026-10-19 07:13 · 5.4 · review · rebase sur la pile 6.3 (conflit de test résolu), M1 (aperçu vidé au changement d'étape, type recontrôlé), L2, L3 corrigés ; L4, L5, L6 écartés ; CI branche verte sur 6 jobs · 1d7a8c4
 - 2026-10-19 07:13 · 5.4 · fusion · commit de fusion sur main, story done · 782b4cf
+- 2026-10-19 07:33 · 7.6 · dev · fini, tests ciblés verts (suite complète en CI, verte) ; ci.yml, Jenkinsfile et .gitlab-ci.yml dans les gabarits d'exercice avec balises wds:job, test de concordance avec pipeline.yaml, bouton « Voir dans le pipeline » et onglets Pipeline dans la vue Code ; base avant 2.10 et 6.3 (empreintes à régénérer au rebase) ; les jobs 8.x devront baliser les trois fichiers · 65ea7ab
 - 2026-10-19 07:13 · — · arrêt propre · pause demandée par Anaël pour /clear ; agents encore actifs listés dans « Reprise » · —
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
@@ -460,7 +461,7 @@ Agents encore actifs au moment de la pause (leur travail est poussé sur leur br
 | Story | Branche · worktree | État · étape suivante |
 |---|---|---|
 
-| 7.6 | `story/7-6-pipeline-trois-ci` · agent-a86fecb393c4f1485 | dev en cours. Fini quand la spec est en `review` et la CI verte : second avis, puis reviewer. |
+| 7.6 | `story/7-6-pipeline-trois-ci` (65ea7ab) · agent-a86fecb393c4f1485 | dev fini, CI verte : second avis, puis reviewer ; rebase sur main (2.10, 6.3 : empreintes à régénérer). |
 | 8.1 | `story/8-1-bandit-sast` · agent-a36487cfb1221a062 | dev en cours (arrêt prévu si bandit absent de la table Stack : décision d'Anaël). Puis second avis, reviewer. |
 | outillage | `chore/tests-rapides` · agent-afd00f6cf6816f025 | marqueur slow + pytest-xdist en cours. À fusionner en priorité dès sa CI verte (accélère tout le reste). |
 
