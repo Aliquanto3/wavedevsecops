@@ -453,6 +453,27 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 07:35 · 8.1 · dev · fini, 97 tests ciblés, CI verte sur 6 jobs ; job bandit en fin de pipeline.yaml (bandit 1.9.4 déjà dans la table Stack), lecteur bandit_json, scénario code-vulnerable.A (station 3, pipeline: true, parcours sans IA), champ checks de pr_state ; doit aussi baliser ci.yml, Jenkinsfile et .gitlab-ci.yml après 7.6 · 81328ca
 - 2026-10-19 08:22 · outillage · fusion · 242 tests marqués slow (rapide local : 2 min avec -n auto), pytest-xdist 3.8.0 (table Stack, groupe dev), CI en -n auto : macOS 7 → 3-5 min, Windows 17 → 8-11 min ; CI verte deux fois, aucune instabilité ; commit de fusion sur main · f3d5720
 - 2026-10-19 07:13 · — · arrêt propre · pause demandée par Anaël pour /clear ; agents encore actifs listés dans « Reprise » · —
+- 2026-10-19 08:31 · — · reprise · /clear puis reprise par l'orchestrateur, git worktree prune, aucun agent actif · —
+- 2026-10-19 08:31 · 5.6 · review · lancé (reviewer Opus, rebase sur main, liste du second avis de 07:13) · —
+- 2026-10-19 08:31 · 7.5, 7.6, 8.1 · second-avis · lancés · —
+- 2026-10-19 08:47 · 7.5 · second-avis · 1 high (3 scénarios de station 2 absents de STATION_ORDER, test du catalogue à un seul groupe), 2 medium (conflits fingerprints/terminal/remote.js ; étapes de lecture validées sur l'état seul), 3 low ; reviewer Opus lancé (rebase sur main) · —
+- 2026-10-19 08:47 · 9.4 · dev · lancé (dev-story Sonnet, worktree depuis main) · —
+- 2026-10-19 08:52 · 8.1 · second-avis · 2 high (code-vulnerable absent de STATION_ORDER ; blocs wds:job bandit à ajouter aux 6 fichiers CI de 7.6), 2 medium (# nosec contourne le SAST ; clé errors de bandit ignorée : fichier illisible = check vert), 3 low ; reviewer en attente de la revue de 7.6 (rebase dessus) · —
+- 2026-10-19 08:53 · 7.6 · second-avis · aucun high ni medium, 4 low (404 sur pipeline illisible, survol resté posé après redessin, uv supposé dans Jenkins, concordance par sous-chaîne) ; test de concordance vérifié par mutation ; reviewer Opus lancé (rebase sur main) · —
+- 2026-10-19 09:11 · 9.4 · dev · fini, 1228 passed (rapides), CI 39214349917 en cours ; content/glossary.yaml (9 termes, DAST nommé seulement), page Vocabulaire, glossary-term [[id|texte]] dans les explications, 2 barrières ajoutées à la station 2 de chain.yaml ; CURRENT_MILESTONE passé à v0.2 (à vérifier avant 6.7) · de7fe48
+- 2026-10-19 09:11 · 9.4 · second-avis · lancé · —
+- 2026-10-19 09:12 · 5.6 · review · rebase --onto main (seul le commit 5.6 rejoué, empreintes stables), H (.env encore indexé après reset --soft), M (refs/original expliqué), M (lignes et fichiers du diff désignables dans la vue Code), M (18 tests vrai git marqués slow), L (--full-history) corrigés ; 2 low écartés ; critère 4 (encart « Ce qui l'aurait bloqué ») reporté ; 1224 passed (rapides), CI 39214395134 en cours · c2b72b9
+- 2026-10-19 09:12 · — · décision pour Anaël · 5.6 : critère 4 sans support (specs 5-1 et 9-3 contradictoires sur qui le fait) : story dédiée recommandée ; chain.yaml dit station 1 delivered: true, contraire à « Arrive en v0.2 » · —
+- 2026-10-19 09:12 · 5.7 · dev · lancé (dev-story Sonnet, base story/5-6-scenario-b-env ; chemin critique de la v0.1) · —
+- 2026-10-19 09:16 · 9.4 · second-avis · aucun high, 4 medium (CURRENT_MILESTONE v0.2 avant la v0.1.0, test de masquage retiré, traçabilité sans lien, scenario_id inconnu silencieux), 6 low ; reviewer Opus lancé · —
+- 2026-10-19 09:16 · — · décision · 9.4 : jalon remis à v0.1, la surface Vocabulaire reste masquée jusqu'à la release 9.5 qui passe CURRENT_MILESTONE à v0.2 · —
+- 2026-10-19 09:22 · 5.6 · CI · rouge sur Windows seulement : 1 failed / 1517 passed, test ancien de 7.4 (test_pipeline::test_chaque_job_donne_un_check_ecrit_par_la_file, github.json illisible : lecture pendant une écriture sous -n auto, probable remplacement de fichier non atomique sous Windows) ; job relancé ; instabilité à corriger si elle revient · c2b72b9
+- 2026-10-19 09:26 · 7.5 · review · rebase (conflit fingerprints.json, 6 empreintes ajoutées, stables), H1 (3 ids dans STATION_ORDER, test du catalogue à deux groupes), M2 corrigés ; M3, L4, L5 écartés (étapes d'observation : l'état n'est atteignable que par le chemin enseigné) ; L6 décision pour Anaël ; 1244 passed / 1 échec isolé sous charge (test_stations_pr check-en-echec[llm], vert seul) · af67e0c
+- 2026-10-19 09:32 · 7.6 · review · rebase (code.js : deux côtés gardés ; fingerprints régénéré, stable), 4 low du second avis et 1 low de revue corrigés (409 sur pipeline.yaml illisible, survol remis à zéro au redessin, uv dans Jenkins, concordance sur ligne non commentée, message du test = contrat des jobs 8.x) ; 1 écarté ; 1269 passed (rapides) · dee2751
+- 2026-10-19 09:32 · — · décision pour Anaël · 7.6 : 409 pour un pipeline.yaml invalide ; entrée d'explication de la vue pipeline (story à part ?) · —
+- 2026-10-19 09:32 · 8.1 · review · lancé (reviewer Opus, rebase sur story/7-6, balisage bandit des 6 fichiers CI) · —
+- 2026-10-19 09:35 · 5.6 · CI · verte après relance du job Windows (instabilité github.json de 7.4) · c2b72b9
+- 2026-10-19 09:35 · 5.6 · fusion · commit de fusion sur main, story done ; 5.7 se rebasera dessus · 9071c05
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
 

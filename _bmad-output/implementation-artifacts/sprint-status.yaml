@@ -83,7 +83,7 @@ development_status:
   5-3-désigner-un-élément-dans-les-vues: done
   5-4-choisir-dans-une-liste-ou-par-sha: done
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: done
-  5-6-le-scénario-b-env-committé: review
+  5-6-le-scénario-b-env-committé: done
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
   epic-5-retrospective: optional
