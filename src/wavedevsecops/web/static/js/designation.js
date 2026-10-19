@@ -43,6 +43,7 @@ export function designationFor(store) {
   let picks = new Map();
   let last = null; // dernière case remplie : un nouveau choix la remplace quand toutes sont pleines
   let button = null;
+  let correction = null; // correction active (story 5.5) : le serveur l'a écrite, les vues la marquent
   const listeners = new Set();
   const notify = () => {
     for (const listener of [...listeners]) listener();
@@ -77,6 +78,16 @@ export function designationFor(store) {
       picks = new Map();
       last = null;
       armed = false;
+      notify();
+    },
+    /** Correction dont les vues portent les marques ; null : aucune (story 5.5). */
+    get correction() {
+      return correction;
+    },
+    setCorrection(next) {
+      const value = next || null;
+      if (JSON.stringify(value) === JSON.stringify(correction)) return;
+      correction = value;
       notify();
     },
     setButton(node) {

@@ -168,6 +168,10 @@ def correct(
                 expected_element_id=primary,
                 accepted_element_ids=accepted,
                 text=text,
+                label_text=slot.label_text,
+                element_texts={
+                    e: describe(e, state) for e in dict.fromkeys([element, primary, *accepted])
+                },
             )
         )
     right = sum(m.correct for m in marks)

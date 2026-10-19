@@ -210,6 +210,10 @@ class SlotMark(_Payload):
     """Tous les éléments acceptés pour cette case, principal compris."""
     text: str
     """Phrase de correction écrite par le serveur."""
+    label_text: str = ""
+    """Intitulé de la case (« Le commit en cause »), relu après la fermeture de l'étape."""
+    element_texts: dict[str, str] = {}
+    """Un nom en mots (écrit par le serveur) pour le choix, l'attendu et les équivalents (5.5)."""
 
 
 class AnswerCorrected(_Payload):

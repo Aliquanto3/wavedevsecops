@@ -3,6 +3,7 @@
 // marques « Nouveau », commits perdus, HEAD et refs viennent de `state_projected.views`. Ici, seules
 // des coordonnées d'écran se calculent à partir des cases du serveur (une rangée de 28 px par commit).
 import { el, svg } from "./dom.js";
+import { markCorrection } from "./correction.js";
 import { designationFor, markDesignated } from "./designation.js";
 import { selectionFor } from "./selection.js";
 
@@ -377,6 +378,7 @@ export function renderRepo(body, ctx, renderEmpty) {
     if (selection.value && !ids.has(selection.value)) selection.set(null);
     refreshSelection();
     markDesignated(root, designation);
+    markCorrection(root, designation);
     settleRoving(focusedId);
     if (focusedId) {
       const again = [...root.querySelectorAll("button")].find(
@@ -397,7 +399,10 @@ export function renderRepo(body, ctx, renderEmpty) {
     draw(store.state, true);
   });
   selection.subscribe(refreshSelection);
-  designationFor(store).subscribe(() => markDesignated(root, designation));
+  designationFor(store).subscribe(() => {
+    markDesignated(root, designation);
+    markCorrection(root, designation);
+  });
   syncToggle();
   store.subscribe((state) => draw(state));
 }
