@@ -400,6 +400,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:48 · 7.4 ★ · review · rebase (app.py : restart et pipeline gardés), front ajouté (Voir la sortie, liens fichier:ligne, ⚠ Erreur de l'outil, Relancer le check, evidence_seen via check_output_seen), M1 (jobs restants en erreur, Relancer d'un check orphelin), test instable stabilisé, M2 (constat no_detail), M3 partiel (clone sans remote), L5, L7 corrigés ; L4, L8 écartés, L6 reporté à 7.5 ; 1323 passed, CI branche verte · b8dac37
 - 2026-10-19 04:48 · — · décision pour Anaël · 7.4 : intention check_output_seen ajoutée à la liste d'AD-17 (ou preuve à l'écriture du résultat) ; pas de bac à sable pour le code de l'apprenant dans le pipeline (même confiance que le terminal 7.2) ; Relancer affiché sans pipeline (409 expliqué) · —
 - 2026-10-19 04:48 · 7.4 ★ · fusion · rebase sur main (6.2) sans conflit, branche poussée, suite complète et CI en cours · —
+- 2026-10-19 04:53 · 9.3 · dev · fini, 1310 passed, CI verte ; section Stations (station n · nom depuis chain.yaml, cartes), description_text, STATION_ORDER et catalogue_rank (stations après le socle) ; 3e critère (encart .env) reporté à 8.x · 7f05670
+- 2026-10-19 04:53 · 9.3 · second-avis · lancé · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
