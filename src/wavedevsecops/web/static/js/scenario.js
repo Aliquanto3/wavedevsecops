@@ -3,6 +3,7 @@
 // invente aucun hors des libellés fixes de l'interface, et ne calcule aucun verdict. Il ne garde
 // que des choix d'affichage : l'étape rouverte par un segment, l'encart écarté par « Continuer ».
 import { bindAction } from "./actions.js";
+import { createDesignateBlock } from "./designation.js";
 import { el, richText } from "./dom.js";
 import { OPEN_HINT_LABEL, defaultTier, hintTabs, nextTier } from "./hints.js";
 import { alteredExplanation, quizChoices, restoreFailedNotice } from "./quiz.js";
@@ -49,7 +50,14 @@ export function statusFor(state) {
 }
 
 /** Monte le contenu du panneau ; `update(state)` le redessine depuis le magasin. */
-export function createScenarioView({ onSelect, onIntent, onError, navigate, fetchImpl } = {}) {
+export function createScenarioView({
+  onSelect,
+  onIntent,
+  onError,
+  navigate,
+  fetchImpl,
+  designation = null,
+} = {}) {
   const root = el("div", "scenario-body", { "data-zone": "scenario-body" });
   root.hidden = true;
   let shownId = null; // étape rouverte par un segment terminé
@@ -60,6 +68,7 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
   let hintStep = null; // étape à laquelle `hintTier` se rapporte
   let lastState = null;
   const uid = ++counter;
+  const designateBlock = designation ? createDesignateBlock({ designation, onIntent }) : null;
 
   function modeRow(panel) {
     const row = el("div", "mode-row");
@@ -237,6 +246,9 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
       );
     }
     children.push(instruction);
+    // Désignation (story 5.3) : le bloc ne se montre que sur l'étape courante.
+    if (designateBlock && shown === current && current.designate) children.push(designateBlock.root);
+    else if (designation) designation.disarm();
     // Indices par paliers de l'étape courante (UX-DR28) ; aucun compteur.
     if (shown === current && current.hints) {
       if (hintStep !== current.step_id) {
@@ -309,6 +321,8 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
     if (active.classList.contains("hint-tab")) return `.hint-tab[data-tier="${active.dataset.tier}"]`;
     if (active.classList.contains("quiz-radio")) return `.quiz-radio[value="${active.getAttribute("value")}"]`;
     if (active.classList.contains("quiz-run")) return ".quiz-run";
+    const part = active.getAttribute && active.getAttribute("data-designate-focus");
+    if (part) return `[data-designate-focus="${part}"]`;
     if (active.dataset && active.dataset.elementId) {
       return `.element-link[data-element-id="${active.dataset.elementId}"]`;
     }
@@ -323,6 +337,17 @@ export function createScenarioView({ onSelect, onIntent, onError, navigate, fetc
   return {
     root,
     update(state) {
+      if (designation) {
+        const panel = state.stepPanel;
+        const step = panel && panel.steps.find((s) => s.step_id === panel.current_step_id);
+        const active = step && step.designate ? step : null;
+        designation.sync(
+          active
+            ? { stepId: active.step_id, slots: active.designate.slots, accept: active.designate.accept }
+            : null,
+        );
+        designateBlock.update(state, active);
+      }
       const changed =
         !lastState ||
         state.stepPanel !== lastState.stepPanel ||

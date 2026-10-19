@@ -8,6 +8,7 @@ import * as L from "./layout.js";
 import { mountNetworkRun } from "./network-run.js";
 import { listPanes } from "./panes.js";
 import { createQuizBanner, postIntent, quizStatus } from "./quiz.js";
+import { designationFor, installDesignation } from "./designation.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
@@ -44,8 +45,10 @@ export function mountWorkspace(
   panelTitle.textContent = title;
   const panelStatus = el("p", "scenario-status", { role: "status" });
   const panelError = el("p", "scenario-error", { role: "alert" });
+  const designation = designationFor(store);
   const scenarioView = createScenarioView({
     onSelect,
+    designation,
     onIntent: (intent, body) => postIntent(store, intent, body),
     onError: (text) => store.fail(text),
   });
@@ -77,6 +80,7 @@ export function mountWorkspace(
   }
   workspace.append(panel, zone);
   container.replaceChildren(workspace);
+  installDesignation(workspace, designation);
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
   // Région role="status" unique du panneau : « Commande terminée. Vues mises à jour : … » (FR-4).
