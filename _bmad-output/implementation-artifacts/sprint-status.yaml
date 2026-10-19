@@ -82,7 +82,7 @@ development_status:
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: done
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
-  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: in-progress
+  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: review
   5-6-le-scénario-b-env-committé: backlog
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
@@ -92,7 +92,7 @@ development_status:
   6-1-choisir-son-parcours-et-parcourir-le-catalogue: done
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: review
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
-  6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
+  6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: in-progress
   6-5-exporter-mon-rapport-de-progression: done
   6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: done
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog

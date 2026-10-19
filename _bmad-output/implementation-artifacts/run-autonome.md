@@ -366,6 +366,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 03:04 · — · décision pour Anaël · 2.9 : message « fichier supprimé sur le disque » ? effacement de la notice après enregistrement ou commande ? · —
 - 2026-10-19 03:04 · 2.9 · fusion · empilée sur 6.5 sans conflit, branche poussée, suite complète du sommet et CI en cours · —
 - 2026-10-19 03:05 · 6.5 · fusion · CI branche verte sur 6 jobs, commit de fusion sur main, story done · c089c65
+- 2026-10-19 03:17 · 5.5 · dev · fini, 1180 passed / 46 skipped, CI verte ; marques ✓/✗ Votre choix, ✓ Attendu, ≡ Accepté aussi dans les vues du dépôt, liste de correction au panneau, Continuer (affichage), correction reprise après rechargement depuis le panneau serveur ; contrôles navigateur pour Anaël · 923c69c
+- 2026-10-19 03:17 · 5.5 · second-avis · lancé · —
+- 2026-10-19 03:17 · 6.4 · dev · lancé (dev-story Sonnet ; Sprint 1, sur la ligne de coupe) ; 5.6 attend 5.5, 5.4 attend 5.5 (même front), 7.3 au prochain créneau · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
