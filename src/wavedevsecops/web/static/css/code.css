@@ -272,3 +272,17 @@
   outline: calc(var(--stroke-min) * 2) solid var(--color-primary);
   outline-offset: -2px;
 }
+
+/* --- ligne « Modifié hors de l'application » (story 2.9) ------------------------------------ */
+.external-change-notice {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-primary-soft);
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / 1.3 var(--font-family-body-sm);
+}
+
+.external-change-notice[hidden] {
+  display: none;
+}

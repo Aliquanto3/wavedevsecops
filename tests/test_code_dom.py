@@ -175,7 +175,7 @@ console.log(JSON.stringify({ bar, reloaded, kept: disk.get("a.txt"), hiddenAfter
     assert out["bar"] == {
         "hidden": False,
         "role": "alert",
-        "text": "Le fichier a changé sur le disque depuis son ouverture.",
+        "text": "Le fichier a changé sur le disque.",
         "buttons": ["Garder ma version", "Recharger"],
         "disk": "version du disque\n",
     }

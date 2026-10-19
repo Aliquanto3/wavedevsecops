@@ -23,6 +23,7 @@ function initial() {
     terminal: { entries: [], cleared: 0, version: 0 }, // sorties du terminal, dans l'ordre d'arrivée
     stepPanel: null, // panneau Scénario écrit par le serveur (étapes, étape courante)
     verdict: null, // dernier step_verdict de l'espace ; null après un rechargement
+    externalChange: 0, // compteur des modifications faites hors de l'application (story 2.9)
     announce: null, // { text, command } : dernière annonce de vues mises à jour (FR-4)
     projectedOp: null, // op_id de la dernière state_projected (seconde projection d'une op)
     restored: false, // vrai entre un rétablissement réussi et la commande suivante
@@ -196,6 +197,7 @@ export function createStore() {
         patch.announce = same ? state.announce : text ? { text, command } : null;
       } else if (envelope.kind === "external_change") {
         if (envelope.op_id) externalOps.add(envelope.op_id);
+        patch.externalChange = state.externalChange + 1;
       } else if (envelope.kind === "terminal_output") {
         // Verbatim : le front n'analyse jamais la sortie (AD-2).
         patch.terminal = withEntry(state.terminal, {

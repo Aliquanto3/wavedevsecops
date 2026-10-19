@@ -12,7 +12,8 @@ export const MARKER = { added: "+", removed: "−", context: " " };
 export const KIND_CLASS = { added: "is-added", removed: "is-removed", context: "is-context" };
 export const UNSAVED_TEXT = "non enregistré";
 export const SAVED_TEXT = "Enregistré";
-export const CONFLICT_TEXT = "Le fichier a changé sur le disque depuis son ouverture.";
+export const CONFLICT_TEXT = "Le fichier a changé sur le disque.";
+export const EXTERNAL_TEXT = "Modifié hors de l'application";
 export const KEEP_TEXT = "Garder ma version";
 export const RELOAD_TEXT = "Recharger";
 export const SAVE_TEXT = "Enregistrer";
@@ -117,7 +118,10 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   const filePanel = el("div", "code-panel code-file-panel");
   const diffPanel = el("div", "code-panel code-diff-panel");
   const status = el("p", "code-status", { "aria-live": "polite" });
-  main.append(modes, status, filePanel, diffPanel);
+  // `external-change-notice` : ligne en haut de l'éditeur après une modification venue d'ailleurs.
+  const notice = el("p", "external-change-notice", { role: "status", hidden: true });
+  notice.textContent = EXTERNAL_TEXT;
+  main.append(notice, modes, status, filePanel, diffPanel);
 
   const editor = createEditor({ onChange: onEdit, onSave: save });
   const title = el("div", "code-file-title");
@@ -383,14 +387,24 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
     }
   }
 
-  /** Après une modification venue d'ailleurs (terminal, éditeur externe) : relit un fichier propre. */
+  /**
+   * Après une modification venue d'ailleurs (terminal, éditeur externe) : relit un fichier propre ;
+   * un fichier avec des changements non enregistrés garde sa version et propose le choix
+   * « Garder ma version » / « Recharger » dès que le disque diffère (pas seulement à l'enregistrement).
+   */
   async function refreshOpen() {
     const path = current;
     const buffer = path && buffers.get(path);
-    if (!buffer || isDirty(path)) return;
+    if (!buffer) return;
     try {
       const file = await fetchFile(path);
-      if (file.hash !== buffer.hash && current === path && !isDirty(path)) {
+      if (current !== path) return;
+      if (isDirty(path)) {
+        if (file.hash !== buffer.hash && !(buffer.conflict && buffer.conflict.hash === file.hash)) {
+          buffer.conflict = { hash: file.hash, content: file.content };
+          drawFile();
+        }
+      } else if (file.hash !== buffer.hash) {
         Object.assign(buffer, { content: file.content, saved: file.content, hash: file.hash });
         editor.setValue(file.content);
         drawFile();
@@ -444,7 +458,13 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
     else if (mode === "diff") loadDiff();
   });
 
+  let seenExternal = store.state.externalChange || 0;
   store.subscribe((state) => {
+    const external = state.externalChange || 0;
+    if (external !== seenExternal) {
+      seenExternal = external;
+      notice.hidden = false;
+    }
     if (state.views === drawnViews) return;
     drawnViews = state.views;
     if (!state.workspaceId) return;
