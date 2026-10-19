@@ -45,7 +45,7 @@ NOT_YOUR_CODE = "Ce n'est pas un défaut de votre code."
 NO_DETAIL_RULE = "no_detail"
 """Constat d'un échec dont l'exécution machine n'a rien donné : la sortie humaine reste là."""
 MAX_OUTPUT_CHARS = 60_000
-"""Sortie humaine gardée dans `github.json` : le début et surtout la fin (résumé des outils)."""
+"""Sortie humaine gardée dans le check : le début et surtout la fin (résumé des outils)."""
 
 
 class PipelineError(AppError):
