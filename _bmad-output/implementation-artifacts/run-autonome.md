@@ -447,17 +447,19 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 07:13 · — · décision pour Anaël · 7.5 : ajouter pr_request_review à AD-17 (ou approbation automatique sans critère observable) · —
 - 2026-10-19 07:13 · 5.5, 6.4, 9.3, 2.10, 7.3, 6.3 · fusion · CI verte sur les six branches de la pile, six commits de fusion sur main dans cet ordre (code identique au sommet testé), stories done · aeaef91
 - 2026-10-19 07:13 · — · outillage · agent-cost-kit PR #13 : docs/amelioration-continue.md (dix limites du run et leurs contournements) · —
+- 2026-10-19 07:13 · 5.4 · review · rebase sur la pile 6.3 (conflit de test résolu), M1 (aperçu vidé au changement d'étape, type recontrôlé), L2, L3 corrigés ; L4, L5, L6 écartés ; CI branche verte sur 6 jobs · 1d7a8c4
+- 2026-10-19 07:13 · 5.4 · fusion · commit de fusion sur main, story done · 782b4cf
 - 2026-10-19 07:13 · — · arrêt propre · pause demandée par Anaël pour /clear ; agents encore actifs listés dans « Reprise » · —
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
 
-État : 48 stories `done` (Epics 1, 3 et 4 complets ; 2.1 à 2.11 ; 5.1, 5.2, 5.3, 5.5 ; 6.1 à 6.6 sauf 6.7 ; 7.1 à 7.4 ; 8.2 ; 9.1 à 9.3). `main` poussé. Règle 5 révisée : la CI de branche est la seule suite complète.
+État : 49 stories `done` (Epics 1, 3 et 4 complets ; 2.1 à 2.11 ; 5.1 à 5.5 ; 6.1 à 6.6 sauf 6.7 ; 7.1 à 7.4 ; 8.2 ; 9.1 à 9.3). `main` poussé. Règle 5 révisée : la CI de branche est la seule suite complète.
 
 Agents encore actifs au moment de la pause (leur travail est poussé sur leur branche à la fin ; à la reprise, lire la spec de la story et la dernière CI de la branche plutôt que d'attendre leur rapport) :
 
 | Story | Branche · worktree | État · étape suivante |
 |---|---|---|
-| 5.4 | `story/5-4-liste-sha` · agent-a770fc7ec4ac12d80 | reviewer Opus en cours (rebase sur le sommet de pile, M1 aperçu SHA). Si la section `## Revue` de la spec est remplie et la CI verte : rebase sur main, CI, fusion. |
+
 | 7.6 | `story/7-6-pipeline-trois-ci` · agent-a86fecb393c4f1485 | dev en cours. Fini quand la spec est en `review` et la CI verte : second avis, puis reviewer. |
 | 8.1 | `story/8-1-bandit-sast` · agent-a36487cfb1221a062 | dev en cours (arrêt prévu si bandit absent de la table Stack : décision d'Anaël). Puis second avis, reviewer. |
 | outillage | `chore/tests-rapides` · agent-afd00f6cf6816f025 | marqueur slow + pytest-xdist en cours. À fusionner en priorité dès sa CI verte (accélère tout le reste). |
@@ -469,7 +471,7 @@ Revues prêtes à lancer (aucun agent) :
 | 5.6 | `story/5-6-scenario-b-env` (8e8d3e1, base ancienne 5.5) · agent-ac66659daa05d0686 | reviewer Opus avec la liste du second avis (journal, ligne 5.6 second-avis ; 1 high prouvé) ; rebase sur main d'abord. |
 | 7.5 | `story/7-5-revue-protection` (cbf1730) · agent-a98e0dcdab815945c | second avis, puis reviewer ; rebase sur main (contient 6.3 : conditions de repo_state, fingerprints.json à régénérer). |
 
-Éligibles ensuite : 5.7 (← 5.6 et 3.5), 8.3 (← 8.1, 8.2), 9.4 (← 2.10, done). Puis 5.8 (← 5.7), 8.4, 8.5, 8.6. 6.7 (mixte, release v0.1.0) quand toutes les stories `dev` des Epics 1 à 6 sont `done` (restent 5.4, 5.6, 5.7, 5.8). 10.2 à 10.5 restent en backlog.
+Éligibles ensuite : 5.7 (← 5.6 et 3.5), 8.3 (← 8.1, 8.2), 9.4 (← 2.10, done). Puis 5.8 (← 5.7), 8.4, 8.5, 8.6. 6.7 (mixte, release v0.1.0) quand toutes les stories `dev` des Epics 1 à 6 sont `done` (restent 5.6, 5.7, 5.8). 10.2 à 10.5 restent en backlog.
 
 Méthode : empiler les branches revues, CI sur chaque branche, fusion de la pile quand toutes les CI sont vertes ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees des stories done en fin de run seulement (fichiers verrouillés sous Windows). Contrats partagés à rappeler dans les prompts : identifiants du socle et des stations (`scenarios/order.py`), `RESTART_KIND = "scenario_reset"`, `answer_submit` avec `step_id` obligatoire, conditions de `repo_state` ajoutées par 6.3.
 
