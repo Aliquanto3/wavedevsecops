@@ -1,4 +1,4 @@
-"""Story 6.2 : les scénarios A « add-commit », « push-pull », « branche » et « pr-merge ».
+"""Stories 6.2 et 6.3 : les huit scénarios A du socle git (« add-commit » à « recuperation »).
 
 Contenu : lint (consignes, explications, trois paliers d'indice par étape), et chaque scénario
 joué de bout en bout, dans les deux parcours, sur un vrai git : setup, solution de chaque étape
@@ -31,7 +31,7 @@ from wavedevsecops.scenarios.order import SOCLE_ORDER
 from wavedevsecops.scenarios.steps._base import BLANK
 
 WAIT = 60.0
-IDS = ("add-commit", "push-pull", "branche", "pr-merge")
+IDS = SOCLE_ORDER
 TRACKS = ("llm", "no_ai")
 
 
@@ -97,6 +97,42 @@ SOLUTIONS: dict[str, list[tuple[str, list[Do]]]] = {
         ("revenir_sur_main", [quiz("switch_main")]),
         ("fusionner", [quiz("merge_feature")]),
         ("supprimer_feature", [quiz("branch_d")]),
+    ],
+    "conflit": [
+        ("lancer_la_fusion", [line("git merge feature")]),
+        (
+            "resoudre",
+            [
+                line('echo "def bonjour(nom: str) -> str:" > src/bonjour.py'),
+                line("echo \"    return f'Salut, {nom} ! Bienvenue.'\" >> src/bonjour.py"),
+                line("git add src/bonjour.py"),
+                line('git commit -m "Fusionne feature"'),
+            ],
+        ),
+    ],
+    "stash": [
+        ("mettre_de_cote", [quiz("stash")]),
+        ("recuperer", [line("git pull")]),
+        ("reprendre", [line("git stash pop")]),
+    ],
+    "rebase": [
+        ("recuperer_main", [line("git fetch")]),
+        ("lancer_le_rebase", [line("git rebase origin/main")]),
+        (
+            "resoudre",
+            [
+                line('echo "def bonjour(nom: str) -> str:" > src/bonjour.py'),
+                line("echo \"    return f'Salut, {nom} ! Bienvenue.'\" >> src/bonjour.py"),
+                line("git add src/bonjour.py"),
+                line("git rebase --continue"),
+            ],
+        ),
+        ("pousser_apres_rebase", [quiz("force_with_lease")]),
+    ],
+    "recuperation": [
+        ("perdre_le_commit", [line("git reset --hard HEAD~1")]),
+        ("retrouver", [quiz("reflog")]),
+        ("restaurer", [line("git reset --hard HEAD@{1}")]),
     ],
     "pr-merge": [
         (
@@ -203,7 +239,7 @@ def test_contenu_complet_et_sans_avertissement(scenario_id: str) -> None:
 
 
 def test_les_identifiants_sont_ceux_de_l_ordre_conseille() -> None:
-    assert IDS == SOCLE_ORDER[:4]
+    assert len(IDS) == 8
     shipped = {p.name for p in scenario_files(Settings())}
     assert {f"{i}.A.yaml" for i in IDS} <= shipped
 
@@ -306,7 +342,63 @@ def _after_pr_merge(box: Box) -> None:
     assert box.log("main").splitlines()[0] == "Merge pull request #1 from feature"
 
 
+def _after_conflit(box: Box) -> None:
+    repo = box.engine.layout.repo
+    text = (repo / "src" / "bonjour.py").read_text(encoding="utf-8")
+    assert "<<<<<<<" not in text and "Bienvenue" in text
+    merge = box.git.internal("rev-list", "--parents", "-n1", "HEAD", cwd=repo).split()
+    assert len(merge) == 3  # le commit de fusion a deux parents
+    assert box.log("main").splitlines()[0] == "Fusionne feature"
+
+
+def _before_stash(box: Box) -> None:
+    repo = box.engine.layout.repo
+    assert "À compléter" in (repo / "README.md").read_text(encoding="utf-8")
+    assert box.git.internal("stash", "list", cwd=repo).strip() == ""
+
+
+def _after_stash(box: Box) -> None:
+    repo = box.engine.layout.repo
+    readme = (repo / "README.md").read_text(encoding="utf-8")
+    assert "(équipe)" in readme and "À compléter" in readme  # les deux travaux sont réunis
+    assert box.git.internal("stash", "list", cwd=repo).strip() == ""
+
+
+def _before_rebase(box: Box) -> None:
+    assert box.log("origin/feature").splitlines()[0] == "Raccourcit le salut"
+
+
+def _after_rebase(box: Box) -> None:
+    repo = box.engine.layout.repo
+    assert box.log("feature").splitlines()[:2] == [
+        "Raccourcit le salut",
+        "Ajoute une formule de bienvenue",
+    ]
+    parents = box.git.internal("rev-list", "--parents", "-n1", "feature", cwd=repo).split()
+    assert len(parents) == 2  # historique linéaire
+    # `--force-with-lease` a réécrit l'origine : elle a la même pointe que la branche locale.
+    assert box.log("origin/feature") == box.log("feature")
+
+
+def _lost_subjects(box: Box) -> list[str]:
+    nodes = box.engine.snapshot()["views"]["graph"]["nodes"]
+    return [n["subject"] for n in nodes if n["lost"]]
+
+
+def _before_recuperation(box: Box) -> None:
+    assert _lost_subjects(box) == []
+
+
+def _after_recuperation(box: Box) -> None:
+    assert _lost_subjects(box) == []  # plus en tirets : le commit est de retour sur main
+    assert box.log("main").splitlines()[0] == "Note une idée d'amélioration"
+
+
 SOCLE_PLAN: dict[str, Plan] = {
+    "conflit": Plan((0, 0), _nothing, _after_conflit),
+    "stash": Plan((1, 1), _before_stash, _after_stash),
+    "rebase": Plan((1, 1), _before_rebase, _after_rebase),
+    "recuperation": Plan((1, 1), _before_recuperation, _after_recuperation),
     "add-commit": Plan((1, 1), _nothing, _after_add_commit),
     "push-pull": Plan((1, 1), _before_push_pull, _after_push_pull),
     "branche": Plan((3, 3), _nothing, _after_branche),
@@ -408,3 +500,236 @@ def test_pr_merge_la_pr_n_est_pas_mergeable_sans_la_revue(make_box) -> None:
     assert (card["head"], card["base"], card["state"]) == ("feature", "main", "open")
     assert card["merge"]["enabled"] is True
     assert feature()["can_open_pr"] is False
+
+
+# ------------------------------------------------------------ erreurs réalistes (story 6.3)
+def _play_until(box: Box, scenario_id: str, step_id: str) -> None:
+    for sid, gestures in SOLUTIONS[scenario_id]:
+        if sid == step_id:
+            return
+        for gesture in gestures:
+            box.play(gesture)
+    raise AssertionError(step_id)
+
+
+def _restore(box: Box) -> None:
+    box.engine.submit(build_operation(box.engine, "restore_state", {})).result(WAIT)
+
+
+def test_exigences_des_scenarios_avances() -> None:
+    settings = Settings()
+
+    def load(scenario_id: str):
+        return load_scenario(settings.scenarios_path() / f"{scenario_id}.A.yaml", settings).scenario
+
+    # « conflit » : la fusion en conflit, puis le commit de fusion.
+    conflit = load("conflit")
+    assert [s.expect.in_progress for s in conflit.steps] == ["merge", ""]
+    # « stash » : un collègue simulé, un quiz dont une réponse efface le travail.
+    stash = load("stash")
+    assert any(op.op == "colleague_commit" for op in stash.setup)
+    assert any(c.command_text == "git reset --hard" for c in stash.steps[0].choices)
+    # « rebase » : branche déjà poussée, quiz de push forcé.
+    rebase = load("rebase")
+    assert any(op.op == "push" and op.branch == "feature" for op in rebase.setup)
+    assert {c.command_text for c in rebase.steps[-1].choices} >= {
+        "git push --force-with-lease",
+        "git push --force",
+    }
+    # « récupération » : le reflog est l'objet d'un quiz.
+    assert any(c.command_text == "git reflog" for c in load("recuperation").steps[1].choices)
+
+
+def test_conflit_abandonner_la_fusion_est_explique(make_box) -> None:
+    box = make_box("conflit", "no_ai")
+    box.play(line("git merge feature"))
+    assert box.current() == "resoudre"
+    box.play(line("git merge --abort"))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "abandonnée" in failed["reason_text"]
+    box.play(line("git merge feature"))  # on recommence : le conflit revient
+    assert box.current() == "resoudre"
+    text = (box.engine.layout.repo / "src" / "bonjour.py").read_text(encoding="utf-8")
+    assert "<<<<<<<" in text and ">>>>>>>" in text
+
+
+def test_conflit_fusion_en_cours_est_rappelee(make_box) -> None:
+    box = make_box("conflit", "llm")
+    box.play(line("git merge feature"))
+    box.play(line("git add src/bonjour.py"))  # marqueurs encore présents, mais indexé
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "toujours en cours" in failed["reason_text"]
+    assert box.current() == "resoudre"
+
+
+def test_stash_pull_refuse_puis_reset_dur_rattrapable(make_box) -> None:
+    box = make_box("stash", "llm")
+    repo = box.engine.layout.repo
+    box.play(quiz("pull"))
+    assert box.verdicts("mettre_de_cote")[-1]["passed"] is False
+    assert "titre" not in box.log("main")  # le commit du collègue n'est pas arrivé
+    _restore(box)
+    box.play(quiz("reset_dur"))
+    assert "À compléter" not in (repo / "README.md").read_text(encoding="utf-8")  # perdu
+    _restore(box)
+    assert "À compléter" in (repo / "README.md").read_text(encoding="utf-8")
+    box.play(quiz("stash"))
+    assert box.current() == "recuperer"
+
+
+def test_stash_drop_ne_ramene_pas_le_travail(make_box) -> None:
+    box = make_box("stash", "no_ai")
+    _play_until(box, "stash", "reprendre")
+    assert box.current() == "reprendre"
+    box.play(line("git stash drop"))
+    # La pile est vide, mais `README.md` n'a pas repris le travail : l'étape n'est pas validée.
+    assert box.current() == "reprendre"
+    assert "À compléter" not in (box.engine.layout.repo / "README.md").read_text(encoding="utf-8")
+
+
+def test_rebase_abandonne_est_explique_et_push_simple_refuse(make_box) -> None:
+    box = make_box("rebase", "llm")
+    repo = box.engine.layout.repo
+    _play_until(box, "rebase", "lancer_le_rebase")
+    box.play(line("git rebase origin/main"))
+    assert box.current() == "resoudre"
+    box.play(line("git rebase --abort"))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "n'a pas abouti" in failed["reason_text"]
+    box.play(line("git rebase origin/main"))
+    for gesture in SOLUTIONS["rebase"][2][1]:
+        box.play(gesture)
+    assert box.current() == "pousser_apres_rebase"
+    tip = box.git.internal("rev-parse", "origin/feature", cwd=repo).strip()
+    box.play(quiz("push"))
+    assert box.verdicts("pousser_apres_rebase")[-1]["passed"] is False
+    assert box.git.internal("rev-parse", "origin/feature", cwd=repo).strip() == tip
+
+
+def test_recuperation_commit_perdu_en_tirets_jusqu_a_sa_restauration(make_box) -> None:
+    box = make_box("recuperation", "no_ai")
+    box.play(line("git reset --hard HEAD~1"))
+    assert _lost_subjects(box) == ["Note une idée d'amélioration"]
+    box.play(quiz("log"))  # mauvaise réponse : `git log` ne le montre pas
+    assert box.verdicts("retrouver")[-1]["passed"] is False
+    assert _lost_subjects(box) == ["Note une idée d'amélioration"]
+    _restore(box)
+    box.play(quiz("reflog"))
+    assert _lost_subjects(box) == ["Note une idée d'amélioration"]  # retrouvé, pas restauré
+    assert box.current() == "restaurer"
+    box.play(line("git reset --hard HEAD@{1}"))
+    assert _lost_subjects(box) == []
+    assert box.current() is None
+
+
+def test_recuperation_reset_mixed_laisse_le_fichier_et_n_est_pas_valide(make_box) -> None:
+    box = make_box("recuperation", "llm")
+    box.play(line("git reset --mixed HEAD~1"))
+    failed = box.verdicts("perdre_le_commit")[-1]
+    assert failed["passed"] is False and "idee.txt" in failed["reason_text"]
+    assert box.current() == "perdre_le_commit"
+
+
+# ------------------------------------------- contournements refusés (revue de la story 6.3)
+FIX_BONJOUR = SOLUTIONS["conflit"][1][1][:2]  # réécrit src/bonjour.py sans marqueur
+
+
+def test_conflit_marqueurs_commites_ne_valident_pas(make_box) -> None:
+    box = make_box("conflit", "no_ai")
+    box.play(line("git merge feature"))
+    box.play(line("git add src/bonjour.py"))  # marqueurs encore présents
+    box.play(line('git commit -m "Fusionne feature"'))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "marqueurs" in failed["reason_text"]
+    assert box.current() == "resoudre"
+    for gesture in FIX_BONJOUR:  # on suit la raison : corriger puis commiter
+        box.play(gesture)
+    box.play(line("git add src/bonjour.py"))
+    box.play(line('git commit -m "Retire les marqueurs"'))
+    assert box.current() is None
+
+
+def test_conflit_abandon_puis_commits_ordinaires_ne_valident_pas(make_box) -> None:
+    box = make_box("conflit", "llm")
+    box.play(line("git merge feature"))
+    box.play(line("git merge --abort"))
+    for name in ("a", "b"):  # trois commits depuis `depart`, mais aucune fusion
+        box.play(line(f'echo "{name}" > {name}.txt'))
+        box.play(line(f"git add {name}.txt"))
+        box.play(line(f'git commit -m "Ajoute {name}"'))
+    assert box.current() == "resoudre"
+
+
+def test_rebase_remplace_par_une_fusion_ne_valide_pas(make_box) -> None:
+    box = make_box("rebase", "no_ai")
+    _play_until(box, "rebase", "lancer_le_rebase")
+    box.play(line("git rebase origin/main"))
+    box.play(line("git rebase --abort"))
+    box.play(line("git merge origin/main"))
+    for gesture in FIX_BONJOUR:
+        box.play(gesture)
+    box.play(line("git add src/bonjour.py"))
+    box.play(line('git commit -m "Fusionne origin/main"'))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "fusion" in failed["reason_text"]
+    assert box.current() == "resoudre"
+    # La raison donne la voie de retour : revenir sur origin/feature puis rebaser.
+    box.play(line("git reset --hard origin/feature"))
+    box.play(line("git rebase origin/main"))
+    for gesture in SOLUTIONS["rebase"][2][1]:
+        box.play(gesture)
+    assert box.current() == "pousser_apres_rebase"
+
+
+def test_rebase_continue_avec_marqueurs_ne_valide_pas(make_box) -> None:
+    box = make_box("rebase", "llm")
+    _play_until(box, "rebase", "lancer_le_rebase")
+    box.play(line("git rebase origin/main"))
+    box.play(line("git add src/bonjour.py"))  # marqueurs encore présents
+    box.play(line("git rebase --continue"))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "marqueurs" in failed["reason_text"]
+    assert box.current() == "resoudre"
+
+
+def test_recuperation_nouveau_commit_au_meme_message_ne_restaure_pas(make_box) -> None:
+    box = make_box("recuperation", "no_ai")
+    _play_until(box, "recuperation", "restaurer")
+    box.play(line('echo "Une idee" > idee.txt'))
+    box.play(line("git add idee.txt"))
+    box.play(line('git commit -m "Note une idée d\'amélioration"'))
+    failed = box.verdicts("restaurer")[-1]
+    assert failed["passed"] is False and "tirets" in failed["reason_text"]
+    assert box.current() == "restaurer"
+    assert _lost_subjects(box) == ["Note une idée d'amélioration"]
+    box.play(line("git reset --hard HEAD@{2}"))  # le vrai commit, retrouvé dans le reflog
+    assert box.current() is None
+
+
+def test_stash_drop_puis_reecriture_ne_valide_pas(make_box) -> None:
+    box = make_box("stash", "llm")
+    _play_until(box, "stash", "reprendre")
+    box.play(line("git stash drop"))
+    box.play(line('echo "Ma section" >> README.md'))  # README modifié, pile vide
+    assert box.current() == "reprendre"
+
+
+def test_push_pull_faux_guide_commite_ne_valide_pas(make_box) -> None:
+    box = make_box("push-pull", "no_ai")
+    _play_until(box, "push-pull", "recuperer")
+    box.play(line("mkdir docs"))
+    box.play(line('echo "Guide" > docs/guide.md'))
+    box.play(line("git add docs/guide.md"))
+    box.play(line('git commit -m "Ajoute le guide"'))
+    assert box.current() == "recuperer"
+    assert box.verdicts("recuperer")[-1]["passed"] is False
+
+
+def test_pr_merge_faux_commit_de_merge_ne_valide_pas(make_box) -> None:
+    box = make_box("pr-merge", "llm")
+    _play_until(box, "pr-merge", "recuperer_main")
+    box.play(line("git switch main"))
+    box.play(line('echo "x" > faux.txt'))
+    box.play(line("git add faux.txt"))
+    box.play(line('git commit -m "Merge pull request #1 from feature"'))
+    assert box.current() == "recuperer_main"

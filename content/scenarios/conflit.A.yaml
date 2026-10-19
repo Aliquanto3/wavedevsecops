@@ -1,0 +1,127 @@
+# Scénario A « conflit » (Story 6.3) : fusionner deux branches qui ont modifié la même ligne,
+# résoudre les marqueurs, puis terminer la fusion par `git add` et `git commit`.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: conflit
+mode: A
+title_text: Conflit
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # `feature` change la ligne du `return`...
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Salut, {nom} !"
+  - op: commit
+    message: Raccourcit le salut
+    as: commit-feature
+  # ... et `main` change la même ligne autrement.
+  - op: switch
+    branch: main
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} ! Bienvenue."
+  - op: commit
+    message: Ajoute une formule de bienvenue
+    as: commit-main
+steps:
+  - step_id: lancer_la_fusion
+    type: repo_state
+    title_text: Fusionner feature et rencontrer le conflit
+    instruction_text: >-
+      Vous êtes sur `main`. Fusionnez-y la branche `feature`. Les deux branches ont modifié la
+      même ligne de `src/bonjour.py` : git ne sait pas laquelle garder et s'arrête.
+    explanation_text: >-
+      Git fusionne seul tout ce qui ne se recoupe pas. Quand deux branches changent la même
+      ligne, il ne choisit pas à votre place : il inscrit les deux versions dans le fichier,
+      entre des marqueurs, et laisse la fusion « en cours » jusqu'à ce que vous la terminiez.
+    explain_ref: graph.branch
+    expect:
+      in_progress: merge
+    hints:
+      lead_text: >-
+        La commande est celle d'une fusion ordinaire : c'est la situation qui change, pas ce
+        que vous tapez.
+      partial_text: git merge ___
+      solution_text: git merge feature
+
+  - step_id: resoudre
+    type: repo_state
+    title_text: Résoudre le conflit et terminer la fusion
+    instruction_text: >-
+      Ouvrez `src/bonjour.py` dans la vue Code. Entre `<<<<<<<` et `>>>>>>>`, vous voyez votre
+      version (en haut, côté `HEAD`) puis celle de `feature` (en bas), séparées par `=======`.
+      Gardez la ligne que vous voulez, supprimez les trois lignes de marqueurs et enregistrez.
+      Indexez ensuite le fichier et commitez pour terminer la fusion.
+    explanation_text: >-
+      Résoudre un conflit, c'est laisser dans le fichier le texte final, sans aucun marqueur.
+      `git add` indique à git que le fichier est réglé ; `git commit` crée alors le commit de
+      fusion, qui a deux parents : le sommet de `main` et celui de `feature`.
+    explain_ref: graph.commit
+    expect:
+      in_progress: ""
+      index:
+        clean: true
+      tree:
+        markers_absent: [src/bonjour.py]
+      commits:
+        - ahead_of: "@depart"
+          min: 3
+          merges: true
+    foreseen:
+      - when:
+          in_progress: merge
+        reason_text: >-
+          La fusion est toujours en cours. Corrigez le fichier dans la vue Code (plus aucun
+          marqueur), indexez-le avec `git add`, puis terminez avec `git commit`.
+      - when:
+          in_progress: ""
+          tree:
+            markers_present: [src/bonjour.py]
+        reason_text: >-
+          Le commit est enregistré, mais `src/bonjour.py` contient encore des marqueurs de
+          conflit : `git add` ne vérifie pas le contenu. Supprimez les lignes `<<<<<<<`,
+          `=======` et `>>>>>>>` dans la vue Code, puis commitez la correction.
+      - when:
+          in_progress: ""
+          commits:
+            - "on": feature
+              ahead_of: main
+              min: 1
+        reason_text: >-
+          La fusion a été abandonnée : `feature` n'est pas dans `main`. Relancez la fusion pour
+          reprendre le conflit.
+    hints:
+      lead_text: >-
+        Trois gestes dans l'ordre : corriger le fichier, dire à git qu'il est réglé, puis
+        enregistrer la fusion.
+      partial_text: git add ___
+      solution_text: >-
+        Corrigez src/bonjour.py dans la vue Code (gardez une seule version de la ligne, sans
+        marqueur), puis git add src/bonjour.py, puis git commit -m "Fusionne feature"

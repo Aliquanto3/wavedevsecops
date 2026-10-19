@@ -1,0 +1,198 @@
+# Scénario A « rebase » (Story 6.3) : rejouer sa branche sur la dernière version de main,
+# résoudre le conflit, continuer le rebase, puis pousser la branche réécrite.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: rebase
+mode: A
+title_text: Rebase
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Votre branche `feature` : un commit, déjà poussé.
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Salut, {nom} !"
+  - op: commit
+    message: Raccourcit le salut
+    as: commit-feature
+  - op: push
+    branch: feature
+    as: origin-feature
+  # Pendant ce temps, le collègue a changé la même ligne sur `main`.
+  - op: colleague_commit
+    branch: main
+    message: Ajoute une formule de bienvenue
+    files:
+      - path: src/bonjour.py
+        content: |
+          def bonjour(nom: str) -> str:
+              return f"Bonjour, {nom} ! Bienvenue."
+    as: commit-collegue
+steps:
+  - step_id: recuperer_main
+    type: repo_state
+    title_text: Télécharger la dernière version de main
+    instruction_text: >-
+      Vous êtes sur `feature`. Votre collègue a poussé sur `main`. Téléchargez ses commits sans
+      rien intégrer : `origin/main` doit avancer.
+    explanation_text: >-
+      Le `fetch` met à jour `origin/main` sans toucher à `feature` ni à vos fichiers. C'est
+      cette référence à jour que vous allez prendre pour base.
+    explain_ref: graph.remote_ref
+    expect:
+      commits:
+        - "on": origin/main
+          ahead_of: "@depart"
+          min: 1
+    foreseen:
+      - when:
+          head:
+            branch: feature
+        reason_text: >-
+          `origin/main` n'a pas encore avancé : téléchargez les commits de l'origine, sans les
+          intégrer à `feature`.
+    hints:
+      lead_text: >-
+        Une commande ne fait que télécharger : ni fusion, ni envoi.
+      partial_text: git ___
+      solution_text: git fetch
+
+  - step_id: lancer_le_rebase
+    type: repo_state
+    title_text: Rejouer feature sur origin/main
+    instruction_text: >-
+      Rebasez `feature` sur la dernière version de `main`, celle de l'origine. Comme vous avez
+      tous deux modifié la même ligne de `src/bonjour.py`, git va s'arrêter sur un conflit.
+    explanation_text: >-
+      Rebaser, c'est rejouer vos commits un par un par-dessus une nouvelle base, comme si vous
+      aviez commencé votre travail après le commit du collègue. Quand un commit rejoué touche
+      une ligne déjà modifiée, git s'arrête et attend que vous régliez le conflit.
+    explain_ref: graph.branch
+    expect:
+      in_progress: rebase
+    hints:
+      lead_text: >-
+        Il faut nommer la base sur laquelle vos commits seront rejoués : celle que vous venez de
+        télécharger.
+      partial_text: git rebase ___
+      solution_text: git rebase origin/main
+
+  - step_id: resoudre
+    type: repo_state
+    title_text: Résoudre le conflit et continuer le rebase
+    instruction_text: >-
+      Ouvrez `src/bonjour.py` dans la vue Code, gardez la ligne voulue et supprimez les marqueurs
+      de conflit. Indexez le fichier, puis demandez à git de continuer le rebase.
+    explanation_text: >-
+      Après la résolution, git rejoue le commit sur la nouvelle base et le rebase se termine.
+      L'historique est maintenant linéaire : le commit du collègue, puis le vôtre. Votre commit
+      a été recréé : il a un nouvel identifiant, différent de l'ancien.
+    explain_ref: graph.commit
+    expect:
+      in_progress: ""
+      head:
+        branch: feature
+      index:
+        clean: true
+      tree:
+        markers_absent: [src/bonjour.py]
+      commits:
+        - "on": feature
+          ahead_of: "@depart"
+          min: 2
+          merges: false
+    foreseen:
+      - when:
+          in_progress: rebase
+        reason_text: >-
+          Le rebase est toujours en cours. Corrigez le fichier (plus aucun marqueur), indexez-le
+          avec `git add`, puis demandez à git de continuer.
+      - when:
+          in_progress: ""
+          tree:
+            markers_present: [src/bonjour.py]
+        reason_text: >-
+          Le rebase est terminé, mais `src/bonjour.py` contient encore des marqueurs de conflit :
+          `git add` ne vérifie pas le contenu. Supprimez les lignes `<<<<<<<`, `=======` et
+          `>>>>>>>` dans la vue Code, puis commitez la correction.
+      - when:
+          commits:
+            - "on": feature
+              ahead_of: "@depart"
+              min: 1
+              merges: true
+        reason_text: >-
+          `feature` contient un commit de fusion : l'historique n'est pas linéaire. L'étape
+          attend un rebase, qui rejoue votre commit sur `origin/main` sans fusion. Ramenez
+          `feature` sur `origin/feature` (`git reset --hard origin/feature`), puis relancez le
+          rebase.
+      - when:
+          in_progress: ""
+          head:
+            branch: feature
+        reason_text: >-
+          Le rebase n'a pas abouti : `feature` n'est pas rejouée sur `origin/main`. Relancez-le
+          pour reprendre le conflit.
+    hints:
+      lead_text: >-
+        Corriger le fichier, dire à git qu'il est réglé, puis lui demander de reprendre le
+        rebase là où il s'est arrêté.
+      partial_text: git rebase ___
+      solution_text: >-
+        Corrigez src/bonjour.py dans la vue Code, puis git add src/bonjour.py, puis
+        git rebase --continue
+
+  - step_id: pousser_apres_rebase
+    type: quiz
+    title_text: Pousser une branche réécrite
+    instruction_text: >-
+      `feature` avait déjà été poussée avant le rebase. Son historique a été réécrit : quelle
+      commande l'envoie à l'origine ?
+    explanation_text: >-
+      Après un rebase, vos commits ont de nouveaux identifiants : l'origine ne reconnaît plus
+      votre branche comme la suite de la sienne. Il faut forcer l'envoi. `--force-with-lease`
+      refuse d'écraser un commit que vous n'avez pas encore vu : c'est la forme prudente.
+    choices:
+      - choice_id: force_with_lease
+        command_text: git push --force-with-lease
+        correct: true
+      - choice_id: push
+        command_text: git push
+        effect_text: >-
+          git a refusé l'envoi : votre `feature` ne prolonge plus celle de l'origine, puisque son
+          historique a été réécrit.
+      - choice_id: force
+        command_text: git push --force
+        effect_text: >-
+          L'envoi est passé, mais `--force` écrase l'origine sans rien vérifier : un commit
+          qu'un collègue y aurait ajouté entre-temps serait perdu. Préférez `--force-with-lease`.
+    hints:
+      lead_text: >-
+        Un envoi simple est refusé quand l'historique a été réécrit ; une option autorise
+        l'écrasement, et l'une d'elles le fait avec un garde-fou.
+      partial_text: git push ___
+      solution_text: git push --force-with-lease

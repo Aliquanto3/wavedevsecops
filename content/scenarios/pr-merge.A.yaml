@@ -157,6 +157,7 @@ steps:
     expect:
       head:
         branch: main
+        at: origin/main
       commits:
         - ahead_of: "@depart"
           min: 1
