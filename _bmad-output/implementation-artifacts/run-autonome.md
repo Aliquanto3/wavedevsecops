@@ -418,6 +418,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 05:50 · 7.4 ★ · fusion · suite complète 1350 passed / 47 skipped (durée 60 min), CI branche verte, commit de fusion sur main, story done ; 7.5, 7.6, 8.1 éligibles · a40f998
 - 2026-10-19 05:50 · 5.5, 6.4, 2.10 · fusion · empilées sur main dans cet ordre (2.10 : conflit projections/__init__.py, annotate + linker de 7.4, résolu par l'orchestrateur), ruff vert, trois branches poussées ; suite complète unique du sommet et CI en cours · —
 - 2026-10-19 05:50 · — · proposition · la suite complète locale dure maintenant ~60 min (7 min en début de soirée) et bride les fusions : pytest-xdist (accord d'Anaël sur la table Stack) ou un découpage des tests lents · —
+- 2026-10-19 05:51 · 7.5 · dev · lancé (dev-story Sonnet ; 7.4 done, premier scénario pipeline: true) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
