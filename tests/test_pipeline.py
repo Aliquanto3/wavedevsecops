@@ -50,7 +50,7 @@ FEATURE = "src/inventory/rapport.py"
 # ------------------------------------------------------------------ contrat du pipeline
 def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
     pipeline = ci.load_pipeline(Settings())
-    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit"]
+    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit", "pip_audit"]
     registry = load_registry(settings=Settings())
     chain = yaml.safe_load((CONTENT / "chain.yaml").read_text("utf-8"))
     barriers = {

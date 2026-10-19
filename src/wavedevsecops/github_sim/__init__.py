@@ -43,6 +43,7 @@ from wavedevsecops.contracts.github import (
     ReactionTrigger,
     Review,
     ReviewState,
+    SbomComponent,
 )
 from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.wsfs import Layout
@@ -50,8 +51,8 @@ from wavedevsecops.wsfs import Layout
 MIGRATIONS: dict[int, Callable[[dict[str, Any]], dict[str, Any]]] = {}
 """`MIGRATIONS[n]` fait passer un `github.json` de la version `n` à `n + 1` (en ajout seulement)."""
 
-FINGERPRINT_EXCLUDED_CHECK_FIELDS = frozenset({"output", "duration_ms", "updated_at"})
-"""Champs d'un check exclus de l'empreinte (AD-6) : sortie, durée, horodatage."""
+FINGERPRINT_EXCLUDED_CHECK_FIELDS = frozenset({"output", "duration_ms", "updated_at", "sbom"})
+"""Champs d'un check exclus de l'empreinte (AD-6) : sortie, durée, horodatage, SBOM."""
 FINGERPRINT_EXCLUDED_REVIEW_FIELDS = frozenset({"created_at"})
 """Champs d'une revue exclus de l'empreinte : l'heure (celle d'une réaction est réelle)."""
 
@@ -564,6 +565,7 @@ def set_check_state(
     *,
     output: str = "",
     findings: Iterable[Finding] = (),
+    sbom: Iterable[SbomComponent] = (),
     duration_ms: int | None = None,
     expected: tuple[str, str] | None = None,
 ) -> PullRequest:
@@ -590,6 +592,7 @@ def set_check_state(
             "state": state,
             "output": output,
             "findings": list(findings),
+            "sbom": list(sbom),
             "duration_ms": duration_ms,
             "updated_at": now_iso(),
         }

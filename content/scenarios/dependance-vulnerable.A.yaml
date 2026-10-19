@@ -1,0 +1,210 @@
+# Station 3 (Story 8.3) : une PR qui épingle une dépendance vulnérable, que pip-audit (SCA) refuse.
+# Parcours sans IA. La branche `feature` porte déjà un commit : `jinja2==3.1.2` est ajouté à
+# `pyproject.toml` et à `requirements.txt` (le fichier épinglé que lit pip-audit). Le pipeline
+# simulé tourne sur la PR ; le check pip_audit échoue (base OSV embarquée et figée), le SBOM
+# montre la ligne vulnérable, puis le check repasse au vert quand la version corrigée est poussée.
+# Le `uv.lock` reste celui du gabarit : jinja2 3.1.6, la version corrigée, y est déjà préchargée
+# (c'est une dépendance de diff-cover), donc `uv sync --offline` réussit sans réseau.
+schema_version: 1
+scenario_id: dependance-vulnerable
+mode: A
+title_text: Bloquer une PR sur une dépendance vulnérable
+section: stations
+station: 3
+tracks: [no_ai]
+tools: [git, pip-audit]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige le check pip_audit avant tout merge ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_checks: [pip_audit]
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: pyproject.toml
+    content: |
+      [project]
+      name = "inventory"
+      version = "0.1.0"
+      description = "Petit projet d'exercice : le stock d'un atelier."
+      readme = "README.md"
+      requires-python = ">=3.14,<3.15"
+      dependencies = ["jinja2==3.1.2"]
+
+      # Outils de la chaîne DevSecOps, aux versions exactes de la table Stack (AD-12, AD-16).
+      [dependency-groups]
+      chain = [
+          "ruff==0.17.1",
+          "pytest==9.1.1",
+          "pytest-cov==7.1.0",
+          "coverage==7.16.2",
+          "diff-cover==10.6.0",
+          "bandit==1.9.4",
+          "pip-audit==2.10.1",
+          "pre-commit==4.7.0",
+      ]
+
+      [tool.uv]
+      package = false
+      default-groups = ["chain"]
+
+      [tool.ruff]
+      line-length = 100
+      target-version = "py314"
+
+      [tool.ruff.lint]
+      select = ["E", "F", "W", "I", "UP", "B"]
+
+      [tool.pytest.ini_options]
+      testpaths = ["tests"]
+      pythonpath = ["src"]
+
+      [tool.ruff.lint.isort]
+      known-first-party = ["inventory"]
+  - op: write_file
+    path: requirements.txt
+    content: |
+      # Dépendances de l'application, épinglées exactement : c'est le fichier que lit pip-audit
+      # (tâche « pip_audit » du pipeline). Il reflète `dependencies` de pyproject.toml ; aucune
+      # dépendance pour l'instant.
+      jinja2==3.1.2
+  - op: commit
+    message: Ajoute jinja2 pour les rapports de stock
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : il ajoute la bibliothèque jinja2
+      aux dépendances du projet (`pyproject.toml` et `requirements.txt`). Poussez cette branche
+      vers l'origine pour pouvoir ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline analysera ce commit avant qu'il n'arrive sur `main`.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      analyse de sécurité du code, puis audit des dépendances.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi pip-audit bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check pip_audit doit passer à « Échec » et « Merger »
+      devenir inactif. Dépliez la ligne de détail du check : elle nomme la dépendance et la
+      vulnérabilité. Ouvrez aussi « Voir la sortie » pour lire le rapport complet de pip-audit.
+    explanation_text: >-
+      pip-audit est un outil d'analyse de composition logicielle (SCA) : il compare chaque
+      dépendance épinglée du fichier `requirements.txt` à une base de vulnérabilités connues. Ici,
+      il n'interroge aucun site : la base est embarquée dans WaveDevSecOps et figée à la date
+      citée dans le détail du check. jinja2 3.1.2 y a plusieurs failles, toutes corrigées dans
+      des versions plus récentes. Le check est obligatoire : tant qu'il échoue, la PR ne peut pas
+      être mergée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      pip_audit: failure
+    hints:
+      lead_text: >-
+        Le check pip_audit est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        encore « En attente » ou « En cours », patientez : le pipeline passe d'abord par les
+        autres contrôles.
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check pip_audit de la PR, puis « Voir la sortie ». La dépendance
+        désignée est jinja2 3.1.2, épinglée à la ligne 4 de requirements.txt.
+
+  - step_id: designer_la_dependance
+    type: designate
+    title_text: Repérer la dépendance vulnérable dans le SBOM
+    instruction_text: >-
+      Cliquez sur « Voir le SBOM » sur le check pip_audit : le tableau liste chaque composant du
+      logiciel, sa version, sa licence et ses vulnérabilités. Désignez la ligne marquée ✗, puis
+      validez : vous n'avez qu'un essai, et la correction s'affiche ensuite.
+    explanation_text: >-
+      Le SBOM (la nomenclature logicielle) est l'inventaire de ce que contient votre logiciel :
+      sans lui, impossible de savoir quelle faille vous touche. Ici, une seule ligne est
+      vulnérable : `jinja2` en version 3.1.2, déclarée dans `pyproject.toml` et épinglée dans
+      `requirements.txt`. Cette vue se lit seulement : on corrige en changeant la version de la
+      dépendance dans le dépôt.
+    explain_ref: remote.sbom
+    question_text: Quelle dépendance est vulnérable ?
+    accept: [sbom]
+    slots:
+      - slot_id: composant
+        label_text: Le composant vulnérable
+        answers: ["sbom:jinja2@3.1.2"]
+        primary: "sbom:jinja2@3.1.2"
+    hints:
+      lead_text: >-
+        Dans le tableau du SBOM, la ligne vulnérable porte un ✗ suivi de l'identifiant de la
+        faille (PYSEC-… ou GHSA-…).
+      partial_text: "Désigner la ligne du SBOM : composant ___, version 3.1.2"
+      solution_text: "Désigner la ligne jinja2 3.1.2 du SBOM du check pip_audit"
+
+  - step_id: corriger_et_pousser
+    type: pr_state
+    title_text: Mettre à jour la dépendance et faire repasser le check au vert
+    instruction_text: >-
+      Passez jinja2 à la version corrigée, `3.1.6`, dans `pyproject.toml` et dans
+      `requirements.txt`. Committez la correction sur `feature`, puis poussez-la. Le pipeline
+      repart sur le nouveau commit.
+    explanation_text: >-
+      La version corrigée est déjà préchargée dans le cache d'installation : la mise à jour
+      fonctionne sans réseau (`uv sync --offline`). Le correctif n'a pas besoin d'être validé à
+      la main : le pipeline relance pip-audit sur le nouveau commit, et le check repasse au vert
+      de lui-même. C'est ce résultat, et non votre commande, qui valide l'étape. Supprimer ou
+      vider `requirements.txt` ne ferait pas l'affaire : le SBOM doit toujours contenir jinja2.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      pip_audit: success
+    sbom_has:
+      pip_audit: [jinja2]
+    hints:
+      lead_text: >-
+        La sortie de pip-audit donne la version qui corrige la faille. Modifiez le numéro de
+        version aux deux endroits où jinja2 est épinglé, committez, puis poussez : un push sur la
+        branche de la PR relance le pipeline.
+      partial_text: >-
+        Dans pyproject.toml et requirements.txt : jinja2==___ ; puis git add, git commit et git push
+      solution_text: >-
+        Dans pyproject.toml et requirements.txt : remplacer jinja2==3.1.2 par jinja2==3.1.6, puis
+        git add, git commit et git push

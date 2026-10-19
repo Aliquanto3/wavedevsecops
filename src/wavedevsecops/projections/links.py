@@ -24,6 +24,7 @@ from wavedevsecops.projections.views import (
     EXPLAIN_PR,
     EXPLAIN_REMOTE,
     EXPLAIN_REVIEW,
+    EXPLAIN_SBOM,
 )
 
 PATH_ZONES = ("head", "index", "worktree")
@@ -110,6 +111,11 @@ def annotate(views: Views) -> Views:
             edges.add(check.element_id, *check.links)
             _, segments = parse_element_id(check.element_id)
             edges.add(check.element_id, element_id("commit", segments[2]))
+            for row in check.sbom:
+                names[row.element_id] = f"composant {row.name} {row.version} ({label})"
+                explain[row.element_id] = EXPLAIN_SBOM
+                edges.add(row.element_id, *row.links)
+                edges.add(check.element_id, row.element_id)
         for entry in pr.review.entries:
             _, segments = parse_element_id(entry.element_id)
             names[entry.element_id] = f"revue n°{segments[1]} ({label})"

@@ -163,7 +163,9 @@ def make_box(tmp_path: Path, git_path: Path, fakes: Fakes) -> Iterator[Callable[
     def make(scenario_id: str, track: str) -> Box:
         settings = Settings(data_dir=tmp_path / f"data-{len(boxes)}")
         loaded = load_scenario(settings.scenarios_path() / f"{scenario_id}.A.yaml", settings)
-        manager = WorkspaceManager(settings, git_path=git_path, watch=False)
+        manager = WorkspaceManager(
+            settings, git_path=git_path, watch=False, osv_url=Settings().osv_url(1)
+        )
         events: list[Envelope] = []
         manager.events(f"{track}.{scenario_id}.A").attach(None, events.append)
         engine, setup = manager.create(loaded, track)
@@ -350,6 +352,7 @@ def test_pr_sans_revue_checks_verts_mais_merge_bloque_jusqu_a_la_revue(
         "pytest": "success",
         "gitleaks": "success",
         "bandit": "success",
+        "pip_audit": "success",
     }
     # Checks verts, mais la revue obligatoire manque : seule cette raison bloque.
     assert not pr.mergeable and pr.approvals == 0

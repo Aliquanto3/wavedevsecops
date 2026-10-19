@@ -8,12 +8,14 @@ message, fichier posix relatif à l'arbre, ligne). Un texte illisible lève `Val
 from __future__ import annotations
 
 import json
+import re
 import xml.etree.ElementTree as ET  # noqa: S405 - rapport écrit par pytest dans ci/, pas du réseau
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from wavedevsecops.contracts.github import Finding
+from wavedevsecops.config import get_settings
+from wavedevsecops.contracts.github import Finding, SbomComponent, SbomVuln
 from wavedevsecops.toolrun.findings import relative_posix
 
 MESSAGE_MAX = 500
@@ -158,10 +160,163 @@ def parse_bandit_json(text: str, tree: Path) -> list[Finding]:
     return found
 
 
-PARSERS: dict[str, Callable[[str, Path], list[Finding]]] = {
+REQUIREMENTS_FILE = "requirements.txt"
+"""Fichier d'exigences épinglées que lit pip-audit (`-r`, AD-11) : le constat et le SBOM s'y
+rattachent (ligne de la dépendance)."""
+_REQUIREMENT = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*==")
+
+
+def _pkg(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _requirement_lines(tree: Path) -> dict[str, int]:
+    """Ligne (à partir de 1) de chaque dépendance épinglée du fichier d'exigences, par nom."""
+    try:
+        text = (tree / REQUIREMENTS_FILE).read_text(encoding="utf-8")
+    except OSError, UnicodeDecodeError:
+        return {}
+    found: dict[str, int] = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        match = _REQUIREMENT.match(line)
+        if match:
+            found.setdefault(_pkg(match[1]), number)
+    return found
+
+
+def osv_date() -> str:
+    """Date de l'extrait OSV embarqué (`content/osv/index.json`), citée par les constats."""
+    try:
+        meta = json.loads((get_settings().osv_path() / "index.json").read_text("utf-8"))
+        return str(meta.get("extracted_on") or "")
+    except OSError, UnicodeDecodeError, ValueError, AttributeError:
+        return ""
+
+
+def _json_dict(text: str, what: str) -> dict[str, Any]:
+    """JSON objet ; un texte vide est illisible (pip-audit n'écrit rien quand le fichier
+    d'exigences est absent ou invalide : l'échec garde alors sa sortie humaine)."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise ValueError(f"la sortie machine de {what} est illisible") from None
+    if not isinstance(data, dict):
+        raise ValueError(f"la sortie machine de {what} est inattendue")
+    return data
+
+
+def parse_pip_audit_json(text: str, tree: Path) -> list[Finding]:
+    """`pip-audit -f json` : un constat par couple (dépendance, vulnérabilité), sur la ligne
+    du fichier d'exigences. Une dépendance que pip-audit n'a pas pu auditer (`skip_reason`)
+    est un constat `unscanned_file` : un vert ne prouverait rien sur elle."""
+    data = _json_dict(text, "pip-audit")
+    deps = data.get("dependencies", [])
+    if not isinstance(deps, list):
+        raise ValueError("la sortie machine de pip-audit est inattendue")
+    lines = _requirement_lines(tree)
+    date = osv_date()
+    base = f" Base embarquée, figée au {date}." if date else " Base embarquée et figée."
+    path = REQUIREMENTS_FILE if (tree / REQUIREMENTS_FILE).is_file() else None
+    found = []
+    for dep in deps:
+        if not isinstance(dep, dict):
+            continue
+        name = str(dep.get("name") or "")
+        label = f"{name} {dep.get('version') or ''}".strip()
+        line = lines.get(_pkg(name))
+        if dep.get("skip_reason"):
+            found.append(
+                Finding(
+                    rule_id=UNSCANNED_RULE,
+                    severity="error",
+                    message_text=_short(
+                        f"pip-audit n'a pas pu auditer {label} ({dep.get('skip_reason')}) : "
+                        "une dépendance non auditée ne prouve pas qu'elle est sûre."
+                    ),
+                    path=path,
+                    line=line,
+                )
+            )
+            continue
+        seen: set[str] = set()
+        for vuln in dep.get("vulns") or []:
+            vuln_id = str(vuln.get("id") or "") if isinstance(vuln, dict) else ""
+            if not vuln_id or vuln_id in seen:
+                continue
+            seen.add(vuln_id)
+            fixes = [str(v) for v in vuln.get("fix_versions") or []]
+            aliases = [str(a) for a in vuln.get("aliases") or []]
+            message = f"{label} est vulnérable"
+            if aliases:
+                message += f" ({', '.join(aliases)})"
+            description = str(vuln.get("description") or "").strip()
+            message += f" : {description}." if description else "."
+            if fixes:
+                message += f" Corrigée dans la version {' ou '.join(fixes)}."
+            found.append(
+                Finding(
+                    rule_id=vuln_id,
+                    severity="error",
+                    message_text=_short(message + base),
+                    path=path,
+                    line=line,
+                )
+            )
+    return found
+
+
+def parse_cyclonedx_json(text: str, tree: Path) -> list[SbomComponent]:
+    """`pip-audit -f cyclonedx-json` : un composant par dépendance (nom, version, licences si
+    le document en porte, vulnérabilités rattachées par `affects`). Aucun constat : le SBOM
+    se lit, il ne juge rien."""
+    data = _json_dict(text, "pip-audit (SBOM)")
+    components = data.get("components", [])
+    vulns = data.get("vulnerabilities", [])
+    if not isinstance(components, list) or not isinstance(vulns, list):
+        raise ValueError("le SBOM de pip-audit est inattendu")
+    lines = _requirement_lines(tree)
+    by_ref: dict[str, list[SbomVuln]] = {}
+    for item in vulns:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        entry = SbomVuln(vuln_id=_short(item["id"]))
+        for affect in item.get("affects") or []:
+            ref = str(affect.get("ref") or "") if isinstance(affect, dict) else ""
+            bucket = by_ref.setdefault(ref, [])
+            if ref and all(v.vuln_id != entry.vuln_id for v in bucket):
+                bucket.append(entry)
+    found = []
+    for item in components:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        licenses = []
+        for lic in item.get("licenses") or []:
+            if not isinstance(lic, dict):
+                continue
+            body = lic.get("license") if isinstance(lic.get("license"), dict) else {}
+            label = body.get("id") or body.get("name") or lic.get("expression")
+            if label:
+                licenses.append(_short(label))
+        name = _short(item["name"])
+        found.append(
+            SbomComponent(
+                name=name,
+                version=_short(item.get("version")),
+                licenses=licenses,
+                vulns=by_ref.get(str(item.get("bom-ref") or ""), []),
+                line=lines.get(_pkg(name)),
+            )
+        )
+    return found
+
+
+PARSERS: dict[str, Callable[[str, Path], list[Any]]] = {
     "ruff_json": parse_ruff_json,
     "junit": parse_junit,
     "gitleaks_json": parse_gitleaks_json,
     "bandit_json": parse_bandit_json,
+    "pip_audit_json": parse_pip_audit_json,
+    "cyclonedx_json": parse_cyclonedx_json,
 }
-"""Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée."""
+"""Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée.
+Un lecteur rend des `Finding`, sauf `cyclonedx_json` : des `SbomComponent` (le SBOM)."""

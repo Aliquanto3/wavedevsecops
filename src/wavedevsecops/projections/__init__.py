@@ -29,6 +29,7 @@ from wavedevsecops.projections.spans import Linker
 from wavedevsecops.projections.state import read_repo_state
 from wavedevsecops.projections.views import (
     EXPLAIN_REFS,
+    EXPLAIN_SBOM,
     announce,
     build_graph,
     build_prompt,
@@ -114,6 +115,7 @@ def project(
 __all__ = [
     "ACTORS",
     "EXPLAIN_REFS",
+    "EXPLAIN_SBOM",
     "Layout",
     "Linker",
     "Projected",

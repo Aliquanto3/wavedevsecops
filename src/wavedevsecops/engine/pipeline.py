@@ -432,6 +432,7 @@ def check_operation(
                     state,  # type: ignore[arg-type]
                     output=result.output if result else "",
                     findings=result.findings if result else (),
+                    sbom=result.sbom if result else (),
                     duration_ms=result.duration_ms if result else None,
                     expected=(run.head_sha, run.base_sha),
                 )

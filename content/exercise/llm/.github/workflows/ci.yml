@@ -1,5 +1,5 @@
 # Pipeline du projet en GitHub Actions. Le même pipeline s'écrit dans « Jenkinsfile » (Jenkins)
-# et dans « .gitlab-ci.yml » (GitLab CI) : quatre tâches, l'une après l'autre.
+# et dans « .gitlab-ci.yml » (GitLab CI) : cinq tâches, l'une après l'autre.
 # Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 # surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
 name: CI
@@ -55,4 +55,17 @@ jobs:
       - run: uv sync --frozen
       # Le code de l'application (src/), sans les exemptions « # nosec ».
       - run: uv run bandit -r src -q --ignore-nosec
+  # wds:end
+
+  # wds:job pip_audit
+  pip_audit:
+    name: Dépendances (pip-audit)
+    needs: bandit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      # Dépendances épinglées de requirements.txt, sans résolution ; {osv_url} : adresse du point OSV (dans WaveDevSecOps : le point local, base figée).
+      - run: uv run pip-audit --vulnerability-service osv --osv-url '{osv_url}' --no-deps --disable-pip --progress-spinner off -r requirements.txt
   # wds:end

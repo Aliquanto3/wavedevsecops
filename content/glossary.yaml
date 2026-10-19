@@ -35,6 +35,7 @@ terms:
       L'analyse de composition logicielle (SCA) compare les dépendances du projet aux failles
       connues. Une version vulnérable est signalée avant d'arriver en production.
     barrier_id: dependencies
+    scenario_id: dependance-vulnerable
   - id: sbom
     term_text: "SBOM"
     definition_text: >-
@@ -42,6 +43,7 @@ terms:
       Il sert de base à l'audit des dépendances : sans inventaire, impossible de savoir ce qu'une
       faille touche.
     barrier_id: dependencies
+    scenario_id: dependance-vulnerable
   - id: quality-gate
     term_text: "Quality gate"
     definition_text: >-

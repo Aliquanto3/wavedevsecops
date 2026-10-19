@@ -27,13 +27,16 @@ from wavedevsecops import toolrun, wsfs
 from wavedevsecops.ci.findings import PARSERS, UNSCANNED_RULE
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
-from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, Finding
+from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, Finding, SbomComponent
 from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.registry import load_registry
 from wavedevsecops.wsfs import Layout
 
-Parse = Literal["ruff_json", "junit", "gitleaks_json", "bandit_json"]
-"""Lecteurs de constats livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent."""
+Parse = Literal[
+    "ruff_json", "junit", "gitleaks_json", "bandit_json", "pip_audit_json", "cyclonedx_json"
+]
+"""Lecteurs livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent. `cyclonedx_json` lit
+le SBOM (composants), pas des constats."""
 
 TOKENS = frozenset({"repo", "base_sha", "osv_url", "report"})
 """Jetons des argv, remplacés par `ci` ; `report` n'existe que dans une exécution machine."""
@@ -265,6 +268,8 @@ class JobResult:
     state: CheckState
     output: str = ""
     findings: list[Finding] = field(default_factory=list)
+    sbom: list[SbomComponent] = field(default_factory=list)
+    """Composants du SBOM (job pip-audit, exécution `cyclonedx_json`)."""
     duration_ms: int = 0
     interrupted: bool = False
 
@@ -332,8 +337,9 @@ def _machine_findings(
     tokens: Mapping[str, str],
     settings: Settings,
     on_start: Callable[[Any], None] | None,
-) -> tuple[list[Finding] | None, bool]:
-    """Constats d'une exécution machine ; `(None, interrompu)` si elle n'a rien donné."""
+) -> tuple[list[Any] | None, bool]:
+    """Constats (ou composants du SBOM) d'une exécution machine ; `(None, interrompu)` si elle
+    n'a rien donné."""
     reports = reports_dir(tree)
     wsfs.make_dirs(reports)
     report = reports / f"{job.job_id}-{index}.out"
@@ -384,6 +390,7 @@ def run_job(
         return JobResult(job.job_id, "error", interrupted=True)
     output = bound_output(result.stdout + result.stderr)
     findings: list[Finding] = []
+    sbom: list[SbomComponent] = []
     if result.timed_out:
         state: CheckState = "error"
         delay = f"{settings.pipeline_job_timeout_s:g}"
@@ -409,7 +416,7 @@ def run_job(
             )
             if stopped:
                 return JobResult(job.job_id, "error", interrupted=True)
-            if found is None and state == "failure":
+            if found is None and state == "failure" and run.parse != "cyclonedx_json":
                 findings.append(
                     Finding(
                         rule_id=NO_DETAIL_RULE,
@@ -420,12 +427,13 @@ def run_job(
                         ),
                     )
                 )
-            findings.extend(found or [])
+            for item in found or []:
+                (sbom if isinstance(item, SbomComponent) else findings).append(item)
         # Un fichier que l'outil a sauté (syntaxe illisible) : le vert ne prouverait rien.
         if state == "success" and any(f.rule_id == UNSCANNED_RULE for f in findings):
             state = "failure"
     elapsed = int((time.monotonic() - started) * 1000)
-    return JobResult(job.job_id, state, output, findings, elapsed)
+    return JobResult(job.job_id, state, output, findings, sbom, elapsed)
 
 
 __all__ = [

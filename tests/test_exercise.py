@@ -49,7 +49,7 @@ def test_seul_le_code_d_exercice_differe() -> None:
     llm, no_ai = _files("llm"), _files("no_ai")
     assert no_ai < llm
     assert llm - no_ai == LLM_ONLY
-    for name in sorted(no_ai - {"pyproject.toml", "uv.lock"}):
+    for name in sorted(no_ai - {"pyproject.toml", "uv.lock", "requirements.txt"}):
         assert (EXERCISE / "llm" / name).read_bytes() == (EXERCISE / "no_ai" / name).read_bytes()
 
 

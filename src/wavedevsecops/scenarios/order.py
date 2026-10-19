@@ -38,6 +38,8 @@ STATION_ORDER: tuple[str, ...] = (
     "push-direct-main",
     # Station 3 · Sécurité et qualité (story 8.1)
     "code-vulnerable",
+    # Station 3 (story 8.3)
+    "dependance-vulnerable",
 )
 """Ordre conseillé des scénarios de station, par `scenario_id` (station 1, puis 2, puis 3). Un
 identifiant pas encore livré est absent du catalogue."""

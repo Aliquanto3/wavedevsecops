@@ -93,7 +93,7 @@ steps:
     type: pr_state
     title_text: Constater que les checks verts ne suffisent pas
     instruction_text: >-
-      Attendez que les trois checks soient verts. « Merger » reste pourtant inactif : lisez la
+      Attendez que tous les checks soient verts. « Merger » reste pourtant inactif : lisez la
       raison affichée sous le bouton et le compteur d'approbations du journal de revue.
     explanation_text: >-
       Les checks vérifient le code, pas le regard d'une autre personne. La protection de `main`
@@ -109,10 +109,11 @@ steps:
       pytest: success
       gitleaks: success
       bandit: success
+      pip_audit: success
     mergeable: false
     hints:
       lead_text: >-
-        Les checks tournent l'un après l'autre. Quand les trois portent la marque ✓, comparez
+        Les checks tournent l'un après l'autre. Quand tous portent la marque ✓, comparez
         le bouton « Merger » et le compteur « Approbations » du journal de revue.
       partial_text: "Vue « Distant + PR » : « Approbations : ___ sur 1 »"
       solution_text: >-
