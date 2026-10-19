@@ -95,13 +95,17 @@ def test_actions_suivant_catalogue_recommencer(tmp_path: Path) -> None:
 mount(SUMMARY);
 $('[data-action="restart"]').click();
 await tick();
+const asked = posts.length; // la confirmation en ligne précède l'envoi (Story 4.4)
+$('[data-action="restart-confirm"]').click();
+await tick();
 $('[data-action="catalogue"]').click();
 $('[data-action="next"]').click();
 await tick();
 await tick();
-console.log(JSON.stringify({ posts, assigned }));
+console.log(JSON.stringify({ posts, assigned, asked }));
 """,
     )
+    assert out["asked"] == 0
     assert out["posts"] == [
         ["/api/ws/llm.fin.A/restart", {}],
         ["/api/open", {"scenario_id": "zeta", "mode": "A", "track": "no_ai"}],

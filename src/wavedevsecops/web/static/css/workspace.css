@@ -1007,3 +1007,19 @@ main.is-workspace {
   outline: var(--stroke-min) solid var(--color-ink);
   outline-offset: 1px;
 }
+
+/* Recommencer (Story 4.4) : pied du panneau, confirmation en ligne, lien vers le diagnostic. */
+.restart-foot {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.restart-confirm-text {
+  margin: 0;
+}
+
+.scenario-error-link {
+  display: inline-block;
+  margin-top: var(--space-2);
+}

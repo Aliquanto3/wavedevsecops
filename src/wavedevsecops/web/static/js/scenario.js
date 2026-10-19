@@ -7,6 +7,7 @@ import { createDesignateBlock } from "./designation.js";
 import { el, richText } from "./dom.js";
 import { OPEN_HINT_LABEL, defaultTier, hintTabs, nextTier } from "./hints.js";
 import { alteredExplanation, quizChoices, restoreFailedNotice } from "./quiz.js";
+import { RESTARTED_TEXT, RESTART_LABEL, contentChangedNotice, restartFoot } from "./restart.js";
 import { openNext, scoreSummary, summaryStatus } from "./summary.js";
 
 export const UNEXPECTED_TITLE = "État inattendu";
@@ -39,6 +40,7 @@ export function statusFor(state) {
   const verdict = state.verdict;
   const current = panel.steps.find((step) => step.step_id === panel.current_step_id);
   const parts = [];
+  if (state.restarted) parts.push(RESTARTED_TEXT);
   if (verdict && verdict.status === "passed") parts.push(PASSED_TEXT);
   else if (verdict && verdict.status === "failed" && verdict.reason_text) {
     parts.push(verdict.reason_text.replaceAll("`", ""));
@@ -66,6 +68,9 @@ export function createScenarioView({
   let chosen = null; // commande cochée du quiz en cours
   let hintTier = null; // palier d'indice affiché ; null : le plus avancé des paliers ouverts
   let hintStep = null; // étape à laquelle `hintTier` se rapporte
+  let confirming = false; // confirmation de « Recommencer » ouverte dans le pied du panneau
+  let focusTitle = false; // après une remise à zéro : le focus revient sur la consigne
+  let restartPending = false; // POST `restart` en cours : un second clic est ignoré
   let lastState = null;
   const uid = ++counter;
   const designateBlock = designation ? createDesignateBlock({ designation, onIntent }) : null;
@@ -146,6 +151,38 @@ export function createScenarioView({
     }
   }
 
+  /** Ouvre la confirmation en ligne de « Recommencer » et y met le focus (bouton le moins grave). */
+  function askRestart() {
+    if (restartPending) return;
+    confirming = true;
+    render(lastState);
+    const cancel = root.querySelector('[data-action="restart-cancel"]');
+    if (cancel) cancel.focus();
+  }
+
+  function cancelRestart() {
+    confirming = false;
+    render(lastState);
+    const ask = root.querySelector('[data-action="restart-ask"]');
+    if (ask) ask.focus();
+  }
+
+  async function confirmRestart() {
+    // Garde synchrone : un double clic pendant l'envoi ne poste qu'un seul `restart`.
+    if (restartPending) return;
+    restartPending = true;
+    confirming = false;
+    focusTitle = true;
+    let ok = false;
+    try {
+      ok = onIntent ? await onIntent("restart", {}) : false;
+    } finally {
+      restartPending = false;
+    }
+    if (!ok) focusTitle = false;
+    if (lastState) render(lastState);
+  }
+
   function notice(verdict, current) {
     const id = `notice-${uid}`;
     const card = el("div", "notice-card notice-warning", {
@@ -194,6 +231,10 @@ export function createScenarioView({
       render(lastState);
     });
     actions.append(next);
+    const again = el("button", "btn", { type: "button", "data-action": "restart-ask" });
+    again.textContent = RESTART_LABEL;
+    again.addEventListener("click", askRestart);
+    actions.append(again);
     // « Ouvrir un indice » : le premier palier non encore ouvert (le serveur dit s'il l'est).
     const upcoming = current && current.hints ? nextTier(current.hints) : null;
     if (upcoming) {
@@ -239,12 +280,11 @@ export function createScenarioView({
           onCatalogue() {
             (navigate || ((path) => window.location.assign(path)))("/");
           },
-          onRestart() {
-            if (onIntent) onIntent("restart", {});
-          },
+          onRestart: askRestart,
         }),
       );
     }
+    if (panel.content_changed) children.push(contentChangedNotice(panel.content_changed, askRestart));
     children.push(instruction);
     // Désignation (story 5.3) : le bloc ne se montre que sur l'étape courante.
     if (designateBlock && shown === current && current.designate) children.push(designateBlock.root);
@@ -302,9 +342,22 @@ export function createScenarioView({
       explained = byId.get(verdict.step_id) || null;
     }
     if (explained && explained.explanation_text) children.push(explanationBlock(explained));
+    // Pied du panneau : « Recommencer » et, une fois demandée, sa confirmation en ligne.
+    children.push(
+      restartFoot({
+        confirming,
+        onAsk: askRestart,
+        onConfirm: confirmRestart,
+        onCancel: cancelRestart,
+      }),
+    );
     const focusKey = focusKeyOf(document.activeElement);
     root.replaceChildren(...children);
-    if (focusKey) restoreFocus(focusKey);
+    if (focusTitle && !String(state.engineState).startsWith("restor")) {
+      focusTitle = false;
+      const title = root.querySelector(".step-title");
+      if (title) title.focus();
+    } else if (focusKey) restoreFocus(focusKey);
   }
 
   // Le redessin remplace les nœuds : le focus qui était dans le panneau revient sur l'élément
@@ -317,6 +370,9 @@ export function createScenarioView({
     if (active.classList.contains("mode-info")) return ".mode-info";
     if (active.dataset && active.dataset.action && active.closest(".score-summary")) {
       return `.score-summary [data-action="${active.dataset.action}"]`;
+    }
+    if (active.dataset && active.dataset.action && active.closest(".restart-foot")) {
+      return `.restart-foot [data-action="${active.dataset.action}"]`;
     }
     if (active.classList.contains("hint-tab")) return `.hint-tab[data-tier="${active.dataset.tier}"]`;
     if (active.classList.contains("quiz-radio")) return `.quiz-radio[value="${active.getAttribute("value")}"]`;
@@ -354,7 +410,12 @@ export function createScenarioView({
         state.verdict !== lastState.verdict ||
         quizEngine(state) !== quizEngine(lastState);
       if (lastState && state.verdict !== lastState.verdict) shownId = null;
-      if (changed) render(state);
+      if (state.restarted && !(lastState && lastState.restarted)) {
+        focusTitle = true;
+        confirming = false;
+      }
+      const focusDue = focusTitle && !String(state.engineState).startsWith("restor");
+      if (changed || focusDue) render(state);
       else lastState = state; // rien à redessiner : le focus du panneau reste en place
       return statusFor(state);
     },

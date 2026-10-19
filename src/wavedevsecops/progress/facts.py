@@ -23,9 +23,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from wavedevsecops.progress import FILENAME, _read_json, ensure_progress, write_json_atomic
 
 FactKind = Literal[
-    "step_validated", "quiz_first_attempt", "hint_opened", "scenario_completed", "evidence_seen"
+    "step_validated",
+    "quiz_first_attempt",
+    "hint_opened",
+    "scenario_completed",
+    "scenario_reset",
+    "evidence_seen",
 ]
 ScenarioState = Literal["todo", "in_progress", "done"]
+RESTART_KIND = "scenario_reset"
+"""Fait « remise à zéro » émis par Recommencer (story 4.4) : un fait par remise (`op_id` dans
+l'identité). Le rapport (6.5) les compte ; `derive` les ignore pour l'état, et ne retient pour le
+score et les indices que les faits d'avant la première remise. Contrat partagé : ne pas renommer
+sans aligner `derive` et `progress.report`."""
 
 
 class Fact(BaseModel):
@@ -64,6 +74,8 @@ class Fact(BaseModel):
             return (*base, self.barrier_id)
         if self.kind == "hint_opened":
             return (*base, self.step_id, self.tier)
+        if self.kind == RESTART_KIND:
+            return (*base, self.op_id)  # un fait par remise à zéro (story 4.4)
         return (*base, self.step_id)
 
 
@@ -89,10 +101,14 @@ def derive(
         for f in facts
         if (f.get("track"), f.get("scenario_id"), f.get("mode")) == (track, scenario_id, mode)
         # Une remise à zéro ne fait ni commencer ni avancer un scénario (premier passage = foi).
-        and f.get("kind") != "scenario_reset"
+        and f.get("kind") != RESTART_KIND
     ]
     validated = [f["step_id"] for f in mine if f.get("kind") == "step_validated"]
-    quizzes = [f for f in mine if f.get("kind") == "quiz_first_attempt"]
+    # Score du premier coup et indices : seuls les faits antérieurs à la première remise à zéro
+    # comptent (story 4.4, « mon premier passage reste la mesure »). `facts` est dans l'ordre
+    # d'ajout de `progress.json` (ajout seulement).
+    first_pass = _before_first_reset(facts, track, scenario_id, mode)
+    quizzes = [f for f in first_pass if f.get("kind") == "quiz_first_attempt"]
     correct = sum(1 for f in quizzes if f.get("correct") is True)
     done = any(f.get("kind") == "scenario_completed" for f in mine)
     return ScenarioProgress(
@@ -101,8 +117,22 @@ def derive(
         quiz_total=len(quizzes),
         quiz_correct=correct,
         first_try_score=round(100 * correct / len(quizzes)) if quizzes else None,
-        hints=sum(1 for f in mine if f.get("kind") == "hint_opened"),
+        hints=sum(1 for f in first_pass if f.get("kind") == "hint_opened"),
     )
+
+
+def _before_first_reset(
+    facts: list[dict[str, Any]], track: str, scenario_id: str, mode: str
+) -> list[dict[str, Any]]:
+    """Faits du scénario ajoutés avant son premier `scenario_reset` (tous s'il n'y en a pas)."""
+    kept: list[dict[str, Any]] = []
+    for f in facts:
+        if (f.get("track"), f.get("scenario_id"), f.get("mode")) != (track, scenario_id, mode):
+            continue
+        if f.get("kind") == RESTART_KIND:
+            break
+        kept.append(f)
+    return kept
 
 
 def _identity(raw: dict[str, Any]) -> tuple[Any, ...]:
@@ -178,9 +208,3 @@ class ProgressStore:
             if all(isinstance(part, str) for part in key):
                 groups.setdefault(key, []).append(raw)  # type: ignore[arg-type]
         return {key: derive(group, *key) for key, group in groups.items()}
-
-
-RESTART_KIND = "scenario_reset"
-"""Fait « remise à zéro » émis par Recommencer (story 4.4) : un fait par remise (`op_id` dans
-l'identité). Le rapport (6.5) les compte ; `derive` les ignore pour l'état, le score et les
-indices. Contrat partagé : ne pas renommer sans aligner `derive` et `progress.report`."""

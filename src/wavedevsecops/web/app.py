@@ -25,7 +25,14 @@ from fastapi.staticfiles import StaticFiles
 from wavedevsecops import diagnostic, osv, terminal
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.contracts import DiagnosticCheck
-from wavedevsecops.engine import WorkspaceManager, code_intents, designation, hints, pr_intents
+from wavedevsecops.engine import (
+    WorkspaceManager,
+    code_intents,
+    designation,
+    hints,
+    pr_intents,
+    restart,
+)
 from wavedevsecops.web.catalogue import install_catalogue_routes
 from wavedevsecops.web.code import install_code_routes
 from wavedevsecops.web.exercise import register_exercise_intent
@@ -211,6 +218,7 @@ def create_app(
     designation.register_intents()
     code_intents.register_intents()
     hints.register_intents()
+    restart.register_intents()
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
     register_exercise_intent()

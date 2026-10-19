@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from wavedevsecops import toolrun, wsfs
 from wavedevsecops.config import Settings, get_settings
@@ -72,8 +73,12 @@ def prepare_workspace(
     settings: Settings | None = None,
     git_path: Path | None = None,
     replace: bool = False,
+    epoch: int = 0,
 ) -> PreparedWorkspace:
-    """Construit l'espace du scénario pour `track` ; `replace` reconstruit un espace existant."""
+    """Construit l'espace du scénario pour `track` ; `replace` reconstruit un espace existant.
+
+    `epoch` : celui de l'opération qui reconstruit (« Recommencer », 4.4), écrit dans `run.json`.
+    """
     settings = settings or get_settings()
     scenario = loaded.scenario
     if track not in scenario.tracks:
@@ -99,25 +104,36 @@ def prepare_workspace(
     except BaseException:
         wsfs.remove_tree(layout.root)
         raise
+    _prepare_tool_environment(scenario.tools, layout, settings)
+    wsfs.write_json(layout.run_json, initial_run(loaded, track, digest, aliases, epoch=epoch))
+    return PreparedWorkspace(layout, digest, aliases)
+
+
+def initial_run(
+    loaded: LoadedScenario,
+    track: str,
+    digest: str,
+    aliases: dict[str, str],
+    *,
+    epoch: int = 0,
+) -> dict[str, Any]:
+    """`run.json` d'un espace à l'étape 1 : setup et « Recommencer » (4.4) l'écrivent pareil."""
     from wavedevsecops.engine import hints  # noqa: PLC0415 - hints importe le moteur
 
+    scenario = loaded.scenario
     first_step = scenario.steps[0].step_id if scenario.steps else None
-    _prepare_tool_environment(scenario.tools, layout, settings)
-    wsfs.write_json(
-        layout.run_json,
-        {
-            "schema_version": RUN_SCHEMA_VERSION,
-            "scenario_id": scenario.scenario_id,
-            "mode": scenario.mode,
-            "track": track,
-            "epoch": 0,
-            "step_id": first_step,
-            "hints": hints.start_step({}, first_step, hints.clock()),  # début de la 1re étape
-            "content_hash": loaded.content_hash,
-            "setup_fingerprint": digest,
-            "aliases": aliases,
-            "restoring": None,
-            "restore_failed": None,
-        },
-    )
-    return PreparedWorkspace(layout, digest, aliases)
+    return {
+        "schema_version": RUN_SCHEMA_VERSION,
+        "scenario_id": scenario.scenario_id,
+        "mode": scenario.mode,
+        "track": track,
+        "epoch": epoch,
+        "step_id": first_step,
+        "hints": hints.start_step({}, first_step, hints.clock()),  # début de la 1re étape
+        "content_hash": loaded.content_hash,
+        "step_ids": [step.step_id for step in scenario.steps],
+        "setup_fingerprint": digest,
+        "aliases": aliases,
+        "restoring": None,
+        "restore_failed": None,
+    }

@@ -9,6 +9,7 @@ import { mountNetworkRun } from "./network-run.js";
 import { listPanes } from "./panes.js";
 import { createQuizBanner, postIntent, quizStatus } from "./quiz.js";
 import { designationFor, installDesignation } from "./designation.js";
+import { diagnosticLink } from "./restart.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
@@ -52,7 +53,8 @@ export function mountWorkspace(
     onIntent: (intent, body) => postIntent(store, intent, body),
     onError: (text) => store.fail(text),
   });
-  panel.append(panelTitle, scenarioView.root, panelStatus, panelError);
+  const errorLink = diagnosticLink();
+  panel.append(panelTitle, scenarioView.root, panelStatus, panelError, errorLink);
   // Seul le parcours LLM a du code d'exercice à lancer ; le serveur revérifie le parcours.
   const networkRun = track === "llm" ? mountNetworkRun(panel, { store, fetchImpl }) : null;
 
@@ -108,6 +110,7 @@ export function mountWorkspace(
     announced = state.announce;
     panelStatus.textContent = state.errorText ? "" : line;
     panelError.textContent = state.errorText;
+    errorLink.hidden = !state.errorText;
   });
 
   // --- volets (créés une fois, déplacés ensuite) -----------------------------------------
