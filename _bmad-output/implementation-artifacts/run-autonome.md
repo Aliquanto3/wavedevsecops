@@ -369,6 +369,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 03:17 · 5.5 · dev · fini, 1180 passed / 46 skipped, CI verte ; marques ✓/✗ Votre choix, ✓ Attendu, ≡ Accepté aussi dans les vues du dépôt, liste de correction au panneau, Continuer (affichage), correction reprise après rechargement depuis le panneau serveur ; contrôles navigateur pour Anaël · 923c69c
 - 2026-10-19 03:17 · 5.5 · second-avis · lancé · —
 - 2026-10-19 03:17 · 6.4 · dev · lancé (dev-story Sonnet ; Sprint 1, sur la ligne de coupe) ; 5.6 attend 5.5, 5.4 attend 5.5 (même front), 7.3 au prochain créneau · —
+- 2026-10-19 03:20 · 2.9 · fusion · suite complète du sommet de pile 1277 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done · 7cddcd0
+- 2026-10-19 03:20 · 7.4 ★ · dev · fini, CI verte sur 6 jobs (dont unshare -n) ; pipeline.yaml (ruff, pytest, gitleaks, jetons contrôlés), module ci/ (clone --shared, venv par uv.lock), engine/pipeline.py (un run par espace, annulation, résultats par la file avec epoch), intention check_rerun ; front Distant + PR (Voir la sortie, Relancer) non fait faute de 3.3 sur sa base · 6631d16
+- 2026-10-19 03:20 · 7.4 ★ · second-avis · lancé · —
+- 2026-10-19 03:20 · 7.3 · dev · lancé (dev-story Sonnet ; 3.5 et 7.1 done) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

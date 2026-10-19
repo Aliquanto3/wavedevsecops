@@ -54,7 +54,7 @@ development_status:
   2-6-calculer-l-état-du-dépôt-et-un-graphe-stable-côté-serveur: done
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: done
-  2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: review
+  2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: done
   2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: in-progress
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
   epic-2-retrospective: optional
@@ -101,8 +101,8 @@ development_status:
   epic-7: in-progress
   7-1-provisionner-les-outils-de-la-chaîne-pour-un-usage-hors-lign: done
   7-2-lancer-ruff-et-pytest-dans-le-terminal-station-1-poste-local: done
-  7-3-être-protégé-par-le-hook-pre-commit-gitleaks: backlog
-  7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: in-progress
+  7-3-être-protégé-par-le-hook-pre-commit-gitleaks: in-progress
+  7-4-faire-tourner-le-pipeline-simulé-sur-chaque-pr: review
   7-5-voir-la-revue-obligatoire-et-la-protection-de-main-bloquer-s: backlog
   7-6-lire-le-même-pipeline-en-github-actions-jenkins-et-gitlab-ci: backlog
   epic-7-retrospective: optional
