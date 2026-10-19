@@ -40,6 +40,7 @@ from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.engine.snapshots import Sleep, get_snapshot, restore_snapshot
 from wavedevsecops.engine.workspace import initial_run, prepare_workspace, resolve_git
 from wavedevsecops.gitio import Git
+from wavedevsecops.progress.facts import RESTART_KIND
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario
 
 log = logging.getLogger("wavedevsecops")
@@ -50,7 +51,7 @@ MISMATCH_TEXT = (
     "L'espace reconstruit ne correspond pas à l'état de référence du scénario : il n'est pas "
     "fiable."
 )
-RESTARTED_FACT = "scenario_reset"
+RESTARTED_FACT = RESTART_KIND
 
 
 class Restart(BaseModel):

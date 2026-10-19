@@ -31,6 +31,8 @@ FactKind = Literal[
     "evidence_seen",
 ]
 ScenarioState = Literal["todo", "in_progress", "done"]
+RESTART_KIND = "scenario_reset"
+"""Fait d'une remise à zéro (story 4.4) : ni l'état ni le score du premier coup n'en dépendent."""
 
 
 class Fact(BaseModel):
@@ -69,7 +71,7 @@ class Fact(BaseModel):
             return (*base, self.barrier_id)
         if self.kind == "hint_opened":
             return (*base, self.step_id, self.tier)
-        if self.kind == "scenario_reset":
+        if self.kind == RESTART_KIND:
             return (*base, self.op_id)  # un fait par remise à zéro (story 4.4)
         return (*base, self.step_id)
 
@@ -96,7 +98,7 @@ def derive(
         for f in facts
         if (f.get("track"), f.get("scenario_id"), f.get("mode")) == (track, scenario_id, mode)
         # Une remise à zéro ne fait ni commencer ni avancer un scénario (premier passage = foi).
-        and f.get("kind") != "scenario_reset"
+        and f.get("kind") != RESTART_KIND
     ]
     validated = [f["step_id"] for f in mine if f.get("kind") == "step_validated"]
     # Score du premier coup et indices : seuls les faits antérieurs à la première remise à zéro
@@ -124,7 +126,7 @@ def _before_first_reset(
     for f in facts:
         if (f.get("track"), f.get("scenario_id"), f.get("mode")) != (track, scenario_id, mode):
             continue
-        if f.get("kind") == "scenario_reset":
+        if f.get("kind") == RESTART_KIND:
             break
         kept.append(f)
     return kept

@@ -48,4 +48,5 @@ Second avis (Haiku) puis reviewer (Opus), après rebase sur main (5.3, 3.3, 7.2,
 - low · second avis L4 · corrigé · `prepare_workspace(epoch=…)` : la reconstruction écrit l'`epoch` de l'opération au lieu de 0.
 - low · second avis L5 · rejeté · une étape ajoutée en fin de scénario change bien la liste des étapes (la spec pose l'encart dans ce cas) ; l'encart propose Recommencer sans l'imposer.
 - low · reviewer · reporté · le fait `scenario_reset` non rejoué au réveil pèse désormais sur le score (voir Reports).
+- coordination 6.5 · orchestrateur · fait · `progress.facts.RESTART_KIND = "scenario_reset"` défini ici sous le nom de la 6.5 ; `restart.RESTARTED_FACT` pointe dessus, `derive` l'utilise pour l'état et pour la borne du premier passage (une seule définition à garder à la fusion).
 - Complexité : 0 constat (`derive` reste linéaire par scénario ; `all_progress` en un passage par groupe).
