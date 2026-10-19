@@ -329,3 +329,156 @@ console.log(JSON.stringify({ hovered, slot: slotText(), selection: selectionFor(
     )
     assert out["hovered"] == {"armed": True, "linked": [True, False, True]}
     assert "ccccccc" in out["slot"] and out["selection"] is None
+
+
+# ------------------------------------------------------------------ Story 5.4
+def test_liste_filtrable_groupe_par_vue_filtre_et_marque_choisi(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const toggle = $(".designate-list-toggle");
+const closed = [toggle.getAttribute("aria-expanded"), $(".designate-list-box").hidden, toggle.textContent];
+toggle.click();
+const items = () => $$(".designate-item").map((b) => b.getAttribute("data-element-id"));
+const opened = [toggle.getAttribute("aria-expanded"), items(), $$(".designate-group-title").map((n) => n.textContent),
+  $(".designate-filter-label").textContent];
+const filter = $(".designate-filter");
+filter.value = "sujet ccc";
+filter.dispatchEvent(makeEvent("input"));
+const filtered = items();
+filter.value = "refs/heads";
+filter.dispatchEvent(makeEvent("input"));
+const byPath = items();
+filter.value = "zzz";
+filter.dispatchEvent(makeEvent("input"));
+const none = $(".designate-list-empty").textContent;
+filter.value = "";
+filter.dispatchEvent(makeEvent("input"));
+$$(".designate-item").find((b) => b.getAttribute("data-element-id") === C).click();
+const chosen = $$(".designate-item").find((b) => b.getAttribute("data-element-id") === C);
+console.log(JSON.stringify({ closed, opened, filtered, byPath, none, slot: slotText(),
+  chosen: [chosen.textContent, chosen.getAttribute("aria-pressed")] }));
+""",
+    )
+    assert out["closed"][:2] == ["false", True] and "▾" in out["closed"][2]
+    assert out["opened"][0] == "true"
+    assert out["opened"][1][0].startswith("commit:") and "ref:refs/heads/main" in out["opened"][1]
+    assert "commit:" + "b" * 40 not in out["opened"][1]  # non désignable : absent de la liste
+    assert out["opened"][2] == ["Graphe"]
+    assert out["opened"][3] == "Filtrer par nom, SHA ou chemin"
+    assert out["filtered"] == ["commit:" + "c" * 40]
+    assert out["byPath"] == ["ref:refs/heads/main"]
+    assert "Aucun élément ne correspond" in out["none"]
+    assert "ccccccc" in out["slot"]
+    assert "choisi" in out["chosen"][0] and out["chosen"][1] == "true"
+
+
+def test_apercu_du_sha_en_direct_puis_placement(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const field = $(".sha-field");
+const urls = [];
+resolver = async (url) => { urls.push(url); return { ok: true, status: 200, json: async () => ({ element_id: A, short_sha: "aaaaaaa", subject: "Add config", actor: "agent" }) }; };
+const wait = () => new Promise((r) => setTimeout(r, 350));
+field.value = "aaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+const short = [urls.length, $(".sha-preview").textContent];
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+const preview = $(".sha-preview");
+const shown = [preview.textContent, preview.getAttribute("role"), slotText(), $(".sha-place").hidden];
+$(".sha-place").click();
+await tick(); await tick();
+console.log(JSON.stringify({ short, shown, after: slotText(), left: preview.textContent, value: field.value, calls: urls.length }));
+""",
+    )
+    assert out["short"] == [0, ""]  # sous 7 caractères : aucune requête
+    assert out["shown"][0] == "aaaaaaa · Add config · Agent"
+    assert out["shown"][1] == "status" and out["shown"][3] is False
+    assert "Aucun élément choisi" in out["shown"][2]  # l'aperçu ne place rien
+    assert "aaaaaaa" in out["after"] and out["left"] == "" and out["value"] == ""
+    assert out["calls"] == 1  # le placement réutilise l'aperçu
+
+
+def test_sha_inconnu_en_direct_aria_invalid_et_alerte_sans_case(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const field = $(".sha-field");
+const wait = () => new Promise((r) => setTimeout(r, 350));
+field.value = "deadbee";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+const err = $(".sha-error");
+const bad = [field.getAttribute("aria-invalid"), err.textContent, err.getAttribute("role"), slotText(), posts.length, $(".sha-place").hidden];
+field.value = "deadbeef";
+field.dispatchEvent(makeEvent("input"));
+const cleared = [field.getAttribute("aria-invalid"), err.textContent];
+console.log(JSON.stringify({ bad, cleared }));
+""",
+    )
+    assert out["bad"][0] == "true"
+    assert out["bad"][1] == "Aucun commit ne correspond à ce SHA dans le bac à sable."
+    assert out["bad"][2] == "alert" and "Aucun élément choisi" in out["bad"][3]
+    assert out["bad"][4] == 0 and out["bad"][5] is True  # aucune réponse envoyée : l'essai reste entier
+    assert out["cleared"] == [None, ""]
+
+
+def test_revue_apercu_perime_entree_pendant_l_attente_et_focus_apres_placer(tmp_path: Path) -> None:
+    """Revue 5.4 : M1 (aperçu de l'étape précédente), L2 (Entrée et anti-rebond), L3 (focus)."""
+    out = _js(
+        tmp_path,
+        """
+const field = $(".sha-field");
+const urls = [];
+const okA = { ok: true, status: 200, json: async () => ({ element_id: A, short_sha: "aaaaaaa", subject: "Add config" }) };
+resolver = async (url) => { urls.push(url); return okA; };
+const wait = () => new Promise((r) => setTimeout(r, 350));
+// L3 : « Placer » rend le focus au champ.
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+$(".sha-place").focus();
+$(".sha-place").click();
+await tick(); await tick();
+const focusAfterPlace = document.activeElement === field;
+$(".answer-clear").click();
+// M1 : aperçu posé, puis l'étape change pour une étape qui n'attend que des refs.
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+const panel2 = structuredClone(PANEL);
+panel2.steps[0].step_id = "q2";
+panel2.current_step_id = "q2";
+panel2.steps[0].designate.accept = ["ref"];
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 5, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: VIEWS, step_panel: panel2 });
+await tick();
+const cleared = [$(".sha-preview").textContent, $(".sha-place").hidden];
+press("Enter", { target: field });
+await tick(); await tick(); await tick();
+const refused = [slotText(), $(".sha-error").textContent, field.getAttribute("aria-invalid")];
+// L2 : Entrée avant la fin de l'anti-rebond, réponse lente : le commit est placé, une seule requête.
+const panel3 = structuredClone(PANEL);
+panel3.steps[0].step_id = "q3";
+panel3.current_step_id = "q3";
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 6, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: VIEWS, step_panel: panel3 });
+await tick();
+urls.length = 0;
+resolver = (url) => { urls.push(url); return new Promise((r) => setTimeout(() => r(okA), 400)); };
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+press("Enter", { target: field });
+await new Promise((r) => setTimeout(r, 700));
+console.log(JSON.stringify({ focusAfterPlace, cleared, refused, slow: [slotText(), urls.length] }));
+""",
+    )
+    assert out["focusAfterPlace"] is True
+    assert out["cleared"] == ["", True]
+    assert "Aucun élément choisi" in out["refused"][0]
+    assert out["refused"][1] == "Cette question n'attend pas de commit." and out["refused"][2] == "true"
+    assert "aaaaaaa" in out["slow"][0] and out["slow"][1] == 1

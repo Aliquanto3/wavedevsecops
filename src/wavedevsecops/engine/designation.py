@@ -316,7 +316,7 @@ def resolve_sha(views: dict[str, Any] | None, prefix: str) -> tuple[int, dict[st
     found = [c for c in (state.commits if state else []) if c.sha.startswith(wanted)]
     if not found:
         return 404, {
-            "reason_text": f"Aucun commit de ce bac à sable ne commence par « {wanted} ». "
+            "reason_text": "Aucun commit ne correspond à ce SHA dans le bac à sable. "
             "Vérifiez le SHA, ou désignez le commit dans le graphe."
         }
     if len(found) > 1:
