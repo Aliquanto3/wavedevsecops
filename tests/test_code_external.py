@@ -61,3 +61,43 @@ console.log(JSON.stringify({{ bar, after: $(".editor-area").value, hidden: $(".c
         "mine": "ma version\n",
     }
     assert out["after"] == "version du disque\n" and out["hidden"] is True and out["saves"] == 0
+
+
+def test_conflit_efface_quand_le_tampon_redevient_propre(tmp_path: Path, diffs: Path) -> None:  # noqa: F811
+    """Revue : un conflit resté posé sur un tampon redevenu propre ferait « Recharger » une
+    version du disque plus ancienne que celle affichée."""
+    out = _js(
+        tmp_path,
+        diffs,
+        f"""
+$$(".code-file")[0].click();
+await flush();
+const orig = $(".editor-area").value;
+type("ma version\\n");
+disk.set("a.txt", "version du disque\\n");
+{EVENTS}
+const shown = $(".code-conflict").hidden;
+type(orig);
+disk.set("a.txt", "troisième version\\n");
+store.applyEvent(evt(3, "external_change", "op3", {{ fingerprint: "w" }}));
+store.applyEvent(evt(4, "state_projected", "op3", {{ views: {{ a: 2 }}, fingerprint: "v" }}));
+await flush();
+console.log(JSON.stringify({{ shown, value: $(".editor-area").value, hidden: $(".code-conflict").hidden }}));
+""",
+    )
+    assert out == {"shown": False, "value": "troisième version\n", "hidden": True}
+
+
+def test_notice_masquee_au_changement_d_espace(tmp_path: Path, diffs: Path) -> None:  # noqa: F811
+    out = _js(
+        tmp_path,
+        diffs,
+        f"""
+{EVENTS}
+const shown = $(".external-change-notice").hidden;
+store.reset("w2");
+await flush();
+console.log(JSON.stringify({{ shown, hidden: $(".external-change-notice").hidden }}));
+""",
+    )
+    assert out == {"shown": False, "hidden": True}

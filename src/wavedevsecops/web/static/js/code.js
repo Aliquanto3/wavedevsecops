@@ -400,12 +400,20 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
       const file = await fetchFile(path);
       if (current !== path) return;
       if (isDirty(path)) {
-        if (file.hash !== buffer.hash && !(buffer.conflict && buffer.conflict.hash === file.hash)) {
+        if (file.hash === buffer.hash) {
+          // Le disque est revenu à la version ouverte : plus de conflit à trancher.
+          if (buffer.conflict) {
+            buffer.conflict = null;
+            drawFile();
+          }
+        } else if (!(buffer.conflict && buffer.conflict.hash === file.hash)) {
           buffer.conflict = { hash: file.hash, content: file.content };
           drawFile();
         }
-      } else if (file.hash !== buffer.hash) {
+      } else if (file.hash !== buffer.hash || buffer.conflict) {
+        // Tampon propre : la version du disque fait foi, un conflit d'avant n'a plus d'objet.
         Object.assign(buffer, { content: file.content, saved: file.content, hash: file.hash });
+        buffer.conflict = null;
         editor.setValue(file.content);
         drawFile();
       }
@@ -461,10 +469,10 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   let seenExternal = store.state.externalChange || 0;
   store.subscribe((state) => {
     const external = state.externalChange || 0;
-    if (external !== seenExternal) {
-      seenExternal = external;
-      notice.hidden = false;
-    }
+    // Le compteur repart de 0 au changement d'espace : la ligne ne vaut que pour l'espace vu.
+    if (external > seenExternal) notice.hidden = false;
+    else if (external < seenExternal) notice.hidden = true;
+    seenExternal = external;
     if (state.views === drawnViews) return;
     drawnViews = state.views;
     if (!state.workspaceId) return;

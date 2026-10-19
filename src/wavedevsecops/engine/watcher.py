@@ -43,6 +43,8 @@ class TreeWatcher:
         self._suspended = False
         self._quiet_until = 0.0
         self._pending = False
+        self._dropped = False
+        """Un lot est arrivé pendant la suspension : il sera proposé après la reprise."""
         self._timer: threading.Timer | None = None
         self._thread: threading.Thread | None = None
         self.ready = threading.Event()
@@ -77,10 +79,19 @@ class TreeWatcher:
             self._suspended = True
 
     def resume(self) -> None:
+        """Reprend après le silence ; un lot vu pendant la suspension est proposé ensuite.
+
+        Une écriture externe faite pendant la commande (entre sa projection et la reprise)
+        ne doit pas être perdue ; le bruit de la commande elle-même est écarté par la
+        pré-vérification d'empreinte de la file.
+        """
         with self._lock:
             self._suspended = False
-            self._pending = False
+            self._pending = self._dropped
+            self._dropped = False
             self._quiet_until = time.monotonic() + self._quiet_s
+            if self._pending:
+                self._arm()
 
     def accepting(self) -> bool:
         """Vrai si un changement observé maintenant doit être proposé à la file."""
@@ -97,6 +108,7 @@ class TreeWatcher:
         """
         with self._lock:
             if self._suspended:
+                self._dropped = True
                 return
             if time.monotonic() < self._quiet_until:
                 self._pending = True
