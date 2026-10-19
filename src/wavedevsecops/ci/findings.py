@@ -18,6 +18,10 @@ from wavedevsecops.toolrun.findings import relative_posix
 
 MESSAGE_MAX = 500
 
+UNSCANNED_RULE = "unscanned_file"
+"""Constat d'un fichier que l'outil n'a pas pu analyser (syntaxe illisible) : un check vert
+ne prouverait rien sur ce fichier, `ci.run_job` tient donc le check pour un échec."""
+
 
 def _line(value: Any) -> int | None:
     try:
@@ -113,9 +117,51 @@ def parse_gitleaks_json(text: str, tree: Path) -> list[Finding]:
     return found
 
 
+def parse_bandit_json(text: str, tree: Path) -> list[Finding]:
+    """`bandit -f json` : un constat par résultat (règle `test_id`, fichier, ligne)."""
+    try:
+        data = json.loads(text or "{}")
+    except ValueError:
+        raise ValueError("la sortie machine de bandit est illisible") from None
+    if not isinstance(data, dict) or not isinstance(data.get("results", []), list):
+        raise ValueError("la sortie machine de bandit est inattendue")
+    found = []
+    for item in data.get("results", []):
+        if not isinstance(item, dict):
+            continue
+        found.append(
+            Finding(
+                rule_id=_short(item.get("test_id")),
+                severity="error",
+                message_text=_short(item.get("issue_text")),
+                path=relative_posix(str(item.get("filename") or ""), tree),
+                line=_line(item.get("line_number")),
+            )
+        )
+    # `errors` : fichiers que bandit n'a pas pu lire (syntaxe), qu'il saute en sortant 0.
+    for item in data.get("errors") or []:
+        if not isinstance(item, dict):
+            continue
+        path = relative_posix(str(item.get("filename") or ""), tree)
+        reason = _short(item.get("reason")) or "fichier illisible"
+        found.append(
+            Finding(
+                rule_id=UNSCANNED_RULE,
+                severity="error",
+                message_text=_short(
+                    f"bandit n'a pas pu analyser ce fichier ({reason}) : un fichier non analysé "
+                    "ne prouve pas que le code est sûr. Corrigez sa syntaxe."
+                ),
+                path=path,
+            )
+        )
+    return found
+
+
 PARSERS: dict[str, Callable[[str, Path], list[Finding]]] = {
     "ruff_json": parse_ruff_json,
     "junit": parse_junit,
     "gitleaks_json": parse_gitleaks_json,
+    "bandit_json": parse_bandit_json,
 }
 """Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée."""

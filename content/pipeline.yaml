@@ -28,6 +28,8 @@
 #               du texte humain. Chacune : `argv`, `parse` (lecteur des constats, voir plus bas),
 #               `when` (`failure` : seulement si la sortie humaine a échoué, par défaut ;
 #               `always` : à chaque run, par exemple la quality gate qui affiche sa valeur).
+#               Un constat `unscanned_file` (fichier que l'outil a sauté) change un succès en
+#               échec : un vert ne prouve rien sur un fichier non analysé.
 #   exit_codes  sens des codes de sortie de la sortie humaine : `success` et `failure` (listes) ;
 #               tout autre code, un dépassement de délai ou un outil introuvable donnent
 #               `error` (« ⚠ Erreur de l'outil », la PR reste bloquée, « Relancer le check »).
@@ -40,7 +42,7 @@
 #
 # Lecteurs `parse` livrés : ruff_json (`ruff check --output-format json`), junit (rapport
 # `--junitxml` de pytest : fichier du test en échec), gitleaks_json (`--report-format json`).
-# 8.1 ajoute bandit_json, 8.3 pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
+# 8.1 a livré bandit_json ; 8.3 ajoute pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
 # diff_cover_json : un lecteur par format, dans `ci/findings.py`, et sa valeur dans `ci.Parse`.
 schema_version: 1
 jobs:
@@ -79,3 +81,20 @@ jobs:
       - argv: [dir, --no-banner, --redact, --exit-code, "3", --report-format, json, --report-path, "{report}", .]
         parse: gitleaks_json
     exit_codes: {success: [0], failure: [3]}
+
+  - job_id: bandit
+    label_text: Analyse de sécurité (bandit)
+    tool: bandit
+    required: true
+    barrier: static-analysis
+    # `-r src` analyse le code de l'application (dossier src/), pas les tests (leurs `assert`
+    # sont attendus) ; `-q` retire les lignes d'information de bandit ; `--ignore-nosec` refuse
+    # les exemptions `# nosec` écrites dans le code. Il sort 1 quand il trouve un défaut.
+    # L'exécution machine tourne aussi sur un succès : un fichier que bandit n'a pas pu lire
+    # (syntaxe) est sauté avec le code 0, et `ci` en fait un échec (`unscanned_file`).
+    human: [-r, src, -q, --ignore-nosec]
+    machine:
+      - argv: [-r, src, -q, --ignore-nosec, -f, json]
+        parse: bandit_json
+        when: always
+    exit_codes: {success: [0], failure: [1]}

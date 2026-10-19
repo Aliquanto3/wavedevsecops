@@ -24,7 +24,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from wavedevsecops import toolrun, wsfs
-from wavedevsecops.ci.findings import PARSERS
+from wavedevsecops.ci.findings import PARSERS, UNSCANNED_RULE
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, Finding
@@ -32,7 +32,7 @@ from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.registry import load_registry
 from wavedevsecops.wsfs import Layout
 
-Parse = Literal["ruff_json", "junit", "gitleaks_json"]
+Parse = Literal["ruff_json", "junit", "gitleaks_json", "bandit_json"]
 """Lecteurs de constats livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent."""
 
 TOKENS = frozenset({"repo", "base_sha", "osv_url", "report"})
@@ -421,6 +421,9 @@ def run_job(
                     )
                 )
             findings.extend(found or [])
+        # Un fichier que l'outil a sauté (syntaxe illisible) : le vert ne prouverait rien.
+        if state == "success" and any(f.rule_id == UNSCANNED_RULE for f in findings):
+            state = "failure"
     elapsed = int((time.monotonic() - started) * 1000)
     return JobResult(job.job_id, state, output, findings, elapsed)
 

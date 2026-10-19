@@ -1,5 +1,5 @@
 // Pipeline du projet en Jenkins (syntaxe déclarative). Le même pipeline s'écrit dans
-// « .github/workflows/ci.yml » (GitHub Actions) et dans « .gitlab-ci.yml » (GitLab CI) : trois
+// « .github/workflows/ci.yml » (GitHub Actions) et dans « .gitlab-ci.yml » (GitLab CI) : quatre
 // tâches, l'une après l'autre.
 // Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 // surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
@@ -32,6 +32,17 @@ pipeline {
             steps {
                 // gitleaks doit être installé sur l'agent qui exécute la tâche.
                 sh 'gitleaks dir --no-banner --redact --exit-code 3 .'
+            }
+        }
+        // wds:end
+
+        // wds:job bandit
+        stage('Analyse de sécurité (bandit)') {
+            steps {
+                // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
+                sh 'uv sync --frozen'
+                // Le code de l'application (src/), sans les exemptions « # nosec ».
+                sh 'uv run bandit -r src -q --ignore-nosec'
             }
         }
         // wds:end

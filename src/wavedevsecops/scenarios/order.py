@@ -36,8 +36,11 @@ STATION_ORDER: tuple[str, ...] = (
     "check-en-echec",
     "pr-sans-revue",
     "push-direct-main",
+    # Station 3 · Sécurité et qualité (story 8.1)
+    "code-vulnerable",
 )
-"""Ordre conseillé des scénarios de station, par `scenario_id` (station 1, puis station 2)."""
+"""Ordre conseillé des scénarios de station, par `scenario_id` (station 1, puis 2, puis 3). Un
+identifiant pas encore livré est absent du catalogue."""
 
 
 def section_of(section: str | None) -> str:

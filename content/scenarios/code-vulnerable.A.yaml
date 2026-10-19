@@ -1,0 +1,133 @@
+# Station 3 (Story 8.1) : une PR qui porte du code vulnérable prévu, que bandit (SAST) refuse.
+# Parcours sans IA. La branche `feature` porte déjà un commit : un module qui passe un texte
+# saisi à `eval`. Le pipeline simulé tourne sur la PR ; le check bandit échoue (règle B307),
+# la PR est bloquée, puis repasse au vert une fois le défaut corrigé et poussé.
+schema_version: 1
+scenario_id: code-vulnerable
+mode: A
+title_text: Bloquer une PR sur du code vulnérable
+section: stations
+station: 3
+tracks: [no_ai]
+tools: [git, bandit]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige le check bandit avant tout merge ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_checks: [bandit]
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: src/inventory/alertes.py
+    content: |
+      """Alertes de stock : le seuil saisi par l'utilisateur."""
+
+
+      def seuil_depuis_texte(texte: str) -> int:
+          """Lit le seuil d'alerte saisi sous forme de texte, par exemple « 5 »."""
+          return eval(texte)
+  - op: commit
+    message: Ajoute la lecture du seuil d'alerte
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : un nouveau module
+      `src/inventory/alertes.py` lit le seuil d'alerte saisi par l'utilisateur. Poussez cette
+      branche vers l'origine pour pouvoir ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline analysera ce commit avant qu'il n'arrive sur `main`.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      puis l'analyse de sécurité du code.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi bandit bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check bandit doit passer à « Échec » et « Merger »
+      devenir inactif. Dépliez la ligne de détail du check bandit : elle nomme le fichier, la
+      ligne et la règle. Ouvrez aussi « Voir la sortie » pour lire le rapport complet de bandit.
+    explanation_text: >-
+      bandit est un outil d'analyse statique (SAST) : il lit le code sans l'exécuter et
+      reconnaît les appels dangereux. Le job analyse le code de l'application, le dossier
+      `src/` (pas les tests), et refuse les exemptions `# nosec`. Ici, `eval` exécuterait n'importe quel texte saisi par
+      l'utilisateur. Le check est obligatoire : tant qu'il échoue, la PR ne peut pas être
+      mergée, et `main` reste protégée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      bandit: failure
+    hints:
+      lead_text: >-
+        Le check bandit est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        encore « En attente » ou « En cours », patientez : le pipeline passe d'abord par les
+        autres contrôles.
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check bandit de la PR, puis « Voir la sortie ». Le défaut
+        désigné est `eval` dans src/inventory/alertes.py, règle B307.
+
+  - step_id: corriger_et_pousser
+    type: pr_state
+    title_text: Corriger le défaut et faire repasser le check au vert
+    instruction_text: >-
+      Corrigez `src/inventory/alertes.py` pour que le texte saisi ne soit plus exécuté comme du
+      code, committez la correction sur `feature`, puis poussez-la. Le pipeline repart sur le
+      nouveau commit.
+    explanation_text: >-
+      Le correctif n'a pas besoin d'être validé à la main : le pipeline relance bandit sur le
+      nouveau commit, et le check repasse au vert de lui-même quand le défaut a disparu. C'est
+      ce résultat, et non votre commande, qui valide l'étape.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      bandit: success
+    hints:
+      lead_text: >-
+        La sortie de bandit propose une alternative plus sûre dans son message. Corrigez la ligne
+        indiquée, committez, puis poussez : un push sur la branche de la PR relance le pipeline.
+      partial_text: "Dans alertes.py : return ___.___(texte) ; puis git add, git commit et git push"
+      solution_text: >-
+        Dans src/inventory/alertes.py : ajouter « import ast » en tête, remplacer eval(texte)
+        par ast.literal_eval(texte), puis git add, git commit et git push

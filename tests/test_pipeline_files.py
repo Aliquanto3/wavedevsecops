@@ -68,6 +68,7 @@ setup:
       - {{job_id: pytest, state: failure}}
       - {{job_id: gitleaks, state: queued}}
       - {{job_id: bandit, state: success}}
+      - {{job_id: revue_manuelle, state: success}}
 """
 NOTES = '  - op: write_file\n    path: NOTES.md\n    content: "notes\\n"'
 
@@ -289,7 +290,9 @@ def test_voir_dans_le_pipeline_n_est_propose_que_pour_les_taches_du_pipeline(
         "ruff": True,
         "pytest": True,
         "gitleaks": True,
-        "bandit": False,
+        "bandit": True,
+        # Un check hors de content/pipeline.yaml n'a pas de tâche à montrer.
+        "revue_manuelle": False,
     }
     default = project(git, layout).views.remote.pulls[0].checks
     assert not any(c.in_pipeline for c in default)

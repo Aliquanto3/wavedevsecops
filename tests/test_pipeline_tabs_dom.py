@@ -111,9 +111,9 @@ console.log(JSON.stringify({
 """,
     )
     assert out["problems"] == []
-    assert sorted(job for job, _ in out["buttons"]) == ["gitleaks", "pytest", "ruff"]
+    assert sorted(job for job, _ in out["buttons"]) == ["bandit", "gitleaks", "pytest", "ruff"]
     assert {label for _, label in out["buttons"]} == {"Voir dans le pipeline"}
-    assert "bandit" in out["checks"]  # présent, mais sans bouton : hors de pipeline.yaml
+    assert "revue_manuelle" in out["checks"]  # présent, mais sans bouton : hors de pipeline.yaml
     assert out["tabsBefore"] == 0 and out["modeButtons"] == ["Fichier", "Diff"]
 
 
@@ -169,7 +169,12 @@ console.log(JSON.stringify({
     assert out["role"] == "tablist" and out["path"] == ".github/workflows/ci.yml"
     assert out["panelLabel"] == ".github/workflows/ci.yml, lecture seule"
     assert out["job"] == _lines(expected["github"]) and out["litNone"] == []
-    assert out["jobs"] == [["ruff", "false"], ["pytest", "true"], ["gitleaks", "false"]]
+    assert out["jobs"] == [
+        ["ruff", "false"],
+        ["pytest", "true"],
+        ["gitleaks", "false"],
+        ["bandit", "false"],
+    ]
     assert out["editors"] == 0 and out["filePanelHidden"]  # lecture seule : ni éditeur ni saisie
     assert out["fetched"] == ["?pr=1"] and out["posts"] == 0
     assert out["status"].startswith("Pipeline, pytest : ")

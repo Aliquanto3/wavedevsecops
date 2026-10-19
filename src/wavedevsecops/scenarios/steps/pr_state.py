@@ -9,13 +9,14 @@ n'existe pas encore ou qui n'a pas l'état attendu donne `pending` (rien à dire
 from __future__ import annotations
 
 import logging
+import re
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from wavedevsecops import github_sim
 from wavedevsecops.contracts import RepoState
-from wavedevsecops.contracts.github import CheckState, PullRequest
+from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, PullRequest
 from wavedevsecops.scenarios.steps._base import StepArgs, StepContext, Verdict
 
 log = logging.getLogger("wavedevsecops")
@@ -37,6 +38,14 @@ class Args(StepArgs):
     périmé ne compte pas : le push qui le remplace remet le check en attente)."""
     mergeable: bool | None = None
     """`True` : « Merger » est actif ; `False` : la PR est bloquée (`merge-blocked`)."""
+
+    @field_validator("check_states")
+    @classmethod
+    def _jobs(cls, value: dict[str, CheckState]) -> dict[str, CheckState]:
+        for job in value:
+            if not re.fullmatch(JOB_ID_PATTERN, job):
+                raise ValueError(f"job_id invalide : « {job} »")
+        return value
 
 
 def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001

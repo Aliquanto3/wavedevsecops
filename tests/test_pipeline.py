@@ -50,7 +50,7 @@ FEATURE = "src/inventory/rapport.py"
 # ------------------------------------------------------------------ contrat du pipeline
 def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
     pipeline = ci.load_pipeline(Settings())
-    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks"]
+    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit"]
     registry = load_registry(settings=Settings())
     chain = yaml.safe_load((CONTENT / "chain.yaml").read_text("utf-8"))
     barriers = {
@@ -272,7 +272,7 @@ class Box:
     def wait_settled(self) -> None:
         self.wait(
             lambda: (
-                len(self.states()) == 3
+                len(self.states()) == 4
                 and all(s not in ("queued", "running") for s in self.states().values())
                 and not self.runner.busy
             ),
@@ -305,7 +305,7 @@ class Box:
 Behaviour = dict[str, tuple[str, int, str, float]]
 """outil -> (sortie humaine, code, sortie machine, pause en secondes avant de sortir)."""
 
-MACHINE_FLAGS = ("--output-format", "--junitxml", "--report-format")
+MACHINE_FLAGS = ("--output-format", "--junitxml", "--report-format", "-f")
 
 RUFF_TEXT = "src/inventory/rapport.py:1:8: F401 [*] `os` imported but unused\nFound 1 error.\n"
 RUFF_JSON = json.dumps(
@@ -320,6 +320,27 @@ RUFF_JSON = json.dumps(
 )
 
 
+BANDIT_TEXT = (
+    ">> Issue: [B307:blacklist] Use of possibly insecure function - consider using safer "
+    "ast.literal_eval.\n   Location: ./src/inventory/rapport.py:4:11\n"
+)
+BANDIT_JSON = json.dumps(
+    {
+        "errors": [],
+        "results": [
+            {
+                "filename": FEATURE,
+                "issue_text": "Use of possibly insecure function - consider using safer "
+                "ast.literal_eval.",
+                "line_number": 4,
+                "test_id": "B307",
+                "issue_severity": "MEDIUM",
+            }
+        ],
+    }
+)
+
+
 def _fake_tools(monkeypatch: pytest.MonkeyPatch, behaviour: Behaviour, calls: list) -> None:
     """`toolrun.spawn_tool` remplacé : sortie et code voulus par outil, rapport machine écrit."""
     real_spawn = procs.spawn
@@ -327,7 +348,7 @@ def _fake_tools(monkeypatch: pytest.MonkeyPatch, behaviour: Behaviour, calls: li
     def fake(tool_id, args, *, cwd, venv, timeout, settings=None):  # noqa: ANN001, ANN202
         args = list(args)
         machine = any(flag in args for flag in MACHINE_FLAGS)
-        human, code, machine_text, pause = behaviour[tool_id]
+        human, code, machine_text, pause = behaviour.get(tool_id, ("", 0, "", 0))
         calls.append((tool_id, machine, Path(cwd)))
         text = machine_text if machine else human
         script = "import sys, time; "
@@ -381,6 +402,7 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
             "ruff": (RUFF_TEXT, 1, RUFF_JSON, 0),
             "pytest": ("3 passed\n", 0, "", 0),
             "gitleaks": ("panic: config\n", 1, "", 0),
+            "bandit": (BANDIT_TEXT, 1, BANDIT_JSON, 0),
         },
         calls,
     )
@@ -388,7 +410,11 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
     opened.wait_settled()
     pr = opened.pr()
     checks = {c.job_id: c for c in pr.checks}
-    assert [c.job_id for c in pr.checks] == ["ruff", "pytest", "gitleaks"]
+    assert [c.job_id for c in pr.checks] == ["ruff", "pytest", "gitleaks", "bandit"]
+    # bandit : sortie humaine verbatim, constat (fichier, ligne, règle) de `-f json`.
+    bandit = checks["bandit"]
+    assert bandit.state == "failure" and bandit.output == BANDIT_TEXT
+    assert [(f.rule_id, f.path, f.line) for f in bandit.findings] == [("B307", FEATURE, 4)]
     assert all(c.required for c in pr.checks)
     assert all((c.head_sha, c.base_sha) == (pr.head_sha, pr.base_sha) for c in pr.checks)
     # Sortie humaine verbatim, constats de l'exécution machine (fichier, ligne, règle).
@@ -414,6 +440,8 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         ("ruff", True),
         ("pytest", False),
         ("gitleaks", False),
+        ("bandit", False),
+        ("bandit", True),
     ]
     assert not tree.exists()
     # Chaque changement d'état est une opération de la file : check_updated, puis pr_updated.
@@ -425,6 +453,8 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         ("pytest", "success"),
         ("gitleaks", "running"),
         ("gitleaks", "error"),
+        ("bandit", "running"),
+        ("bandit", "failure"),
     ]
     assert updates[1]["element_id"] == f"check:1:ruff:{pr.head_sha}"
     ops = {e.op_id for e in opened.events if e.kind == Kind.CHECK_UPDATED}
@@ -435,6 +465,7 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         "ruff": "failure",
         "pytest": "success",
         "gitleaks": "error",
+        "bandit": "failure",
     }
     # Vue Distant + PR : sortie verbatim liée, ligne de détail fichier:ligne, erreur de l'outil.
     opened.engine.submit(Operation("noop", lambda ctx: 0, writes=False)).result(WAIT)
@@ -569,7 +600,7 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
     assert opened.states()["gitleaks"] == "error"
     engine_pipeline.register_intents()
     with pytest.raises(OperationRefused, match="pas de job"):
-        build_operation(opened.engine, "check_rerun", {"number": 1, "job_id": "bandit"})
+        build_operation(opened.engine, "check_rerun", {"number": 1, "job_id": "inconnu"})
     behaviour["gitleaks"] = ("aucune fuite\n", 0, "", 0)
     calls.clear()
     op = build_operation(opened.engine, "check_rerun", {"number": 1, "job_id": "gitleaks"})
@@ -577,7 +608,9 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
     opened.wait(lambda: opened.states()["gitleaks"] == "success", "gitleaks relancé")
     opened.wait_settled()
     assert [t for t, _m, _c in calls] == ["gitleaks"]
-    assert opened.states() == {"ruff": "success", "pytest": "success", "gitleaks": "success"}
+    assert opened.states() == {
+        "ruff": "success", "pytest": "success", "gitleaks": "success", "bandit": "success"
+    }
     assert opened.pr().mergeable
 
 

@@ -1,9 +1,9 @@
 # Pipeline du projet en GitLab CI. Le même pipeline s'écrit dans « .github/workflows/ci.yml »
-# (GitHub Actions) et dans « Jenkinsfile » (Jenkins) : trois tâches, l'une après l'autre
+# (GitHub Actions) et dans « Jenkinsfile » (Jenkins) : quatre tâches, l'une après l'autre
 # (une étape par tâche, car les tâches d'une même étape tournent en parallèle).
 # Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 # surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
-stages: [ruff, pytest, gitleaks]
+stages: [ruff, pytest, gitleaks, bandit]
 
 default:
   image: python:3.14
@@ -37,4 +37,16 @@ gitleaks:
   script:
     # gitleaks doit être installé dans l'image qui exécute la tâche.
     - gitleaks dir --no-banner --redact --exit-code 3 .
+# wds:end
+
+# wds:job bandit
+bandit:
+  # Analyse de sécurité (bandit)
+  stage: bandit
+  before_script:
+    - pip install uv
+    - uv sync --frozen
+  script:
+    # Le code de l'application (src/), sans les exemptions « # nosec ».
+    - uv run bandit -r src -q --ignore-nosec
 # wds:end

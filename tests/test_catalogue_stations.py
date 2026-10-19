@@ -25,7 +25,13 @@ def test_section_stations_rangee_par_station(tmp_path: Path, monkeypatch) -> Non
     assert {"defaut-de-lint", "test-casse"}.isdisjoint(s["scenario_id"] for s in socle)
     stations = body["sections"][1]
     assert stations["title"] == "Stations"
-    group, pr_ci = stations["groups"]
+    # Un groupe par station livrée, dans l'ordre des stations ; chaque story de station en
+    # ajoute un sans réécrire ce test.
+    groups = stations["groups"]
+    numbers = [g["station"] for g in groups]
+    assert numbers == sorted(set(numbers)) and numbers[0] == 1
+    group = groups[0]
+    pr_ci = groups[1]
     assert (group["station"], group["text"]) == (1, "Station 1 · Poste local")
     assert (pr_ci["station"], pr_ci["text"]) == (2, "Station 2 · PR et CI")
     lint, test, secret = group["scenarios"]
@@ -35,6 +41,14 @@ def test_section_stations_rangee_par_station(tmp_path: Path, monkeypatch) -> Non
         "pr-sans-revue",
         "push-direct-main",
     ]
+    # À l'intérieur de chaque station, l'ordre conseillé de STATION_ORDER.
+    for g in groups:
+        ids = [s["scenario_id"] for s in g["scenarios"]]
+        assert ids == sorted(ids, key=STATION_ORDER.index), g["station"]
+    # Station 3 (story 8.1) : l'analyse de sécurité du code.
+    (security,) = [g for g in groups if g["station"] == 3]
+    assert security["text"] == "Station 3 · Sécurité et qualité"
+    assert "code-vulnerable" in [s["scenario_id"] for s in security["scenarios"]]
     assert lint["description"].startswith("Lancez ruff") and test["description"]
     # Un outil absent rend la carte indisponible, avec l'outil nommé.
     (lint_mode,) = lint["modes"]
