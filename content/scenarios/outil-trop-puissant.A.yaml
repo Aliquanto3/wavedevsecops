@@ -1,0 +1,345 @@
+# Station 3 (Story 8.5, Flow 4) : parcours LLM, une PR qui donne à l'assistant un outil trop
+# puissant. La branche `feature` porte un commit : un module `query_tool.py` qui laisse le modèle
+# faire évaluer n'importe quelle expression Python (`eval`), sans test, et un `requirements.txt`
+# qui épingle h11 0.14.0 (vulnérable ; le verrou `uv.lock` porte la 0.16.0, corrigée). Le
+# pipeline simulé tourne sur la PR : bandit, pip-audit et la quality gate échouent ; l'apprenant
+# restreint l'outil, met la dépendance à jour (SBOM consulté), teste le module, puis le collègue
+# et l'agent B approuvent (deux approbations requises) et « Merger » devient actif.
+# `uv.lock` et `pyproject.toml` ne bougent pas : le check `uv_lock` reste vert (aucune
+# dépendance déclarée n'est modifiée), seul le fichier épinglé que lit pip-audit change.
+schema_version: 1
+scenario_id: outil-trop-puissant
+mode: A
+title_text: Bloquer un outil trop puissant donné au LLM
+section: stations
+station: 3
+tracks: [llm]
+tools: [git, bandit, pip-audit, diff-cover]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: loop
+  - op: commit
+    message: Ajoute l'assistant d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige les sept checks et deux approbations ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_approvals: 2
+    required_checks: [ruff, pytest, gitleaks, bandit, pip_audit, uv_lock, quality_gate]
+  # Les deux approbations arrivent d'elles-mêmes quand tous les checks sont verts sur le dernier
+  # commit : le collègue commente puis approuve, l'agent B approuve aussi.
+  - op: colleague_reaction
+    trigger: checks_green
+    head: feature
+    author: colleague
+    reviews:
+      - state: commented
+        body_text: L'outil restreint est beaucoup plus rassurant, et il est testé.
+      - state: approved
+        body_text: Je valide. Les checks sont verts.
+  - op: colleague_reaction
+    trigger: checks_green
+    head: feature
+    author: agent
+    reviews:
+      - state: approved
+        body_text: "Je valide aussi : le modèle ne peut plus exécuter de code arbitraire."
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: src/inventory/query_tool.py
+    content: |
+      """Outil « requête » de l'assistant : interroger le stock avec une expression."""
+
+      from __future__ import annotations
+
+      from typing import Any
+
+      from inventory.stock import Stock
+
+      QUERY_TOOL: dict[str, Any] = {
+          "type": "function",
+          "function": {
+              "name": "run_query",
+              "description": "Évalue une expression Python sur le stock (variable `stock`).",
+              "parameters": {
+                  "type": "object",
+                  "properties": {"expression": {"type": "string"}},
+                  "required": ["expression"],
+              },
+          },
+      }
+
+
+      def run_query(stock: Stock, expression: str) -> str:
+          """Évalue l'expression écrite par le modèle, avec le stock comme variable."""
+          return str(eval(expression, {"stock": stock}))
+  # h11 0.14.0 : version épinglée à la main, plus ancienne que celle du verrou (0.16.0).
+  - op: replace_in_file
+    path: requirements.txt
+    old: |
+      h11==0.16.0
+    new: |
+      h11==0.14.0
+  - op: commit
+    message: Donne à l'assistant un outil de requête sur le stock
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : un nouvel outil pour l'assistant
+      LLM, `src/inventory/query_tool.py`, laisse le modèle interroger le stock avec une
+      expression. Poussez cette branche vers l'origine pour pouvoir ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline analysera ce commit avant qu'il n'arrive sur `main`.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      analyse de sécurité du code, audit des dépendances, verrou des dépendances, puis la quality
+      gate. La protection de `main` exige aussi deux approbations.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi bandit bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check bandit doit passer à « Échec » et « Merger »
+      devenir inactif. Sous le bouton, lisez les raisons du blocage : « bandit en échec » et
+      « Approbations : 0 sur 2 ». Dépliez le détail du check bandit et ouvrez « Voir la
+      sortie » : il nomme le fichier, la ligne et la règle. Deux autres checks sont aussi
+      rouges ; une chose à la fois, commencez par bandit.
+    explanation_text: >-
+      bandit lit le code sans l'exécuter et reconnaît les appels dangereux. Ici, l'outil donné au
+      modèle passe son texte à `eval` : un modèle de langage, ou une injection de prompt
+      glissée dans une donnée qu'il lit, pourrait faire exécuter n'importe quel code à
+      l'assistant, avec les droits de l'application. Un outil de LLM doit faire une chose
+      précise, avec des paramètres bornés, jamais « tout ce que le modèle écrit ». Le check est
+      obligatoire, et `main` demande aussi deux approbations : tant qu'il échoue, la PR ne peut
+      pas être mergée.
+    head: feature
+    base: main
+    pr_state: open
+    max_approvals: 0
+    check_states:
+      bandit: failure
+    mergeable: false
+    hints:
+      lead_text: >-
+        Le check bandit est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        encore « En attente » ou « En cours », patientez : le pipeline passe d'abord par les
+        autres contrôles. La raison du blocage s'affiche sous « Merger ».
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check bandit de la PR, puis « Voir la sortie ». Le défaut désigné
+        est `eval` dans src/inventory/query_tool.py, règle B307.
+
+  - step_id: restreindre_l_outil
+    type: pr_state
+    title_text: Restreindre l'outil et faire repasser bandit au vert
+    instruction_text: >-
+      Modifiez `src/inventory/query_tool.py` pour que le modèle ne fasse plus évaluer de code :
+      l'outil ne doit répondre qu'à une liste fermée de requêtes prévues (par exemple « les
+      articles sous le seuil » et « la quantité d'un article »). Gardez l'outil, restreint.
+      Committez sur `feature`, puis poussez. Le pipeline repart sur le nouveau commit.
+    explanation_text: >-
+      Restreindre, c'est donner au modèle le moins de pouvoir possible : des actions nommées et
+      des paramètres vérifiés, au lieu d'un langage entier. Le correctif n'a pas besoin d'être
+      validé à la main : bandit repasse tout seul au vert quand `eval` a disparu. Les raccourcis
+      ne fonctionnent pas : `# nosec` est refusé, un fichier `.bandit` de votre dépôt est ignoré,
+      et supprimer l'outil ne passera pas l'étape de test qui suit, car la quality gate doit
+      toujours mesurer des lignes du nouveau code.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      bandit: success
+    hints:
+      lead_text: >-
+        Remplacez l'expression libre par un choix parmi des requêtes que vous écrivez vous-même :
+        un dictionnaire de noms vers des fonctions, ou une suite de `if`. Un nom inconnu doit
+        être refusé.
+      partial_text: >-
+        Dans query_tool.py : QUERIES = {"sous_le_seuil": ___, ...}, run_query(stock, name)
+        refuse un nom absent de QUERIES ; puis git add, git commit et git push
+      solution_text: >-
+        Dans src/inventory/query_tool.py : un dictionnaire QUERIES de deux requêtes
+        (sous_le_seuil, quantite), run_query(stock, name, article="") qui lève une erreur pour un
+        nom inconnu et ne contient plus eval ; puis git add, git commit et git push
+
+  - step_id: designer_la_dependance
+    type: designate
+    title_text: Repérer la dépendance vulnérable dans le SBOM
+    instruction_text: >-
+      Le check pip_audit échoue aussi. Cliquez sur « Voir le SBOM » sur ce check : le tableau
+      liste chaque composant du logiciel, sa version, sa licence et ses vulnérabilités. Désignez
+      la ligne marquée ✗, puis validez : vous n'avez qu'un essai, et la correction s'affiche
+      ensuite.
+    explanation_text: >-
+      Le SBOM (la nomenclature logicielle) est l'inventaire de ce que contient votre logiciel :
+      sans lui, impossible de savoir quelle faille vous touche. Ici, une seule ligne est
+      vulnérable : `h11` en version 0.14.0, épinglée dans `requirements.txt`. Cette vue se lit
+      seulement : on corrige en changeant la version de la dépendance dans le dépôt.
+    explain_ref: remote.sbom
+    question_text: Quelle dépendance est vulnérable ?
+    accept: [sbom]
+    slots:
+      - slot_id: composant
+        label_text: Le composant vulnérable
+        answers: ["sbom:h11@0.14.0"]
+        primary: "sbom:h11@0.14.0"
+    hints:
+      lead_text: >-
+        Dans le tableau du SBOM, la ligne vulnérable porte un ✗ suivi de l'identifiant de la
+        faille (PYSEC-… ou GHSA-…).
+      partial_text: "Désigner la ligne du SBOM : composant ___, version 0.14.0"
+      solution_text: "Désigner la ligne h11 0.14.0 du SBOM du check pip_audit"
+
+  - step_id: mettre_a_jour_la_dependance
+    type: pr_state
+    title_text: Mettre à jour la dépendance et faire repasser pip-audit au vert
+    instruction_text: >-
+      Passez h11 à la version corrigée, `0.16.0`, dans `requirements.txt`. Committez la
+      correction sur `feature`, puis poussez-la. Le pipeline repart sur le nouveau commit.
+    explanation_text: >-
+      La version corrigée est celle que le verrou `uv.lock` demandait déjà : le fichier épinglé
+      qui sert à l'audit avait pris du retard. Le correctif n'a pas besoin d'être validé à la
+      main : pip-audit repasse au vert de lui-même. Supprimer la ligne ou vider le fichier ne
+      ferait pas l'affaire : le SBOM doit toujours contenir h11.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      pip_audit: success
+      uv_lock: success
+    sbom_has:
+      pip_audit: [h11]
+    hints:
+      lead_text: >-
+        La sortie de pip-audit donne la version qui corrige la faille. Modifiez le numéro de
+        version de h11 dans `requirements.txt`, committez, puis poussez.
+      partial_text: >-
+        Dans requirements.txt : h11==___ ; puis git add, git commit et git push
+      solution_text: >-
+        Dans requirements.txt : remplacer h11==0.14.0 par h11==0.16.0, puis git add, git commit
+        et git push
+
+  - step_id: tester_l_outil
+    type: pr_state
+    title_text: Tester l'outil restreint et faire repasser la quality gate au vert
+    instruction_text: >-
+      Le check quality_gate est encore en échec : `query_tool.py` n'est exécuté par aucun test.
+      Écrivez des tests dans `tests/test_query_tool.py` : une requête prévue, et le refus d'une
+      requête inconnue. Committez-les sur `feature`, puis poussez. Le check affiche
+      « Couverture du nouveau code n % · seuil 80 % · ✓ ».
+    explanation_text: >-
+      La quality gate mesure ce que les tests exécutent du nouveau code. Un test du refus est
+      justement celui qui prouve que l'outil est bien restreint : le modèle ne peut pas lui
+      faire faire autre chose que ce qui est prévu. Les raccourcis ne fonctionnent pas : le
+      seuil est fixé par la plateforme, `omit` et `# pragma: no cover` sont ignorés, et
+      supprimer le module ne ferait pas l'affaire : il faut toujours des lignes du nouveau code
+      mesurées.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      bandit: success
+      pytest: success
+      quality_gate: success
+    finding_has:
+      quality_gate: [diff_coverage]
+    hints:
+      lead_text: >-
+        Un test appelle l'outil avec un cas précis et vérifie le résultat avec `assert`. Pensez
+        à la requête inconnue : `pytest.raises` vérifie qu'une erreur est bien levée.
+      partial_text: >-
+        Dans tests/test_query_tool.py : un test par requête prévue, plus un test avec
+        pytest.___ pour un nom inconnu ; puis git add, git commit et git push
+      solution_text: >-
+        Dans tests/test_query_tool.py : un Stock avec « vis » en quantité 3 et en seuil 5,
+        assert run_query(stock, "sous_le_seuil") == "vis", un test avec pytest.raises pour un
+        nom inconnu ; puis git add, git commit et git push
+
+  - step_id: constater_les_approbations
+    type: pr_state
+    title_text: Lire les approbations et le feu vert de la PR
+    instruction_text: >-
+      Attendez que les sept checks soient verts. Le collègue et l'agent B relisent alors la PR :
+      le journal de revue affiche « Approbations : 2 sur 2 » et « Merger » devient actif.
+    explanation_text: >-
+      Les checks vérifient le code, pas le regard d'autres personnes. `main` demande ici deux
+      approbations, plus que le minimum d'une : pour un outil donné à un modèle, deux regards
+      valent mieux qu'un. Vous ne pouvez pas les écrire vous-même.
+    explain_ref: graph.remote_ref
+    head: feature
+    base: main
+    pr_state: open
+    min_approvals: 2
+    check_states:
+      ruff: success
+      pytest: success
+      gitleaks: success
+      bandit: success
+      pip_audit: success
+      uv_lock: success
+      quality_gate: success
+    mergeable: true
+    hints:
+      lead_text: >-
+        Les checks tournent l'un après l'autre ; les revues arrivent quand ils sont tous verts.
+        Comparez le compteur « Approbations » du journal de revue et le bouton « Merger ».
+      partial_text: "Vue « Distant + PR » : « Approbations : ___ sur 2 » dans le journal de revue"
+      solution_text: >-
+        Vue « Distant + PR » : « Approbations : 2 sur 2 » dans le journal de revue, et « Merger »
+        actif
+
+  - step_id: merger_la_pr
+    type: pr_state
+    title_text: Merger la pull request
+    instruction_text: >-
+      Sept checks verts, deux approbations : mergez la PR avec le bouton « Merger » de la vue
+      « Distant + PR ».
+    explanation_text: >-
+      Le merge intègre `feature` dans `main` sur l'origine. Il a fallu réunir le code analysé,
+      les dépendances auditées, la couverture du nouveau code et deux relectures : chaque
+      barrière couvre une façon différente de se tromper avec un outil donné à un LLM.
+    explain_ref: graph.remote_ref
+    head: feature
+    base: main
+    pr_state: merged
+    min_approvals: 2
+    hints:
+      lead_text: >-
+        Plus aucune raison ne s'affiche sous le bouton : il est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"
