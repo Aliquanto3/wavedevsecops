@@ -463,6 +463,7 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
       buffer.conflict = null;
       if (buffer.content === sent) buffer.content = written.content;
       say(`${SAVED_TEXT} : ${path}.`);
+      notice.hidden = true; // la modification venue d'ailleurs est tranchée par l'enregistrement
       drawFile();
       drawFiles();
     } catch (err) {

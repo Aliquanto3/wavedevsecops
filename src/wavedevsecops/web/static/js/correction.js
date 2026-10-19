@@ -60,6 +60,11 @@ function clearMarks(root) {
  */
 function namedOwner(node, root) {
   if (node.hasAttribute("aria-label")) return node;
+  // Étiquette de ref du graphe : posée à côté du bouton de son commit (repo.js), elle est nommée
+  // avec lui, comme quand elle était dedans.
+  const refs = node.closest(".graph-refs");
+  const commit = refs && refs.parentElement && refs.parentElement.querySelector("button[aria-label]");
+  if (commit && root.contains(commit)) return commit; // le premier bouton de la rangée : le commit
   const owner = node.parentElement && node.parentElement.closest("button[aria-label]");
   return owner && root.contains(owner) ? owner : null;
 }

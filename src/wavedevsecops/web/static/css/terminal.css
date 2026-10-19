@@ -84,6 +84,24 @@
   color: var(--color-terminal-fg);
 }
 
+.terminal-confirm {
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--space-2);
+  border: 2px solid var(--color-terminal-lit-ring);
+  border-radius: var(--radius-sm);
+  background: var(--color-terminal-lit-fill);
+  color: var(--color-terminal-fg);
+}
+
+.terminal-confirm-text {
+  margin: 0 0 var(--space-1);
+}
+
+.terminal-confirm-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
 .terminal-running {
   margin: 0;
   padding: var(--space-1) var(--pane-padding);

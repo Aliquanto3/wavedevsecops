@@ -482,3 +482,32 @@ console.log(JSON.stringify({ focusAfterPlace, cleared, refused, slow: [slotText(
     assert "Aucun élément choisi" in out["refused"][0]
     assert out["refused"][1] == "Cette question n'attend pas de commit." and out["refused"][2] == "true"
     assert "aaaaaaa" in out["slow"][0] and out["slow"][1] == 1
+
+
+def test_echap_quitte_d_abord_le_mode_designer_puis_ferme_la_chaine(tmp_path: Path) -> None:
+    """Arbitrage 5.3 : chaîne ouverte et mode Désigner actif, un premier Échap quitte le mode
+    (la chaîne reste ouverte), un second Échap ferme la chaîne."""
+    from test_chain_band_dom import MAP_CHAIN  # noqa: PLC0415
+
+    prelude = PRELUDE.replace("mountWorkspace(main,", "const first = mountWorkspace(main,", 1)
+    script = f"""{prelude}
+first.destroy();
+$("#pane-menu").remove();
+main.replaceChildren();
+mountWorkspace(main, {{ title: "Agent", store, storage: memoryStorage(), chain: {json.dumps(MAP_CHAIN)} }});
+const toggle = $("#chain-map-toggle"), map = $("#chain-map");
+const button = $(".designate-button");
+button.click();
+toggle.click();
+const state = () => ({{ armed: workspace().classList.contains("is-designating"), chainHidden: map.hidden }});
+const r = {{ both: state() }};
+press("Escape", {{ target: document.body }}); // focus hors de l'espace
+r.first = state();
+press("Escape", {{ target: document.body }});
+r.second = state();
+console.log(JSON.stringify(r));
+"""
+    out = json.loads(_run(tmp_path, script))
+    assert out["both"] == {"armed": True, "chainHidden": False}
+    assert out["first"] == {"armed": False, "chainHidden": False}
+    assert out["second"] == {"armed": False, "chainHidden": True}

@@ -105,6 +105,13 @@
   background: var(--color-primary);
 }
 
+/* « i » d'une étiquette de ref : à sa suite, dans la rangée, hors du bouton du commit. */
+.explain-trigger.explain-inline {
+  position: static;
+  flex: none;
+  transform: none;
+}
+
 .diff-file > .explain-trigger,
 .tool-output > .explain-trigger {
   top: var(--space-1);

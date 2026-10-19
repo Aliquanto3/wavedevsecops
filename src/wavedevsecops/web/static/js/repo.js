@@ -183,13 +183,19 @@ export function buildGraph(graph) {
     const badge = actorBadge(node.actor);
     if (badge) button.append(badge);
     if (node.lost) button.append(text("span", "graph-lost", LOST_TEXT));
-    for (const label of node.refs) {
-      button.append(refPill(label));
-      if (label.new) button.append(newMark());
-    }
     if (node.new) button.append(newMark());
     if (node.restored) button.append(newMark(true));
     row.append(button);
+    // Les étiquettes de refs sont à côté du bouton du commit, jamais dedans : leur « i »
+    // d'explication (explain.js) est un bouton, et un bouton ne contient pas un bouton.
+    if (node.refs.length) {
+      const refs = el("span", "graph-refs");
+      for (const label of node.refs) {
+        refs.append(refPill(label));
+        if (label.new) refs.append(newMark());
+      }
+      row.append(refs);
+    }
     list.append(row);
   }
   wrap.append(lanes, list);

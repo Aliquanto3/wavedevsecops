@@ -61,6 +61,11 @@ messages:
   file_no_match: "{command} : aucun fichier ne correspond à « {pattern} »."
   file_truncated: "cat : « {path} » dépasse {kib} Kio, la suite n'est pas affichée."
   file_multi_dest: "{command} : avec plusieurs sources, la destination doit être un dossier existant."
+  file_confirm_root: >-
+    Cette commande efface tout le bac à sable (hors historique git) : tous vos fichiers et
+    dossiers disparaissent. Confirmez pour l'exécuter, ou annulez. Recommencer le scénario le
+    reconstruit.
+  file_confirm_cancelled: "Commande annulée : le bac à sable n'a pas été modifié."
   pwd_output: "/repo"
   hint: "Tapez une commande git, par exemple « git status »."
   exit_code: "Code de sortie : {code}"

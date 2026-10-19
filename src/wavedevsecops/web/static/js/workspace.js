@@ -481,6 +481,14 @@ export function mountWorkspace(
   function onKeydown(event) {
     if (event.key === "Escape") {
       if (displayPopup && !displayPopup.hidden) return; // le menu Affichage se ferme d'abord
+      if (designation.armed) {
+        // Le mode Désigner se quitte d'abord, même chaîne ouverte, quel que soit le focus ; un
+        // second Échap ferme la chaîne.
+        event.preventDefault();
+        designation.disarm();
+        designation.focusButton();
+        return;
+      }
       if (chainView?.isOpen()) {
         event.preventDefault();
         chainView.close();

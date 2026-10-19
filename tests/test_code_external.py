@@ -101,3 +101,24 @@ console.log(JSON.stringify({{ shown, hidden: $(".external-change-notice").hidden
 """,
     )
     assert out == {"shown": False, "hidden": True}
+
+
+def test_notice_effacee_a_l_enregistrement(tmp_path: Path, diffs: Path) -> None:  # noqa: F811
+    """Arbitrage 2.9 : la notice « Modifié hors de l'application » s'efface quand l'apprenant
+    enregistre le fichier, sans attendre la commande suivante."""
+    out = _js(
+        tmp_path,
+        diffs,
+        f"""
+$$(".code-file")[0].click();
+await flush();
+disk.set("a.txt", "écrit dans mon éditeur\\n");
+{EVENTS}
+const shown = $(".external-change-notice").hidden;
+type("ma version\\n");
+$(".code-save").click();
+await flush();
+console.log(JSON.stringify({{ shown, hidden: $(".external-change-notice").hidden, saved: disk.get("a.txt") }}));
+""",
+    )
+    assert out == {"shown": False, "hidden": True, "saved": "ma version\n"}

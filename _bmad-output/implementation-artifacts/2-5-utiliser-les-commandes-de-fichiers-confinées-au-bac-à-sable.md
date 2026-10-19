@@ -56,3 +56,16 @@ Revue Opus du 2026-10-18, après rebase sur `origin/main` (6860667, stories 4.1 
 - LOW, second avis n° 9 : corrigé. Une `OSError` de `ls`, du développement d'un glob ou du test de destination de `mv`/`cp` donne « opération impossible » au lieu de remonter.
 - Tests, second avis n° 10 : corrigé (jonction sous Windows, lien sortant copié sous POSIX, gros fichier, parent absent, noms non portables, `.git` imbriqué).
 - Complexité : 1 constat (n° 3), corrigé ; `expand_glob` et `list_dir` restent linéaires par appel.
+
+### Revue des arbitrages UI (branche chore/arbitrages-ui)
+
+- high, second avis 1 : corrigé. `clears_root` ne voyait pas `rm -rf ?*`, `**`, `*?` (même effet que `*`) : tout motif d'un segment fait de `*`/`?` qui prend tout nom non caché demande confirmation.
+- medium, second avis 2 : rejeté. `rm -rf .` efface bien tout hors `.git`, ce que dit le message (« hors historique git »).
+- medium, second avis 3 : rejeté. `confirmed` est un garde-fou d'interface pour l'apprenant, pas une frontière de sécurité ; l'app est locale et un POST direct vient de lui.
+- low, second avis 4 : corrigé. Clic sur la carte pendant une opération : les boutons restent au lieu de disparaître sans effet.
+- low, second avis 5 : rejeté. Le « i » des étiquettes de la liste des commits est cohérent avec celui du graphe.
+- low (a11y), second avis 6 : corrigé. Le verdict d'une étiquette de ref revient dans le nom accessible du bouton de son commit (`namedOwner`).
+- low, second avis 7 : corrigé. Tests ajoutés (`?*`, `**`, `*?`, `rm -r -f *`, `rm -fr *`, `??*`, `.*`).
+- low, revue : rejeté. `rm -rf .*` (cachés seulement, hors `.git`) reste sans confirmation : le message « tout le bac à sable » serait faux.
+- vérifié, revue : le `rm` confirmé suit le même chemin qu'avant l'arbitrage ; aucun scénario n'utilise `rm -r` (leçon 6.2 tenue).
+- Complexité : 0 constat.
