@@ -75,7 +75,7 @@ class Settings(BaseModel):
     max_pending_ops: int = Field(default=32, ge=1)
     """Opérations en attente dans la file d'un espace avant de refuser une intention (409)."""
 
-    watch_quiet_ms: int = Field(default=500, ge=0)
+    watch_quiet_ms: int = Field(default=300, ge=0)
     """Silence après une commande avant que le surveillant de l'arbre reprenne (AD-1)."""
 
     sse_heartbeat_s: float = Field(default=15.0, gt=0)
