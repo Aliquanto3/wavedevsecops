@@ -286,6 +286,7 @@ def _head_text(state: RepoState) -> str:
 STAGED_TEXT = "Indexé"
 UNSTAGED_TEXT = "Modifié, non indexé"
 UNTRACKED_TEXT = "Non suivi"
+STASH_TEXT = "Stash"
 # Lettres d'état de `git status --short`, dites en toutes lettres dans le nom accessible.
 _LETTER_TEXT = {
     "M": "modifié",
@@ -330,7 +331,16 @@ def build_staging(state: RepoState) -> StagingView:
             unstaged.append(
                 _staging_item(UNSTAGED_TEXT, "worktree", entry.path, entry.worktree_status)
             )
-    return StagingView(staged=staged, unstaged=unstaged, untracked=untracked)
+    stash = [
+        StagingItem(
+            element_id=element_id("commit", entry.sha),
+            path=f"stash@{{{entry.index}}} : {entry.message}",
+            letter="S",
+            a11y_name_text=f"{STASH_TEXT} {entry.index} : {entry.message}",
+        )
+        for entry in state.stash
+    ]
+    return StagingView(staged=staged, unstaged=unstaged, untracked=untracked, stash=stash)
 
 
 def build_prompt(state: RepoState) -> PromptView:

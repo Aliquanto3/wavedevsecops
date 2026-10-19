@@ -30,7 +30,7 @@ registerPane({
   projection: {
     graph: (graph) => graph.nodes.flatMap((n) => [n.element_id, ...n.refs.map((r) => r.element_id)]),
     staging: (staging) =>
-      [...staging.staged, ...staging.unstaged, ...staging.untracked].map((i) => i.element_id),
+      [...staging.staged, ...staging.unstaged, ...staging.untracked, ...(staging.stash || [])].map((i) => i.element_id),
   },
   row: 1,
   rowShare: 40,

@@ -63,7 +63,7 @@ export function collectDesignables(views) {
   for (const node of graph.nodes || []) add("graph", node);
   for (const node of graph.nodes || []) for (const ref of node.refs || []) add("graph", ref);
   const staging = v.staging || {};
-  for (const name of ["staged", "unstaged", "untracked"]) for (const item of staging[name] || []) add("staging", item);
+  for (const name of ["staged", "unstaged", "untracked", "stash"]) for (const item of staging[name] || []) add("staging", item);
   const remote = v.remote || {};
   for (const branch of remote.branches || []) add("remote", branch);
   for (const card of remote.pulls || []) {

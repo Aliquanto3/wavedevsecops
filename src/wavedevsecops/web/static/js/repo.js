@@ -23,6 +23,7 @@ export const STAGING_GROUPS = [
   ["staged", "Indexé", "is-staged"],
   ["unstaged", "Modifié, non indexé", "is-modified"],
   ["untracked", "Non suivi", "is-untracked"],
+  ["stash", "Stash", "is-stash"],
 ];
 const ICONS = {
   // poste : écran et pied

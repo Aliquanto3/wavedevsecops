@@ -1,0 +1,199 @@
+# Scénario B « rebase » (Story 5.8) : un agent a lancé un rebase et l'a laissé en conflit.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: rebase
+mode: B
+title_text: Rebase
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # L'agent travaille sur `feature` : un commit qui raccourcit le salut.
+  - op: switch
+    branch: feature
+    create: true
+  - op: agent_commit
+    message: Raccourcit le salut
+    files:
+      - path: src/bonjour.py
+        content: |
+          def bonjour(nom: str) -> str:
+              return f"Salut, {nom} !"
+    as: commit-agent
+  # Pendant ce temps, le collègue a changé la même ligne sur `main`, et l'agent l'a récupéré.
+  - op: colleague_commit
+    branch: main
+    message: Ajoute une formule de bienvenue
+    files:
+      - path: src/bonjour.py
+        content: |
+          def bonjour(nom: str) -> str:
+              return f"Bonjour, {nom} ! Bienvenue."
+    as: commit-collegue
+  - op: fetch
+    branch: main
+  # L'agent rejoue `feature` sur `origin/main` : le conflit l'arrête, il laisse le rebase ouvert.
+  - op: agent_rebase_conflict
+    onto: origin/main
+steps:
+  - step_id: designer
+    type: designate
+    title_text: Repérer le commit en conflit
+    instruction_text: >-
+      Le dépôt est au milieu d'un rebase : un agent l'a lancé puis s'est arrêté sur un conflit.
+      Désignez le commit que git n'a pas pu rejouer, puis validez : vous n'avez qu'un essai, et
+      la correction s'affiche ensuite.
+    explanation_text: >-
+      Le rebase rejoue les commits de `feature` un par un sur `origin/main`. Celui qui bloque est
+      « Raccourcit le salut » : il change la ligne que le collègue a modifiée. On pouvait aussi
+      désigner le fichier en conflit, `src/bonjour.py` ; le commit reste l'élément principal,
+      parce que c'est lui que git est en train de rejouer.
+    explain_ref: graph.commit
+    question_text: Quel commit bloque le rebase ?
+    accept: [commit, path]
+    slots:
+      - slot_id: conflit
+        label_text: Le commit en conflit
+        answers: ["@commit-agent", "path:worktree:src/bonjour.py"]
+        primary: "@commit-agent"
+    hints:
+      lead_text: >-
+        Comparez les deux commits qui touchent `src/bonjour.py` : l'un vient de `main`, l'autre
+        de `feature`. git rejoue celui de `feature`.
+      partial_text: Le commit à désigner est « ___ »
+      solution_text: Désignez le commit « Raccourcit le salut », ou le fichier `src/bonjour.py`.
+
+  - step_id: sortir
+    type: quiz
+    title_text: Savoir renoncer au rebase
+    instruction_text: >-
+      Avant de résoudre quoi que ce soit, sachez comment sortir de ce rebase : quelle commande
+      l'abandonne et remet `feature` dans l'état d'avant son lancement ? Elle sera exécutée, et
+      vous pourrez relancer le rebase ensuite.
+    explanation_text: >-
+      `git rebase --abort` arrête le rebase et rend la branche comme elle était avant son
+      lancement : rien n'est perdu. À l'inverse, `git rebase --continue` reprend après la
+      résolution du conflit, et `git rebase --skip` abandonne le commit en cours : le travail de
+      l'agent serait perdu.
+    choices:
+      - choice_id: abort
+        command_text: git rebase --abort
+        correct: true
+      - choice_id: skip
+        command_text: git rebase --skip
+        effect_text: >-
+          `--skip` a écarté « Raccourcit le salut » : le rebase s'est terminé sans lui, et le
+          travail de l'agent n'est plus dans la branche. Ce n'est pas un retour en arrière, et
+          `--abort` n'a plus de rebase à annuler : recommencez le scénario pour retrouver le
+          rebase en conflit, puis choisissez `--abort`.
+      - choice_id: continue
+        command_text: git rebase --continue
+        effect_text: >-
+          git a refusé : le fichier en conflit n'est pas résolu. `--continue` sert une fois
+          le conflit réglé, pas pour renoncer.
+    hints:
+      lead_text: >-
+        Une option du rebase signifie « arrêter et tout remettre comme avant ».
+      partial_text: git rebase ___
+      solution_text: git rebase --abort
+
+  - step_id: relancer
+    type: repo_state
+    title_text: Relancer le rebase
+    instruction_text: >-
+      `feature` est revenue à son état d'avant. Rejouez-la maintenant vous-même sur
+      `origin/main`, la dernière version de `main` : git va s'arrêter sur le même conflit.
+    explanation_text: >-
+      Rebaser, c'est rejouer vos commits un par un par-dessus une nouvelle base. Quand un commit
+      rejoué touche une ligne déjà modifiée, git s'arrête et attend que vous régliez le conflit.
+    explain_ref: graph.branch
+    expect:
+      in_progress: rebase
+    hints:
+      lead_text: >-
+        Il faut nommer la base sur laquelle les commits de `feature` seront rejoués.
+      partial_text: git rebase ___
+      solution_text: git rebase origin/main
+
+  - step_id: resoudre
+    type: repo_state
+    title_text: Résoudre le conflit et terminer le rebase
+    instruction_text: >-
+      Terminez maintenant le travail de l'agent. Ouvrez `src/bonjour.py` dans la vue Code,
+      gardez la ligne voulue et supprimez les marqueurs de conflit. Indexez le fichier, puis
+      demandez à git de continuer le rebase.
+    explanation_text: >-
+      Après la résolution, git rejoue le commit sur la nouvelle base et le rebase se termine.
+      L'historique est linéaire : le commit du collègue, puis celui de l'agent, recréé avec un
+      nouvel identifiant.
+    explain_ref: graph.commit
+    expect:
+      in_progress: ""
+      head:
+        branch: feature
+      index:
+        clean: true
+      tree:
+        markers_absent: [src/bonjour.py]
+      commits:
+        - "on": feature
+          ahead_of: "@depart"
+          min: 2
+          merges: false
+    foreseen:
+      - when:
+          in_progress: rebase
+        reason_text: >-
+          Le rebase est toujours en cours. Corrigez le fichier (plus aucun marqueur), indexez-le
+          avec `git add`, puis demandez à git de continuer.
+      - when:
+          in_progress: ""
+          tree:
+            markers_present: [src/bonjour.py]
+        reason_text: >-
+          Le rebase est terminé, mais `src/bonjour.py` contient encore des marqueurs de conflit :
+          `git add` ne vérifie pas le contenu. Supprimez les lignes `<<<<<<<`, `=======` et
+          `>>>>>>>` dans la vue Code, puis commitez la correction.
+      - when:
+          commits:
+            - "on": feature
+              ahead_of: "@depart"
+              min: 1
+              merges: true
+        reason_text: >-
+          `feature` contient un commit de fusion : l'historique n'est pas linéaire. L'étape
+          attend un rebase, qui rejoue le commit de l'agent sans fusion. Relancez le rebase de
+          `feature` sur `origin/main`.
+      - when:
+          in_progress: ""
+          head:
+            branch: feature
+        reason_text: >-
+          Le rebase n'a pas abouti : `feature` n'est pas rejouée sur `origin/main`, ou le commit
+          de l'agent a été écarté. Relancez le rebase pour reprendre le conflit.
+    hints:
+      lead_text: >-
+        Corriger le fichier, dire à git qu'il est réglé, puis lui demander de reprendre le
+        rebase là où il s'est arrêté.
+      partial_text: git rebase ___
+      solution_text: >-
+        Corrigez src/bonjour.py dans la vue Code, puis git add src/bonjour.py, puis
+        git rebase --continue

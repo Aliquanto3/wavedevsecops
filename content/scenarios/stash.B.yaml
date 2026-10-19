@@ -1,0 +1,117 @@
+# Scénario B « stash » (Story 5.8) : un agent a mis son travail de côté et l'a oublié.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: stash
+mode: B
+title_text: Stash
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # L'agent a commencé une fonction, l'a mise de côté, puis a rendu la main sans le dire.
+  - op: stash
+    message: "WIP : fonction au_revoir"
+    files:
+      - path: src/bonjour.py
+        content: |
+          def bonjour(nom: str) -> str:
+              return f"Bonjour, {nom} !"
+
+
+          def au_revoir(nom: str) -> str:
+              return f"Au revoir, {nom} !"
+    as: stash-agent
+steps:
+  - step_id: designer
+    type: designate
+    title_text: Retrouver le travail oublié
+    instruction_text: >-
+      Le dossier est propre, mais un agent a travaillé ici avant vous. La section « Stash » de
+      la vue « Index » montre ce qu'il a mis de côté, et `git stash list` le liste dans le
+      terminal. Désignez l'entrée du stash qu'il a oubliée, puis validez : vous n'avez qu'un
+      essai, et la correction s'affiche ensuite.
+    explanation_text: >-
+      Le stash est une pile hors de toute branche : `git stash list` y montre « WIP : fonction
+      au_revoir », rangée par l'agent. Rien n'est perdu, mais rien ne s'affiche dans le graphe
+      non plus : il faut penser à regarder la pile.
+    explain_ref: graph.commit
+    question_text: Qu'est-ce que l'agent a laissé de côté ?
+    accept: [commit]
+    slots:
+      - slot_id: oublie
+        label_text: L'entrée du stash
+        answers: ["@stash-agent"]
+        primary: "@stash-agent"
+    hints:
+      lead_text: >-
+        Le travail oublié n'est sur aucune branche : cherchez la pile du stash, dans la vue
+        « Index » ou avec `git stash list`.
+      partial_text: Désignez l'entrée « ___ » de la section Stash
+      solution_text: >-
+        Désignez l'entrée « WIP : fonction au_revoir » de la section Stash.
+
+  - step_id: reprendre
+    type: repo_state
+    title_text: Appliquer le stash et le committer
+    instruction_text: >-
+      Reprenez le travail de l'agent : la fonction `au_revoir` doit revenir dans
+      `src/bonjour.py`, puis être enregistrée dans un commit. Le dossier doit ensuite être
+      propre.
+    explanation_text: >-
+      `git stash pop` réapplique la dernière entrée de la pile et la supprime ; `git stash apply`
+      la réapplique et la garde. Le travail revient alors comme une modification ordinaire : il
+      reste à l'indexer et à le committer. Un `git stash drop` jette l'entrée sans rien rendre.
+    explain_ref: graph.commit
+    expect:
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+          merges: false
+      index:
+        clean: true
+      tree:
+        contains:
+          - path: src/bonjour.py
+            text: 'return f"Au revoir, {nom} !"'
+    foreseen:
+      - when:
+          stash:
+            min: 1
+          index:
+            clean: true
+        reason_text: >-
+          Le travail de l'agent est encore dans la pile du stash, ou pas encore dans un commit.
+          Réappliquez le stash, puis indexez et committez la modification.
+      - when:
+          stash:
+            count: 0
+          index:
+            clean: false
+        reason_text: >-
+          Le stash est vide, mais la modification n'est pas encore enregistrée : indexez-la avec
+          `git add`, puis committez-la.
+    hints:
+      lead_text: >-
+        Deux gestes : faire revenir le travail rangé dans le dossier, puis l'enregistrer comme
+        n'importe quelle modification.
+      partial_text: git stash ___, puis git add et git commit
+      solution_text: >-
+        git stash pop, puis git add src/bonjour.py, puis git commit -m "Ajoute au_revoir"

@@ -14,9 +14,11 @@
     "llm/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
     "llm/push-pull.B": "05e2098cfb6291170681406154b98472c96f6626e7b79b52cf843faca20ef98e",
     "llm/rebase.A": "317e75d2d035da02bd0b5be610090aff9064a301ce0d507a591b9175fea35d63",
+    "llm/rebase.B": "b5b0ebfc91a79de905e6ea38ac0985ec945ef241b3db30e47c3eb7bf998175ff",
     "llm/recuperation.A": "737dbde642877f92db235102688f5016722bf7db26795a8b28e8fd862cb64f5f",
     "llm/secret-dans-un-commit.A": "b435003cd5ce2298979bd2cb28474dffc953713b99deff427c78c7cc59aefa26",
     "llm/stash.A": "301578b9afa23596e8411f3b97114e62cf5f23fbc9552bec165ef839ca49de01",
+    "llm/stash.B": "accc969cd7482cd3fb13a29c9188fe18e8f163ade8bdc243eb41a300be4580bb",
     "llm/test-casse.A": "77cd65c80e61b25f032a08a83204222c77bc7bf439b156ac3dabd88971c69222",
     "no_ai/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
     "no_ai/add-commit.B": "4056f1bbc2ea6d5c88eba21f64f84497bf1ec9433f330cc488dc57f9ed2e8316",
@@ -33,9 +35,11 @@
     "no_ai/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
     "no_ai/push-pull.B": "05e2098cfb6291170681406154b98472c96f6626e7b79b52cf843faca20ef98e",
     "no_ai/rebase.A": "317e75d2d035da02bd0b5be610090aff9064a301ce0d507a591b9175fea35d63",
+    "no_ai/rebase.B": "b5b0ebfc91a79de905e6ea38ac0985ec945ef241b3db30e47c3eb7bf998175ff",
     "no_ai/recuperation.A": "737dbde642877f92db235102688f5016722bf7db26795a8b28e8fd862cb64f5f",
     "no_ai/secret-dans-un-commit.A": "bde6f4f8bfe056dddaca32b9679a027a56fe73297694713f5aae1ef30d0ccf40",
     "no_ai/stash.A": "301578b9afa23596e8411f3b97114e62cf5f23fbc9552bec165ef839ca49de01",
+    "no_ai/stash.B": "accc969cd7482cd3fb13a29c9188fe18e8f163ade8bdc243eb41a300be4580bb",
     "no_ai/test-casse.A": "9af03e429e877a73e2c2b268a9ce6923a112e4cd61425b39f1c6d784898d8410"
   },
   "schema_version": 1
