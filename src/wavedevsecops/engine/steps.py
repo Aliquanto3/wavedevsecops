@@ -13,6 +13,7 @@ le front ne calcule rien (AD-2).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from wavedevsecops.engine.operations import (
 )
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import StepObserved, StepVerdict
+from wavedevsecops.gitio import Git
 from wavedevsecops.progress.facts import ProgressStore
 from wavedevsecops.progress.summary import FIRST_ATTEMPT_STEP_TYPES, build_summary
 from wavedevsecops.scenarios import (
@@ -133,7 +135,7 @@ class StepRunner:
             if cached is None or cached[0] != stamp:
                 cached = (stamp, content_hash(path.read_bytes().decode("utf-8")))
                 self._hashes[path] = cached
-        except (OSError, UnicodeDecodeError):
+        except OSError, UnicodeDecodeError:
             return None
         if cached[1] == recorded:
             return None
@@ -177,6 +179,18 @@ class StepRunner:
         return project
 
     # ------------------------------------------------------------ validation
+    def _git_factory(self, ctx: OpContext) -> Callable[[], Git]:
+        """`Git` de l'espace, résolu seulement si un type d'étape le demande."""
+
+        def make() -> Git:
+            from wavedevsecops.engine.workspace import resolve_git
+
+            return Git.for_workspace(
+                ctx.git_path or resolve_git(self._settings), ctx.layout.root, self._settings
+            )
+
+        return make
+
     def validate(self, ctx: OpContext, projection: Projection) -> StepOutcome | None:
         """Verdict de l'étape courante sur l'état projeté ; `None` : rien à publier."""
         run = self._run(ctx.layout)
@@ -200,6 +214,7 @@ class StepRunner:
             data=dict(ctx.data),
             views=dict(projection.views or {}),
             layout=ctx.layout,
+            git=self._git_factory(ctx),
         )
         state = _state_from_views(projection.views)
         verdict = STEP_TYPES[step.type].check(state, context)

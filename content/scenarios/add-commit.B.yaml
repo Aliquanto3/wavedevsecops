@@ -1,0 +1,109 @@
+# Scénario B « add / commit » (Story 5.6) : l'agent a committé un fichier de secrets `.env`.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+# L'encart « Ce qui l'aurait bloqué » (gitleaks) arrive avec les stories 8.x.
+schema_version: 1
+scenario_id: add-commit
+mode: B
+title_text: add / commit
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Puis l'agent travaille dans le dépôt : un client d'API, puis sa configuration, `.env` compris.
+  - op: agent_commit
+    message: Ajoute le client de l'API
+    files:
+      - path: src/client.py
+        content: |
+          import os
+
+
+          def cle_api() -> str:
+              return os.environ["API_KEY"]
+    as: commit-client
+  - op: agent_commit
+    message: Ajoute la configuration de l'API
+    files:
+      - path: .env
+        content: |
+          API_KEY=cle-factice-a1b2c3d4e5f6
+          API_URL=http://localhost:8080
+    as: commit-env
+  - op: diff_line
+    commit: "@commit-env"
+    path: .env
+    line: 1
+    contains: API_KEY=
+    as: ligne-cle
+steps:
+  - step_id: designer
+    type: designate
+    title_text: Repérer ce que l'agent a fait
+    instruction_text: >-
+      Un agent a travaillé dans votre dépôt : le graphe montre ses deux commits. L'un d'eux
+      n'aurait pas dû être fait. Désignez dans les vues l'élément en cause, puis validez : vous
+      n'avez qu'un essai, et la correction s'affiche ensuite.
+    explanation_text: >-
+      Le commit « Ajoute la configuration de l'API » a enregistré `.env`, un fichier de secrets.
+      On pouvait le désigner à trois niveaux : le commit (ou son SHA), le fichier `.env` dans ce
+      commit, ou la ligne `API_KEY=` de son diff. Le commit reste l'élément principal, parce que
+      c'est lui qu'il faudra retirer de l'historique.
+    explain_ref: graph.commit
+    question_text: Qu'a fait l'agent ?
+    accept: [commit, path, diffline]
+    slots:
+      - slot_id: fuite
+        label_text: L'élément qui pose problème
+        answers: ["@commit-env", "path:head:.env", "@ligne-cle"]
+        primary: "@commit-env"
+    hints:
+      lead_text: >-
+        Lisez le message et le contenu de chaque commit de l'agent. L'un d'eux enregistre un
+        fichier qui n'a rien à faire dans un dépôt partagé.
+      partial_text: Le commit à désigner ajoute un fichier dont le nom commence par ___
+      solution_text: >-
+        Désignez le commit « Ajoute la configuration de l'API », ou son fichier `.env`, ou la
+        ligne `API_KEY=` de son diff.
+
+  - step_id: retirer_de_l_historique
+    type: history_clean
+    title_text: Retirer .env de l'historique
+    instruction_text: >-
+      Le commit fautif n'a pas été poussé : vous pouvez réécrire votre historique local. Faites
+      en sorte qu'aucune branche ne mène plus à un commit qui contient `.env`, et que git
+      ignore désormais ce fichier. Le fichier peut rester sur votre disque.
+    explanation_text: >-
+      Supprimer `.env` dans un nouveau commit ne suffit pas : l'ancien commit, qui contient la
+      clé, reste dans l'historique et dans tout dépôt qui l'a copié. Il faut réécrire
+      l'historique pour que le commit disparaisse des branches, puis ajouter `.env` à
+      `.gitignore` pour qu'un `git add` ne le remette pas. Si la clé avait quitté votre poste
+      (poussée, copiée), il faudrait en plus la révoquer chez son fournisseur : elle est
+      compromise.
+    path: .env
+    ignored: true
+    hints:
+      lead_text: >-
+        Un commit déjà fait ne se modifie pas : on déplace la branche pour qu'il ne soit plus
+        sur son chemin, sans perdre le travail utile. Puis on dit à git d'ignorer le fichier.
+      partial_text: git reset --___ HEAD~1
+      solution_text: >-
+        git reset --soft HEAD~1, puis git rm --cached .env, puis echo ".env" >> .gitignore,
+        puis git add .gitignore, puis git commit -m "Ajoute la configuration de l'API"
