@@ -327,12 +327,16 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 01:45 · — · décision pour Anaël · 7.2 : scénarios de station 1 absents du catalogue jusqu'à 9.3 (ou les ajouter au socle en attendant) ; evidence_seen limité aux codes 0 et 1 ? · —
 - 2026-10-19 01:52 · 5.1 · fusion · suite complète 1082 passed / 42 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 5.6 attend 5.5 · 0fde9cc
 - 2026-10-19 01:53 · 7.2 · fusion · rebase sur main (conflits d'ajout operations.py submit_facts/output, workspace.py hints/_prepare_tool_environment, résolus par l'orchestrateur), ruff vert, branche poussée, suite complète et CI en cours · —
-- 2026-10-19 01:58 · 5.3 · review · rebase sur 4.6 (scenario.js, workspace.css ; bloc désignation sous la consigne), M1 (garde d'envoi de Valider), L3 partiel (SHA hors type ou hors étape ignoré) corrigés, 2 tests ; L5 écarté, L4 (5.4), L6 reportés ; 1079 passed, CI branche verte · 123706c
-- 2026-10-19 01:58 · — · décision pour Anaël · 5.3 : priorité d'Échap entre chaîne ouverte et mode Désigner · —
-- 2026-10-19 02:05 · 3.3 · review · rebase (views.js, index.html : deux côtés gardés), medium trouvé en revue corrigé (designable dans la vue distante selon le contrat 5.2), L2, L4, L6, L8 corrigés ; L3, L5, L7 écartés ; 1050 passed, CI branche verte · d134366
-- 2026-10-19 02:05 · — · décision pour Anaël · 3.3 : Ouvrir une PR masqué pour une branche déjà contenue, « sur m » omis sans protection (écarts à la lettre des critères) · —
-- 2026-10-19 02:08 · 7.2, 5.3, 3.3 · fusion · CI 7.2 verte sur 6 jobs (287b1c9) ; 5.3 puis 3.3 empilées sans conflit, branches poussées ; suite de 7.2 seule arrêtée au profit d'une suite complète unique sur le sommet de pile (en cours) ; CI 5.3 et 3.3 en cours · —
-- 2026-10-19 02:08 · — · proposition · la suite complète locale dure ~26 min (7 min en début de soirée) : pytest-xdist la diviserait par 3 ou 4 ; dépendance de dev à ajouter à la table Stack, accord d'Anaël requis · —
+- 2026-10-19 02:06 · 5.3 · review · rebase sur 4.6 (scenario.js, workspace.css ; bloc désignation sous la consigne), M1 (garde d'envoi de Valider), L3 partiel (SHA hors type ou hors étape ignoré) corrigés, 2 tests ; L5 écarté, L4 (5.4), L6 reportés ; 1079 passed, CI branche verte · 123706c
+- 2026-10-19 02:06 · — · décision pour Anaël · 5.3 : priorité d'Échap entre chaîne ouverte et mode Désigner · —
+- 2026-10-19 02:06 · 3.3 · review · rebase (views.js, index.html : deux côtés gardés), medium trouvé en revue corrigé (designable dans la vue distante selon le contrat 5.2), L2, L4, L6, L8 corrigés ; L3, L5, L7 écartés ; 1050 passed, CI branche verte · d134366
+- 2026-10-19 02:06 · — · décision pour Anaël · 3.3 : Ouvrir une PR masqué pour une branche déjà contenue, « sur m » omis sans protection (écarts à la lettre des critères) · —
+- 2026-10-19 02:06 · 7.2, 5.3, 3.3 · fusion · CI 7.2 verte sur 6 jobs (287b1c9) ; 5.3 puis 3.3 empilées sans conflit, branches poussées ; suite de 7.2 seule arrêtée au profit d'une suite complète unique sur le sommet de pile (en cours) ; CI 5.3 et 3.3 en cours · —
+- 2026-10-19 02:06 · — · proposition · la suite complète locale dure ~26 min (7 min en début de soirée) : pytest-xdist la diviserait par 3 ou 4 ; dépendance de dev à ajouter à la table Stack, accord d'Anaël requis · —
+- 2026-10-19 02:08 · 6.5 · dev · fini, 1057 passed / 42 skipped, CI verte ; progress/report.py (rapport calculé à la lecture, HTML autonome Jinja2 et CSV ; BOM, ;, cellules neutralisées), GET /api/report et /api/report/export, enregistrement côté navigateur ; scenario_reset attendu de 4.4 · b04150a
+- 2026-10-19 02:08 · 6.5 · second-avis · lancé · —
+- 2026-10-19 02:08 · 6.2 · dev · lancé (dev-story Sonnet ; identifiants du socle de scenarios/order.py gardés en attendant la décision d'Anaël) · —
+- 2026-10-19 02:08 · — · note · les heures de 00:10 à 01:45 consignées par lots dans cette session sont des heures de réception estimées (± 5 min) ; les heures des fusions et des commits cités sont exactes · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
