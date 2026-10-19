@@ -1,0 +1,375 @@
+"""Story 6.2 : les scénarios A « add-commit », « push-pull », « branche » et « pr-merge ».
+
+Contenu : lint (consignes, explications, trois paliers d'indice par étape), et chaque scénario
+joué de bout en bout, dans les deux parcours, sur un vrai git : setup, solution de chaque étape
+par la file d'opérations, verdict de chaque étape, bilan sans indice.
+"""
+
+from __future__ import annotations
+
+import warnings
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import pytest
+
+from wavedevsecops import github_sim, terminal
+from wavedevsecops.config import Settings
+from wavedevsecops.engine import (
+    WorkspaceEngine,
+    WorkspaceManager,
+    build_operation,
+    load_run,
+    pr_intents,
+)
+from wavedevsecops.events import Envelope, Kind
+from wavedevsecops.gitio import Git
+from wavedevsecops.projections import EXPLAIN_REFS
+from wavedevsecops.scenarios import load_scenario, scenario_files
+from wavedevsecops.scenarios.order import SOCLE_ORDER
+from wavedevsecops.scenarios.steps._base import BLANK
+
+WAIT = 60.0
+IDS = ("add-commit", "push-pull", "branche", "pr-merge")
+TRACKS = ("llm", "no_ai")
+
+
+# ----------------------------------------------------------------------------- jeux de solutions
+@dataclass(frozen=True)
+class Do:
+    """Un geste de l'apprenant : une ligne de terminal, un choix de quiz ou une intention."""
+
+    kind: str  # line | quiz | intent
+    value: str
+    body: dict = field(default_factory=dict)
+
+
+def line(text: str) -> Do:
+    return Do("line", text)
+
+
+def quiz(choice_id: str) -> Do:
+    return Do("quiz", choice_id)
+
+
+def intent(name: str, **body) -> Do:
+    return Do("intent", name, body)
+
+
+SOLUTIONS: dict[str, list[tuple[str, list[Do]]]] = {
+    "add-commit": [
+        ("indexer", [line("git add notes.txt")]),
+        ("commiter", [line('git commit -m "Ajoute les notes"')]),
+        ("corriger_le_message", [quiz("amend")]),
+        (
+            "second_commit",
+            [
+                line('echo "Une ligne en plus" >> README.md'),
+                line("git add README.md"),
+                line('git commit -m "Complète le README"'),
+            ],
+        ),
+    ],
+    "push-pull": [
+        ("voir_sans_integrer", [quiz("fetch")]),
+        ("recuperer", [line("git pull")]),
+        (
+            "commiter_a_partager",
+            [
+                line('echo "À faire" > todo.txt'),
+                line("git add todo.txt"),
+                line('git commit -m "Ajoute la liste à faire"'),
+            ],
+        ),
+        ("pousser", [line("git push")]),
+    ],
+    "branche": [
+        ("creer_feature", [line("git switch -c feature")]),
+        (
+            "commiter_sur_feature",
+            [
+                line('echo "Salut" > salut.txt'),
+                line("git add salut.txt"),
+                line('git commit -m "Ajoute le salut"'),
+            ],
+        ),
+        ("revenir_sur_main", [quiz("switch_main")]),
+        ("fusionner", [quiz("merge_feature")]),
+        ("supprimer_feature", [quiz("branch_d")]),
+    ],
+    "pr-merge": [
+        (
+            "commiter_sur_feature",
+            [
+                line("git switch -c feature"),
+                line('echo "Salut" > salut.txt'),
+                line("git add salut.txt"),
+                line('git commit -m "Ajoute le salut"'),
+            ],
+        ),
+        ("pousser_feature", [line("git push -u origin feature")]),
+        ("ouvrir_pr", [intent("pr_open", head="feature")]),
+        ("merger_pr", [intent("pr_merge", number=1)]),
+        ("recuperer_main", [line("git switch main"), line("git pull")]),
+    ],
+}
+
+
+# ------------------------------------------------------------------------------------- banc
+@dataclass
+class Box:
+    manager: WorkspaceManager
+    engine: WorkspaceEngine
+    git: Git
+    events: list[Envelope]
+
+    def play(self, step: Do) -> None:
+        if step.kind == "line":
+            op = terminal.build_terminal_line(self.engine, terminal.TerminalLine(line=step.value))
+        elif step.kind == "quiz":
+            op = build_operation(self.engine, "quiz_choice", {"choice_id": step.value})
+        else:
+            op = build_operation(self.engine, step.value, step.body)
+        self.engine.submit(op).result(WAIT)
+
+    def current(self) -> str | None:
+        return load_run(self.engine.layout).get("step_id")
+
+    def verdicts(self, step_id: str) -> list[dict]:
+        return [
+            e.payload
+            for e in self.events
+            if e.kind == Kind.STEP_VERDICT and e.payload["step_id"] == step_id
+        ]
+
+    def summary(self) -> dict | None:
+        return self.engine.snapshot()["step_panel"]["summary"]
+
+    def log(self, *args: str) -> str:
+        return self.git.internal("log", "--format=%s", *args, cwd=self.engine.layout.repo)
+
+
+@pytest.fixture
+def make_box(tmp_path: Path, git_path: Path) -> Iterator[Callable[[str, str], Box]]:
+    boxes: list[Box] = []
+    terminal.AFTER_COMMAND_HOOKS.clear()
+    terminal.register_intents()
+    pr_intents.register_intents()
+    terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
+
+    def make(scenario_id: str, track: str) -> Box:
+        settings = Settings(data_dir=tmp_path / f"data-{len(boxes)}")
+        loaded = load_scenario(settings.scenarios_path() / f"{scenario_id}.A.yaml", settings)
+        manager = WorkspaceManager(settings, git_path=git_path, watch=False)
+        events: list[Envelope] = []
+        manager.events(f"{track}.{scenario_id}.A").attach(None, events.append)
+        engine, setup = manager.create(loaded, track)
+        setup.result(WAIT)
+        box = Box(
+            manager, engine, Git.for_workspace(git_path, engine.layout.root, settings), events
+        )
+        boxes.append(box)
+        return box
+
+    yield make
+    for box in boxes:
+        box.manager.close()
+    terminal.AFTER_COMMAND_HOOKS.clear()
+
+
+# ------------------------------------------------------------------------------------- lint
+@pytest.mark.parametrize("scenario_id", IDS)
+def test_contenu_complet_et_sans_avertissement(scenario_id: str) -> None:
+    settings = Settings()
+    scenario = load_scenario(
+        settings.scenarios_path() / f"{scenario_id}.A.yaml", settings, explain_keys=EXPLAIN_REFS
+    ).scenario
+    assert scenario.mode == "A"
+    assert sorted(scenario.tracks) == ["llm", "no_ai"]
+    assert scenario.catalogue and scenario.section is None
+    assert scenario.steps
+    with warnings.catch_warnings():
+        assert not scenario.authoring_warnings()
+    for step in scenario.steps:
+        where = f"{scenario_id}/{step.step_id}"
+        assert step.instruction_text.strip() and step.explanation_text.strip(), where
+        assert step.hints is not None, where
+        assert step.hints.lead_text.strip(), where
+        assert BLANK in step.hints.partial_text, where
+        assert step.hints.solution_text.strip(), where
+    # Le jeu de solutions du test couvre toutes les étapes, dans l'ordre.
+    assert [s for s, _ in SOLUTIONS[scenario_id]] == [s.step_id for s in scenario.steps]
+
+
+def test_les_identifiants_sont_ceux_de_l_ordre_conseille() -> None:
+    assert IDS == SOCLE_ORDER[:4]
+    shipped = {p.name for p in scenario_files(Settings())}
+    assert {f"{i}.A.yaml" for i in IDS} <= shipped
+
+
+def test_exigences_propres_a_chaque_scenario() -> None:
+    settings = Settings()
+
+    def load(scenario_id: str):
+        return load_scenario(settings.scenarios_path() / f"{scenario_id}.A.yaml", settings).scenario
+
+    # « push / pull » : le commit d'un collègue simulé est à récupérer par `git pull`.
+    push_pull = load("push-pull")
+    assert any(op.op == "colleague_commit" for op in push_pull.setup)
+    assert any(s.step_id == "recuperer" for s in push_pull.steps)
+    # « branche » : trois quiz, dont un propose `git reset --hard HEAD~1` (Flow 1).
+    quizzes = [s for s in load("branche").steps if s.type == "quiz"]
+    assert len(quizzes) == 3
+    assert any(c.command_text == "git reset --hard HEAD~1" for q in quizzes for c in q.choices)
+    assert all(c.effect_text for q in quizzes for c in q.choices if not c.correct)
+    # « PR / merge » : branche poussée, PR, revue du collègue, merge.
+    pr_merge = load("pr-merge")
+    assert [s.type for s in pr_merge.steps][1:4] == ["repo_state", "pr_state", "pr_state"]
+    assert any(op.op == "colleague_reaction" for op in pr_merge.setup)
+
+
+# ------------------------------------------------------------------------- bout en bout
+@pytest.mark.parametrize("track", TRACKS)
+@pytest.mark.parametrize("scenario_id", IDS)
+def test_scenario_joue_de_bout_en_bout(make_box, scenario_id: str, track: str) -> None:
+    box = make_box(scenario_id, track)
+    plan = SOCLE_PLAN[scenario_id]
+    assert box.current() == SOLUTIONS[scenario_id][0][0]
+    assert box.summary() is None
+    plan.before(box)
+    for index, (step_id, gestures) in enumerate(SOLUTIONS[scenario_id]):
+        for gesture in gestures[:-1]:
+            box.play(gesture)
+            assert box.current() == step_id, f"{step_id} validée trop tôt"
+        box.play(gestures[-1])
+        verdicts = box.verdicts(step_id)
+        assert verdicts and verdicts[-1]["passed"] is True, f"{step_id} : {verdicts}"
+        following = (
+            SOLUTIONS[scenario_id][index + 1][0]
+            if index + 1 < len(SOLUTIONS[scenario_id])
+            else None
+        )
+        assert box.current() == following, step_id
+    plan.after(box)
+    summary = box.summary()
+    assert summary is not None
+    assert summary["hints"] == 0
+    assert (summary["quiz_correct"], summary["quiz_total"]) == plan.score
+    done = [
+        e
+        for e in box.events
+        if e.kind == Kind.PROGRESS_UPDATED and "scenario_completed" in e.payload["facts"]
+    ]
+    assert len(done) == 1
+
+
+@dataclass(frozen=True)
+class Plan:
+    score: tuple[int, int]
+    before: Callable[[Box], None]
+    after: Callable[[Box], None]
+
+
+def _nothing(box: Box) -> None:
+    return None
+
+
+def _after_add_commit(box: Box) -> None:
+    assert box.log("main").splitlines()[:2] == [
+        "Complète le README",
+        "Ajoute les notes de la réunion",
+    ]
+
+
+def _before_push_pull(box: Box) -> None:
+    # Le collègue a poussé avant : l'origine a un commit que le dépôt local ne connaît pas.
+    assert not (box.engine.layout.repo / "docs" / "guide.md").exists()
+    assert "guide" not in box.log("main")
+
+
+def _after_push_pull(box: Box) -> None:
+    origin = box.git.internal("log", "--format=%s", "main", cwd=box.engine.layout.origin)
+    assert origin.splitlines()[:2] == ["Ajoute la liste à faire", "Ajoute le guide de contribution"]
+    assert (box.engine.layout.repo / "docs" / "guide.md").is_file()
+
+
+def _after_branche(box: Box) -> None:
+    assert box.log("main").splitlines()[0] == "Ajoute le salut"
+    branches = box.git.internal("branch", "--format=%(refname:short)", cwd=box.engine.layout.repo)
+    assert branches.split() == ["main"]
+
+
+def _after_pr_merge(box: Box) -> None:
+    pr = github_sim.load(box.engine.layout).pull(1)
+    assert pr.state == "merged" and pr.approvals >= 1
+    assert box.log("main").splitlines()[0] == "Merge pull request #1 from feature"
+
+
+SOCLE_PLAN: dict[str, Plan] = {
+    "add-commit": Plan((1, 1), _nothing, _after_add_commit),
+    "push-pull": Plan((1, 1), _before_push_pull, _after_push_pull),
+    "branche": Plan((3, 3), _nothing, _after_branche),
+    "pr-merge": Plan((0, 0), _nothing, _after_pr_merge),
+}
+
+
+def test_pr_state_sans_espace_ou_sans_pr_ne_dit_rien() -> None:
+    from wavedevsecops.scenarios.steps import StepContext
+    from wavedevsecops.scenarios.steps.pr_state import Args, check
+
+    step = Args(
+        step_id="ouvrir",
+        type="pr_state",
+        title_text="T",
+        instruction_text="I",
+        explanation_text="E",
+        head="feature",
+    )
+    assert check(None, StepContext(step=step)).status == "pending"
+
+
+# --------------------------------------------------------------------- erreurs réalistes
+def test_branche_la_mauvaise_reponse_reset_hard_est_expliquee_puis_retablie(make_box) -> None:
+    box = make_box("branche", "llm")
+    for _, gestures in SOLUTIONS["branche"][:2]:
+        for gesture in gestures:
+            box.play(gesture)
+    assert box.current() == "revenir_sur_main"
+    tip = box.log("feature").splitlines()
+    box.play(quiz("reset_dur"))
+    failed = box.verdicts("revenir_sur_main")[-1]
+    assert failed["passed"] is False and "reflog" in failed["reason_text"]
+    assert box.current() == "revenir_sur_main"
+    # L'état est rétabli : le commit de `feature` est toujours là, et la bonne réponse passe.
+    assert box.log("feature").splitlines() != tip  # l'effet est visible : le commit a reculé
+    box.engine.submit(build_operation(box.engine, "restore_state", {})).result(WAIT)
+    # L'état est rétabli : le commit de `feature` est de retour, et la bonne réponse passe.
+    assert box.log("feature").splitlines() == tip
+    box.play(quiz("switch_main"))
+    assert box.current() == "fusionner"
+
+
+def test_push_pull_pull_n_est_pas_la_bonne_reponse_du_premier_quiz(make_box) -> None:
+    box = make_box("push-pull", "no_ai")
+    box.play(quiz("pull"))
+    assert box.verdicts("voir_sans_integrer")[-1]["passed"] is False
+    assert box.current() == "voir_sans_integrer"
+    guide = box.engine.layout.repo / "docs" / "guide.md"
+    assert guide.exists()  # la mauvaise commande a vraiment tourné
+    box.engine.submit(build_operation(box.engine, "restore_state", {})).result(WAIT)
+    assert not guide.exists()
+    box.play(quiz("fetch"))
+    assert box.current() == "recuperer"
+
+
+def test_pr_merge_la_pr_n_est_pas_mergeable_sans_la_revue(make_box) -> None:
+    """La protection de `main` exige l'approbation que le collègue donne à l'ouverture."""
+    box = make_box("pr-merge", "llm")
+    for _, gestures in SOLUTIONS["pr-merge"][:3]:
+        for gesture in gestures:
+            box.play(gesture)
+    pr = github_sim.load(box.engine.layout).pull(1)
+    assert [r.state for r in pr.reviews] == ["commented", "approved"]
+    assert pr.mergeable and pr.approvals == 1
+    assert box.current() == "merger_pr"

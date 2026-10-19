@@ -199,6 +199,7 @@ class StepRunner:
             intent=ctx.op.intent,
             data=dict(ctx.data),
             views=dict(projection.views or {}),
+            layout=ctx.layout,
         )
         state = _state_from_views(projection.views)
         verdict = STEP_TYPES[step.type].check(state, context)

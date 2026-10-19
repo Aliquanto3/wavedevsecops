@@ -1,12 +1,20 @@
 {
   "fingerprints": {
+    "llm/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
     "llm/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
+    "llm/branche.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "llm/defaut-de-lint.A": "6af2b0dcbfda844cbf0086392d34a92f9563fc8f47843380dc12b1723ab6208e",
     "llm/gabarit-llm.A": "c7b3b99d93b7931197af61d7f673c1540d92bce875147e1ce75161937eba2b4b",
+    "llm/pr-merge.A": "8054961b299a01e237149f65537e57d8bb831d7d329cb8c6b920c9a95e2d19c1",
+    "llm/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
     "llm/test-casse.A": "00d679f63cd30f81433900b17f49d56eabd90653ab7c344727a67c144cfec168",
+    "no_ai/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
     "no_ai/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
+    "no_ai/branche.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "no_ai/defaut-de-lint.A": "3e9d88a11ca67e46d63da4148fef803178ba6d968f2fe2f411a05addd32df7ff",
     "no_ai/gabarit-sans-ia.A": "ab1816d045e819f32c9e986a5c62d93cf95f4f4aee7c12ae8215e8ed684f1094",
+    "no_ai/pr-merge.A": "8054961b299a01e237149f65537e57d8bb831d7d329cb8c6b920c9a95e2d19c1",
+    "no_ai/push-pull.A": "cdaf8e2bc64e2fe73a3e0f71c2a575bf4d86b6bd9de059a607d6f95f96204080",
     "no_ai/test-casse.A": "73ffce7857cb098ca275f70afaaff543f6a02d2583d50a470a7279e0f18ec171"
   },
   "schema_version": 1

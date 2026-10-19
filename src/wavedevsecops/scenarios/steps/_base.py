@@ -116,3 +116,6 @@ class StepContext:
     désigné… ; lecture seule."""
     views: dict[str, Any] = field(default_factory=dict)
     """Toutes les vues projetées après l'opération (pas seulement `repo`)."""
+    layout: Any = None
+    """Disposition de l'espace (`wsfs.Layout`), pour les types qui lisent un état hors du dépôt
+    git (PR du GitHub simulé) ; `None` hors du moteur."""
