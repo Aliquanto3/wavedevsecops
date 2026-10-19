@@ -450,3 +450,30 @@ def test_changement_externe_recalcule_les_pr(settings: Settings, git_path: Path)
     assert refresh(ctx) == fingerprint(layout, git)  # type: ignore[arg-type]
     pr = github_sim.load(layout).pulls[0]
     assert pr.checks[0].state == "queued" and not pr.mergeable
+
+
+def test_lecture_reessayee_pendant_un_remplacement_windows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Sous Windows, ouvrir github.json pendant son os.replace lève PermissionError un instant.
+    path = tmp_path / "github.json"
+    path.write_bytes(b"{}")
+    real_read = Path.read_bytes
+    calls: list[int] = []
+
+    def flaky_read(self: Path) -> bytes:
+        calls.append(1)
+        if len(calls) == 1:
+            raise PermissionError("partage refusé")
+        return real_read(self)
+
+    monkeypatch.setattr(Path, "read_bytes", flaky_read)
+    monkeypatch.setattr(github_sim, "os", type("_Os", (), {"name": "nt"}))
+    monkeypatch.setattr(github_sim.time, "sleep", lambda _s: None)
+    assert github_sim._read_bytes(path) == b"{}"
+    assert len(calls) == 2
+
+    calls.clear()
+    monkeypatch.setattr(Path, "read_bytes", lambda self: (_ for _ in ()).throw(PermissionError()))
+    with pytest.raises(PermissionError):
+        github_sim._read_bytes(path)

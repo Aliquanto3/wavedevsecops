@@ -163,6 +163,9 @@ def test_parcours_sans_ia_refuse() -> None:
     class Engine:
         workspace_id = "no_ai.bac-a-sable-libre.A"
 
+    # L'intention s'enregistre à la création de l'application : sous -n auto, ce test peut
+    # tourner dans un worker qui n'en a encore créé aucune.
+    exercise.register_exercise_intent()
     with pytest.raises(OperationRefused) as refused:
         INTENTS[llmrun.INTENT].build(Engine(), exercise.RunExerciseCode(confirmed=True))
     assert refused.value.reason_text == exercise.WRONG_TRACK_TEXT
