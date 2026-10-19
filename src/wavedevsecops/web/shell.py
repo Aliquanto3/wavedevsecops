@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-CURRENT_MILESTONE = "v0.1"
+CURRENT_MILESTONE = "v0.2"
 
 
 @dataclass(frozen=True)

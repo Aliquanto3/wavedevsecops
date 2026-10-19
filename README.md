@@ -1,6 +1,6 @@
 # WaveDevSecOps
 
-> 🟢 **Version 0.1.0** : le socle git (scénarios des modes A et B), la vue du graphe, le terminal du bac à sable, le quiz et le diagnostic des outils. Notes de version : [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
+> 🟢 **Version 0.2.0** : le socle git de la v0.1.0, plus les stations 1 à 3 de la chaîne DevSecOps (poste local, PR et CI, sécurité et qualité), dans les deux parcours, hors ligne. Notes de version : [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
 
 Application pédagogique locale pour apprendre git et GitHub, puis la chaîne CI/CD et les
 concepts DevSecOps, pensée pour les personnes qui codent avec des agents (vibe coding) et
@@ -9,7 +9,7 @@ doivent comprendre ce que l'agent fait sur leur dépôt. Pédagogie inspirée de
 
 ## Ce que l'application propose
 
-La version 0.1.0 couvre le socle git. Les stations de la chaîne DevSecOps arrivent ensuite (voir [Jalons](#jalons)).
+La version 0.2.0 couvre le socle git et les stations 1 à 3 de la chaîne DevSecOps. La station 4 (livraison) arrive ensuite (voir [Jalons](#jalons)).
 
 - **Du vrai git, hors ligne** : un dépôt bac à sable, un dépôt distant local et un GitHub
   simulé (PR, revue, merge, commits d'un collègue), dans des vues synchronisées.
@@ -18,10 +18,13 @@ La version 0.1.0 couvre le socle git. Les stations de la chaîne DevSecOps arriv
 - **Quiz** où la mauvaise commande est exécutée pour de vrai, expliquée, puis annulée.
 - **Deux parcours** : un code qui appelle un LLM puis devient un mini-harnais (prompt système,
   outils, boucle), ou un code minimal sans IA.
-- **Chaîne DevSecOps en quatre stations**, avec des outils légers (ruff, pytest, pre-commit,
+- **Chaîne DevSecOps en quatre stations** (les stations 1 à 3 sont livrées en v0.2, la 4 en v0.3), avec des outils légers (ruff, pytest, pre-commit,
   gitleaks, bandit, pip-audit) : poste local, PR et CI, sécurité et qualité, livraison.
   Jenkins, GitHub Actions, GitLab CI et Sonar sont montrés comme équivalents.
-- **Savoir en parler à un RSSI** : scénario d'entretien et fiche barrière → risque → preuve.
+- **Barrières de la v0.2**, chacune avec un scénario où elle bloque : gitleaks (secret), ruff et
+  pytest, protection de `main` et revue obligatoire, bandit (code vulnérable), pip-audit et SBOM
+  (dépendance vulnérable), `uv lock --check`, quality gate de 80 % de couverture du nouveau code.
+- **Savoir en parler à un RSSI** : scénario d'entretien et fiche barrière → risque → preuve. (v0.3)
 
 ## Installer sous Windows (sans droits administrateur)
 
@@ -43,8 +46,8 @@ installation interrompue reprend là où elle s'est arrêtée.
   la commande et l'installeur passent par lui (sinon par le proxy système), et l'installeur pose `UV_SYSTEM_CERTS=true`.
 - **Sans git ou si le clone échoue** : `$env:WDS_INSTALL_METHOD = 'zip'` avant la commande.
 - **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche ou version : `$env:WDS_INSTALL_REF`.
-- **Version 0.1.0 exactement** (la commande ci-dessus installe la tête de `main`) :
-  `$env:WDS_INSTALL_REF = 'v0.1.0'` avant la commande, et `/v0.1.0/install.ps1` à la place de `/main/install.ps1`.
+- **Version 0.2.0 exactement** (la commande ci-dessus installe la tête de `main`) :
+  `$env:WDS_INSTALL_REF = 'v0.2.0'` avant la commande, et `/v0.2.0/install.ps1` à la place de `/main/install.ps1`.
 
 ## Installer sous macOS et Linux (sans droits administrateur)
 
@@ -68,8 +71,8 @@ interrompue reprend là où elle s'est arrêtée.
   commande ; `curl` et l'installeur passent par lui, et l'installeur pose `UV_SYSTEM_CERTS=true`.
 - **Sans git ou si le clone échoue** : `export WDS_INSTALL_METHOD=zip` avant la commande (archive `tar.gz` de GitHub).
 - **Autre dossier** : `WDS_DATA_DIR`. Autre branche ou version : `WDS_INSTALL_REF`.
-- **Version 0.1.0 exactement** (la commande ci-dessus installe la tête de `main`) :
-  `curl -fsSL https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/v0.1.0/install.sh | WDS_INSTALL_REF=v0.1.0 sh`.
+- **Version 0.2.0 exactement** (la commande ci-dessus installe la tête de `main`) :
+  `curl -fsSL https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/v0.2.0/install.sh | WDS_INSTALL_REF=v0.2.0 sh`.
 
 ## Confidentialité et réseau
 
@@ -98,7 +101,7 @@ chronométrée de la v0.1.0 est consignée dans les [notes de version](docs/rele
 
 ## Jalons
 
-`v0.1` socle git (version 0.1.0) → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
+`v0.1` socle git (version 0.1.0) → `v0.2` stations 1 à 3 (version 0.2.0) → `v0.3` livraison → `v1.0` présentation.
 
 ## Documents
 

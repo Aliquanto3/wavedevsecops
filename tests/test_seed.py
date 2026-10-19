@@ -15,7 +15,7 @@ def test_gitattributes_force_lf() -> None:
 
 def test_manifeste() -> None:
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert data["project"]["version"] == "0.1.0"
+    assert data["project"]["version"] == "0.2.0"
     assert set(data["dependency-groups"]) >= {"chain", "dev"}
     assert data["project"]["optional-dependencies"]["window"] == ["pywebview==6.2.1"]
 
@@ -37,4 +37,4 @@ def test_arborescence() -> None:
 def test_version_du_paquet_installe() -> None:
     import wavedevsecops
 
-    assert wavedevsecops.__version__ == "0.1.0"
+    assert wavedevsecops.__version__ == "0.2.0"
