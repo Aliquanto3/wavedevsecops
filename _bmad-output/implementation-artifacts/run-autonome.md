@@ -523,28 +523,36 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 12:38 · 8.3 · CI · verte sur les trois OS · a34c468
 - 2026-10-19 12:38 · 8.3 · fusion · commit de fusion sur main (après le tag v0.1.0), story done · 04657d7
 - 2026-10-19 12:38 · docs · fusion · spine et epics.md alignés sur le code (arbitrages), stories 5.9 et 9.6 ajoutées en backlog · db75c3f
+- 2026-10-19 12:39 · — · arrêt propre · pause demandée par Anaël pour /clear ; aucun agent actif ; état dans « Reprise » · —
 
-## Reprise (arrêt propre du 2026-10-19, matin)
+## Reprise (arrêt propre du 2026-10-19 12:39)
 
-État : 49 stories `done` (Epics 1, 3 et 4 complets ; 2.1 à 2.11 ; 5.1 à 5.5 ; 6.1 à 6.6 sauf 6.7 ; 7.1 à 7.4 ; 8.2 ; 9.1 à 9.3). `main` poussé. Règle 5 révisée : la CI de branche est la seule suite complète.
+État : 58 stories `done` (Epics 1 à 5 et 7 complets, 6.1 à 6.6, 8.1 à 8.3, 9.1 à 9.4). **v0.1.0 publiée** (tag annoté sur f940716, release GitHub, topics `ai-portfolio` + `status-test`). `main` poussé (98e6117). Aucun agent actif. Règle 5 révisée : la CI de branche est la seule suite complète.
 
-Agents encore actifs au moment de la pause (leur travail est poussé sur leur branche à la fin ; à la reprise, lire la spec de la story et la dernière CI de la branche plutôt que d'attendre leur rapport) :
+Arbitrages d'Anaël du 2026-10-19 : toutes les recommandations de la liste acceptées (journal, ligne « décision Anaël · accord sur toutes les recommandations »). Le spine et epics.md sont alignés (db75c3f).
 
-| Story | Branche · worktree | État · étape suivante |
+À faire, dans l'ordre :
+
+| Ordre | Story / branche | Étape suivante |
 |---|---|---|
+| 1 | `chore/arbitrages-ui` (711da2e) · worktree agent-a03e688e9c016e8b6 | second avis puis reviewer, puis fusion. Contenu : confirmation avant `rm -r` de la racine (nouveau flux `confirm` dans events/catalog.py, champs `confirmed`/`cancelled` de TerminalLine), Échap quitte d'abord Désigner, notice de changement externe effacée à l'enregistrement, « i » des refs à côté de l'étiquette (span.graph-refs). CI 39238881035. |
+| 2 | 8.4 (couverture < 80 %) | dev-story Sonnet depuis main. **Inclure** : bandit lancé avec `--ini` vers un fichier hors de l'arbre de l'apprenant (ferme le contournement `src/.bandit`) et un job ou contrôle `uv lock --check` (cohérence pyproject.toml / uv.lock, arbitrage 8.3). |
+| 3 | 8.5 (Flow 4, LLM) | après 8.4 (pivot pipeline.yaml) ; sans vrai modèle (règle 2). |
+| 4 | 8.6 | après 8.4. |
+| 5 | 5.9 (encart « Ce qui l'aurait bloqué ») | dev, indépendante de l'Epic 8 ; 4 scénarios B (add-commit.B, push-pull.B, stash.B, rebase.B). |
+| 6 | 9.6 (explications vue pipeline, lien Traçabilité) | dev, après 8.4 pour éviter les conflits d'explanations.yaml. |
+| 7 | 9.5 (mixte, release v0.2.0) | quand Epics 7 à 9 en `done` ; passer `CURRENT_MILESTONE` à `v0.2` (web/shell.py) et réaligner test_surfaces_declarees_par_le_serveur / test_surface_non_livree_absente ; mesure des 45 s et SM-9 par Anaël. |
 
-| 7.6 | `story/7-6-pipeline-trois-ci` (65ea7ab) · agent-a86fecb393c4f1485 | dev fini, CI verte : second avis, puis reviewer ; rebase sur main (2.10, 6.3 : empreintes à régénérer). |
-| 8.1 | `story/8-1-bandit-sast` (81328ca) · agent-a36487cfb1221a062 | dev fini, CI verte : second avis, puis reviewer ; à fusionner après 7.6 (baliser le job bandit dans les trois fichiers CI des gabarits), empreintes à régénérer au rebase. |
+6.7 reste `review` : attente humaine (recette SM-1 à SM-4 avec deux collègues, mesure d'installation sur poste réel, notes de release à compléter). 10.2 à 10.5 en backlog.
 
-Revues prêtes à lancer (aucun agent) :
+Contrats partagés à rappeler dans chaque prompt :
+- Identifiants dans `scenarios/order.py` (`SOCLE_ORDER`, `STATION_ORDER` ; un scénario B = id du socle + `.B`) ; `RESTART_KIND = "scenario_reset"` ; `answer_submit` avec `step_id` obligatoire ; conditions de `repo_state` de 6.3.
+- `pr_state` : champ `check_states` (unique, fusion 7.5/8.1) et `sbom_has` (8.3) ; `required_checks` du scénario.
+- Pipeline : 5 jobs (ruff, pytest, gitleaks, bandit, pip_audit) ; chaque nouveau job est balisé `wds:job <id>` / `wds:end` dans les 6 fichiers CI des gabarits (content/exercise/{no_ai,llm}/{.github/workflows/ci.yml, Jenkinsfile, .gitlab-ci.yml}) ; les scénarios qui attendent tous les checks verts (pr-sans-revue) doivent attendre le nouveau job ; `osv_url` passé par create_app.
+- Constat `unscanned_file` = échec ; empreintes : `uv run python scripts/update_fingerprints.py`, stables sur deux passes.
+- Glossaire (9.4) : chaque `scenario_id` de glossary.yaml doit exister au catalogue.
+- Leçon 6.2 : aucune étape validable par un autre chemin que le geste enseigné (tests de contournement).
 
-| Story | Branche · worktree | Étape suivante |
-|---|---|---|
-| 5.6 | `story/5-6-scenario-b-env` (8e8d3e1, base ancienne 5.5) · agent-ac66659daa05d0686 | reviewer Opus avec la liste du second avis (journal, ligne 5.6 second-avis ; 1 high prouvé) ; rebase sur main d'abord. |
-| 7.5 | `story/7-5-revue-protection` (cbf1730) · agent-a98e0dcdab815945c | second avis, puis reviewer ; rebase sur main (contient 6.3 : conditions de repo_state, fingerprints.json à régénérer). |
+Méthode : empiler les branches revues sur une branche `integ/pile-N` (merges --no-ff, conflits résolus par l'orchestrateur), CI sur la pile, avance rapide de `main` quand elle est verte. Instabilités connues corrigées (lecture de github.json sous Windows, test d'intention d'exercice). En local : `uv run pytest -q -m "not slow" -n auto` ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees en fin de run seulement.
 
-Éligibles ensuite : 5.7 (← 5.6 et 3.5), 8.3 (← 8.1, 8.2), 9.4 (← 2.10, done). Puis 5.8 (← 5.7), 8.4, 8.5, 8.6. 6.7 (mixte, release v0.1.0) quand toutes les stories `dev` des Epics 1 à 6 sont `done` (restent 5.6, 5.7, 5.8). 10.2 à 10.5 restent en backlog.
-
-Tests : en local `uv run pytest -q -m "not slow" -n auto` (environ 2 min) ; la CI joue tout. Méthode : empiler les branches revues, CI sur chaque branche, fusion de la pile quand toutes les CI sont vertes ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees des stories done en fin de run seulement (fichiers verrouillés sous Windows). Contrats partagés à rappeler dans les prompts : identifiants du socle et des stations (`scenarios/order.py`), `RESTART_KIND = "scenario_reset"`, `answer_submit` avec `step_id` obligatoire, conditions de `repo_state` ajoutées par 6.3.
-
-Pour Anaël : lancer le script d'exclusions Defender en administrateur ; décisions non bloquantes au journal (la plus utile : identifiants des scénarios du socle et des stations) ; contrôles navigateur listés dans les specs.
+Pour Anaël : recette v0.1.0 ; script d'exclusions Defender en administrateur ; contrôles navigateur (graphe et refs, commit perdu en tirets, section Stash, popover du vocabulaire, carte de confirmation du terminal) ; vérification sur poste réel de 1.6, 1.7, 6.6 et 2.8.
