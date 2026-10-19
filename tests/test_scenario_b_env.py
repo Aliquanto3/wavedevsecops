@@ -134,6 +134,7 @@ def test_les_textes_visibles_sont_au_vouvoiement() -> None:
 
 
 # ------------------------------------------------------------------------------------ setup
+@pytest.mark.slow
 @pytest.mark.parametrize("track", TRACKS)
 def test_l_agent_a_fait_deux_commits_dont_l_un_ajoute_env(make_box, track: str) -> None:
     box = make_box(track)
@@ -165,6 +166,7 @@ def _elements(box: Box) -> dict[str, str]:
     }
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("which", ["commit", "fichier", "ligne"])
 def test_chaque_element_accepte_est_juste_et_le_commit_est_le_principal(
     make_box, which: str
@@ -180,6 +182,7 @@ def test_chaque_element_accepte_est_juste_et_le_commit_est_le_principal(
     assert box.step_id() == "retirer_de_l_historique"
 
 
+@pytest.mark.slow
 def test_le_sha_saisi_se_resout_en_commit_accepte(make_box) -> None:
     """La liste ou le SHA désignent un `commit:<sha>` : la même bonne réponse (5.2, 5.4)."""
     box = make_box()
@@ -189,6 +192,7 @@ def test_le_sha_saisi_se_resout_en_commit_accepte(make_box) -> None:
     assert box.answer(resolved["element_id"])["correct"] is True
 
 
+@pytest.mark.slow
 def test_la_ligne_du_diff_est_celle_de_la_cle(make_box) -> None:
     box = make_box()
     sha = box.commits()[LEAK]["sha"]
@@ -197,6 +201,7 @@ def test_la_ligne_du_diff_est_celle_de_la_cle(make_box) -> None:
     assert box.git_out("show", f"{sha}:.env").splitlines()[0].startswith("API_KEY=")
 
 
+@pytest.mark.slow
 def test_une_designation_fausse_est_corrigee_une_fois_et_ferme_l_etape(make_box) -> None:
     box = make_box("no_ai")
     elements = _elements(box)
@@ -222,6 +227,7 @@ def _fixed(box: Box) -> None:
     assert summary is not None
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("track", TRACKS)
 def test_la_solution_valide_l_etape_et_le_bilan_s_affiche(make_box, track: str) -> None:
     box = make_box(track)
@@ -247,6 +253,7 @@ def test_la_solution_valide_l_etape_et_le_bilan_s_affiche(make_box, track: str) 
     assert leaked == []
 
 
+@pytest.mark.slow
 def test_une_autre_suite_de_commandes_valide_aussi(make_box) -> None:
     box = make_box()
     _to_repair(box)
@@ -258,6 +265,7 @@ def test_une_autre_suite_de_commandes_valide_aussi(make_box) -> None:
     _fixed(box)
 
 
+@pytest.mark.slow
 def test_supprimer_dans_un_nouveau_commit_ne_suffit_pas(make_box) -> None:
     box = make_box()
     _to_repair(box)
@@ -273,6 +281,7 @@ def test_supprimer_dans_un_nouveau_commit_ne_suffit_pas(make_box) -> None:
     assert box.step_id() == "retirer_de_l_historique"
 
 
+@pytest.mark.slow
 def test_amend_change_le_sha_mais_pas_le_contenu(make_box) -> None:
     box = make_box()
     _to_repair(box)
@@ -285,6 +294,7 @@ def test_amend_change_le_sha_mais_pas_le_contenu(make_box) -> None:
     assert "encore dans l'historique" in box.verdicts("retirer_de_l_historique")[-1]["reason_text"]
 
 
+@pytest.mark.slow
 def test_le_fichier_retire_mais_non_ignore_est_signale(make_box) -> None:
     box = make_box()
     _to_repair(box)
@@ -294,6 +304,7 @@ def test_le_fichier_retire_mais_non_ignore_est_signale(make_box) -> None:
     assert box.step_id() == "retirer_de_l_historique"
 
 
+@pytest.mark.slow
 def test_le_commit_cache_dans_le_stash_ou_une_branche_compte(make_box) -> None:
     box = make_box()
     _to_repair(box)
@@ -305,9 +316,43 @@ def test_le_commit_cache_dans_le_stash_ou_une_branche_compte(make_box) -> None:
     _fixed(box)
 
 
+@pytest.mark.slow
 def test_lecture_seule_ne_dit_rien(make_box) -> None:
     box = make_box()
     _to_repair(box)
     before = len(box.verdicts("retirer_de_l_historique"))
     box.line("git log --oneline")
     assert len(box.verdicts("retirer_de_l_historique")) == before
+
+
+@pytest.mark.slow
+def test_env_encore_dans_l_index_n_est_pas_valide(make_box) -> None:
+    """Revue : après `reset --soft`, `.env` reste indexé ; l'ignorer ne suffit pas, le
+    prochain commit le remettrait dans l'historique."""
+    box = make_box()
+    _to_repair(box)
+    box.line("git reset --soft HEAD~1")
+    box.line('echo ".env" >> .gitignore')
+    assert box.step_id() == "retirer_de_l_historique"
+    verdict = box.verdicts("retirer_de_l_historique")[-1]
+    assert verdict["passed"] is False and "l'index le suit encore" in verdict["reason_text"]
+    box.line("git rm --cached .env")
+    _fixed(box)
+
+
+@pytest.mark.slow
+def test_les_refs_qui_menent_au_commit_sont_nommees(make_box) -> None:
+    """Revue : une sauvegarde (branche, `refs/original/` de `filter-branch`) qui garde le commit
+    est nommée dans la raison de l'échec."""
+    box = make_box()
+    _to_repair(box)
+    leak = box.commits()[LEAK]["sha"]
+    box.git_out("update-ref", "refs/original/refs/heads/main", leak)
+    box.line("git reset --hard HEAD~1")
+    box.line('echo ".env" > .gitignore')
+    reason = box.verdicts("retirer_de_l_historique")[-1]["reason_text"]
+    assert "`refs/original/refs/heads/main`" in reason and "filter-branch" in reason
+    assert "`main`" not in reason
+    box.git_out("update-ref", "-d", "refs/original/refs/heads/main")
+    box.line("git add .gitignore")
+    _fixed(box)

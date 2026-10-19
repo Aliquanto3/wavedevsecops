@@ -53,8 +53,10 @@ def apply(args: Args, ctx: SetupContext) -> str:
     sha = segments[0]
     revision = sha if args.side == "new" else f"{sha}^"
     text = ctx.git.internal("show", f"{revision}:{args.path}", cwd=ctx.layout.repo)
-    lines = text.split("\n")
-    if args.line > len(lines) or (args.contains and args.contains not in lines[args.line - 1]):
+    lines = text.splitlines()
+    if args.line > len(lines):
+        raise SetupError(f"« {args.path} » n'a pas de ligne {args.line}.")
+    if args.contains and args.contains not in lines[args.line - 1]:
         raise SetupError(
             f"La ligne {args.line} de « {args.path} » ne contient pas « {args.contains} »."
         )
