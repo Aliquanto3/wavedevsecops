@@ -120,9 +120,9 @@ steps:
       nouveau commit, et le check repasse au vert de lui-même quand plus aucun fichier ne
       contient la clé. gitleaks lit les fichiers du commit, pas l'historique : la clé reste
       dans le commit précédent de la branche, donc une clé réellement publiée se révoque chez le
-      fournisseur, elle ne se « retire » pas. Les raccourcis ne fonctionnent pas : un
-      commentaire `gitleaks:allow` et un fichier `.gitleaks.toml` de votre dépôt sont ignorés,
-      et déplacer la clé dans un autre fichier ne la cache pas.
+      fournisseur, elle ne se « retire » pas. Les raccourcis ne fonctionnent pas : le check de la
+      PR ignore un commentaire `gitleaks:allow` et un fichier `.gitleaks.toml` de votre dépôt, et
+      déplacer la clé dans un autre fichier ne la cache pas.
     head: feature
     base: main
     pr_state: open
@@ -150,8 +150,8 @@ steps:
       committez et poussez.
     explanation_text: >-
       gitleaks lit un fichier `.gitleaksignore` à la racine du dépôt : y inscrire l'empreinte de
-      la fuite la cache sans la corriger. Cette étape attend un dépôt sans cette exception, dans
-      l'état exact que la PR a vérifié.
+      la fuite la cache sans la corriger. Cette étape attend un dépôt sans cette exception, poussé
+      sur la branche de la PR ; l'étape suivante vérifie que le check reste vert sans elle.
     expect:
       head:
         at: origin/feature
@@ -163,7 +163,36 @@ steps:
       lead_text: >-
         Une exception de secret se range dans un fichier caché à la racine du dépôt, dont le nom
         commence par un point.
-      partial_text: "git status ; git rm .gitleaksignore (s'il existe) ; git commit ; git push"
+      partial_text: "git status ; git rm ___ (s'il existe) ; git commit ; git push"
       solution_text: >-
         Si le fichier .gitleaksignore existe : git rm .gitleaksignore, git commit, git push.
         Sinon, rien à faire : l'étape est déjà vérifiée.
+
+  # Après `sans_exception` : un vert obtenu par un `.gitleaksignore` repasse au rouge une fois
+  # l'exception retirée, et le scénario ne se termine pas sur une clé encore dans le code.
+  - step_id: rester_au_vert
+    type: pr_state
+    title_text: Garder le check vert sans exception
+    instruction_text: >-
+      Le pipeline a tourné sur le dernier commit poussé, sans exception de secret. Les checks
+      gitleaks et pytest doivent y être à « Succès ». Si gitleaks a rouvert l'échec, la clé est
+      encore dans un fichier : sortez-la, committez et poussez.
+    explanation_text: >-
+      Le check vert prouve que gitleaks ne reconnaît plus de secret dans les fichiers du commit.
+      Il a une limite : gitleaks reconnaît des formes, et une clé découpée en morceaux ou encodée
+      lui échappe, tout comme le code que la CI lance lui fait confiance. C'est pourquoi une PR
+      passe aussi par une relecture humaine, qui repère une valeur sensible même déguisée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      gitleaks: success
+      pytest: success
+    hints:
+      lead_text: >-
+        Le check gitleaks est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        en échec, sa ligne de détail nomme le fichier et la ligne de la clé.
+      partial_text: "Vue « Distant + PR » : checks gitleaks et ___ de la PR, état « Succès »"
+      solution_text: >-
+        Vue « Distant + PR » : checks gitleaks et pytest à « Succès ». Sinon, remplacer la clé par
+        API_KEY = os.environ.get("LLM_API_KEY", ""), puis git commit et git push

@@ -50,7 +50,14 @@ def _scenario(path: Path):
         (
             CLE,
             "cle-api-en-dur",
-            ["pousser_feature", "ouvrir_pr", "lire_le_blocage", "retirer_la_cle", "sans_exception"],
+            [
+                "pousser_feature",
+                "ouvrir_pr",
+                "lire_le_blocage",
+                "retirer_la_cle",
+                "sans_exception",
+                "rester_au_vert",
+            ],
         ),
         (
             CLOUD,
@@ -170,6 +177,17 @@ def test_l_etape_cle_attend_gitleaks_et_pytest_verts(tmp_path: Path) -> None:
     assert _pr_status(CLE, "retirer_la_cle", broken) == "pending"
     still = _checks_layout(tmp_path / "c", {"gitleaks": "failure", "pytest": "success"}, {})
     assert _pr_status(CLE, "retirer_la_cle", still) == "pending"
+
+
+def test_le_scenario_cle_finit_sur_un_check_vert_sans_exception(tmp_path: Path) -> None:
+    """Un vert obtenu par un `.gitleaksignore`, retiré à l'étape `sans_exception`, repasse au
+    rouge : la dernière étape attend de nouveau gitleaks et pytest verts sur les SHA courants."""
+    steps = [s.step_id for s in _scenario(CLE).steps]
+    assert steps.index("rester_au_vert") == steps.index("sans_exception") + 1 == len(steps) - 1
+    red = _checks_layout(tmp_path / "a", {"gitleaks": "failure", "pytest": "success"}, {})
+    assert _pr_status(CLE, "rester_au_vert", red) == "pending"
+    green = _checks_layout(tmp_path / "b", {"gitleaks": "success", "pytest": "success"}, {})
+    assert _pr_status(CLE, "rester_au_vert", green) == "passed"
 
 
 def test_l_etape_cloud_exige_les_deux_tests_de_config_en_echec(tmp_path: Path) -> None:
@@ -300,12 +318,38 @@ def test_les_contournements_du_test_de_config_ne_valident_pas_l_etape(
         ),
         original.replace("def test_default_endpoint", "def _default_endpoint"),
         original.replace("    assert config.base_url ==", "    # assert config.base_url ==", 1),
+        # Revue : un décorateur, même séparé par des lignes vides, ou un `return` en tête.
+        original.replace(
+            "def test_default_endpoint", "@pytest.mark.skip\ndef test_default_endpoint"
+        ),
+        original.replace(
+            "def test_allowed_endpoints", "@pytest.mark.xfail\n\n\ndef test_allowed_endpoints"
+        ),
+        original.replace(
+            "load_config\n\n\ndef test_default",
+            "load_config\n\n\n@pytest.mark.skip\n\n\ndef test_default",
+        ),
+        original.replace(
+            "    config = load_config()\n    assert config.base_url",
+            "    return\n    config = load_config()\n    assert config.base_url",
+        ),
     ):
         assert weakened != original
         tests.write_text(weakened, "utf-8")
         assert _guard(CLOUD, "revenir_a_la_config_locale", repo) != "passed", weakened
     tests.write_text(original, "utf-8")
     assert _guard(CLOUD, "revenir_a_la_config_locale", repo) == "passed"
+    # Revue : la valeur locale laissée en commentaire, la config cloud active, ne compte pas.
+    commented = (
+        "# Configuration du modèle de langage.\n"
+        '# base_url = "http://127.0.0.1:11434/v1"\n'
+        '# allowed_endpoints = ["http://127.0.0.1:11434/v1"]\n'
+        'base_url = "https://api.llm-cloud.example/v1"\n'
+        'model = "m"\ntimeout_seconds = 60\n'
+        'allowed_endpoints = ["https://api.llm-cloud.example/v1"]\n'
+    )
+    (repo / "llm.toml").write_text(commented, "utf-8")
+    assert _guard(CLOUD, "revenir_a_la_config_locale", repo) != "passed"
 
 
 # ------------------------------------------------------------------ vrais outils

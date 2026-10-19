@@ -136,17 +136,25 @@ steps:
         clean: true
       tree:
         contains:
+          # En début de ligne (saut de ligne en tête) : une valeur locale laissée en commentaire
+          # ne compte pas.
           - path: llm.toml
-            text: 'base_url = "http://127.0.0.1:11434/v1"'
+            text: "\nbase_url = \"http://127.0.0.1:11434/v1\""
           - path: llm.toml
-            text: 'allowed_endpoints = ["http://127.0.0.1:11434/v1"]'
+            text: "\nallowed_endpoints = [\"http://127.0.0.1:11434/v1\"]"
+          # Les deux tests d'un seul tenant, depuis la ligne d'import : aucun décorateur
+          # (`skip`, `xfail`) ni `return` ou `pytest.skip()` ne peut s'y glisser.
           - path: tests/test_llm.py
             text: |-
+              from inventory.llm_config import LlmConfig, LlmConfigError, load_config
+
+
               def test_default_endpoint_is_local_ollama() -> None:
                   config = load_config()
                   assert config.base_url == "http://127.0.0.1:11434/v1"
-          - path: tests/test_llm.py
-            text: |-
+                  assert config.chat_url == "http://127.0.0.1:11434/v1/chat/completions"
+
+
               def test_allowed_endpoints_are_loopback_only() -> None:
                   config = load_config()
                   for url in config.allowed_endpoints:
@@ -163,7 +171,7 @@ steps:
         l'affiche. Vous pouvez aussi annuler le commit de la branche.
       partial_text: >-
         Remettre base_url et allowed_endpoints sur http://127.0.0.1:11434/v1 (ou
-        git checkout main -- llm.toml) ; puis git add, git commit et git push
+        git checkout ___ -- llm.toml) ; puis git add, git commit et git push
       solution_text: >-
         git checkout main -- llm.toml, git commit -am « Revient au modèle local », git push
 
@@ -178,6 +186,10 @@ steps:
       Le pipeline relance pytest sur le nouveau commit : c'est ce résultat qui valide l'étape,
       pas votre commande. Le test garde la config sur deux points, le défaut local et la liste
       des endpoints : c'est cette liste qu'une revue relit avant qu'un service distant y entre.
+      Le check a une limite : la CI fait confiance au code qu'elle lance, et un test écarté par
+      la configuration de pytest (marqueur de module, `conftest.py`, option `--deselect`) ne
+      tourne pas, sans faire rougir le check. C'est pourquoi une PR passe aussi par une relecture
+      humaine, qui voit ce changement.
     head: feature
     base: main
     pr_state: open
