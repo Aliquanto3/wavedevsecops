@@ -11,6 +11,7 @@ import { bindAction } from "./actions.js";
 import { el } from "./dom.js";
 import { postIntent } from "./quiz.js";
 import { selectionFor } from "./selection.js";
+import { splitSpans, TOOL_OUTPUT_LABEL } from "./terminal.js";
 
 export const REFS_TITLE = "Refs de origin";
 export const NO_REFS_TEXT = "Rien n'a encore été poussé sur origin.";
@@ -25,6 +26,11 @@ export const BLOCKED_TITLE = "Pourquoi Merger est inactif";
 export const REVIEW_TITLE = "Revue";
 export const CHECKS_TITLE = "Checks";
 export const GLYPHS = { success: "✓", failure: "✗", error: "⚠", queued: "○", running: "" };
+export const SHOW_OUTPUT_LABEL = "Voir la sortie";
+export const HIDE_OUTPUT_LABEL = "Masquer la sortie";
+export const RERUN_LABEL = "Relancer le check";
+export const NO_OUTPUT_TEXT = "L'outil n'a rien affiché.";
+const FINISHED = new Set(["success", "failure", "error"]);
 export const REVIEW_MARKS = { approved: "✓", changes_requested: "✗", commented: "•" };
 
 function text(tag, className, value) {
@@ -90,7 +96,99 @@ export function buildRefs(remote, busy = false) {
 
 // --- checks ----------------------------------------------------------------------------------
 
-export function buildCheck(check) {
+/** Bloc `tool-output` (UX-DR20) d'un check : sortie verbatim, fichier:ligne liés, désignable. */
+export function buildCheckOutput(check) {
+  const block = el("div", "tool-output check-output", {
+    role: "group",
+    tabindex: "-1",
+    "data-roving": true,
+    "data-element-id": check.output_element_id,
+    "data-key": check.output_element_id,
+    "aria-label": TOOL_OUTPUT_LABEL(check.job_id),
+  });
+  block.id = `out-${check.element_id}`;
+  const label = text("span", "tool-output-label", check.job_id);
+  label.setAttribute("aria-hidden", "true");
+  const body = el("pre", "tool-output-text", { lang: "en" });
+  if (!check.output_text) body.textContent = NO_OUTPUT_TEXT;
+  for (const part of splitSpans(check.output_text, check.output_spans)) {
+    if (!part.elementId) {
+      body.append(document.createTextNode(part.text));
+      continue;
+    }
+    // data-link : le clic sélectionne le fichier (lien vers Code), comme dans le terminal.
+    const link = el("button", "terminal-link", { type: "button", "data-link": part.elementId, "aria-pressed": "false" });
+    link.textContent = part.text;
+    body.append(link);
+  }
+  block.append(label, body);
+  return block;
+}
+
+function buildDetails(check) {
+  const list = el("ul", "check-details");
+  check.details.forEach((detail, index) => {
+    const item = el("li", "check-detail");
+    if (detail.location_text && detail.link) {
+      const link = el("button", "check-detail-link", {
+        type: "button",
+        "data-link": detail.link,
+        "data-key": `detail:${check.element_id}:${index}`,
+        "aria-pressed": "false",
+      });
+      link.textContent = detail.location_text;
+      item.append(link);
+    } else if (detail.location_text) {
+      item.append(text("code", "check-detail-where", detail.location_text));
+    }
+    if (detail.rule_id) item.append(text("code", "check-detail-rule", detail.rule_id));
+    if (detail.message_text) item.append(text("span", "check-detail-text", detail.message_text));
+    list.append(item);
+  });
+  return list;
+}
+
+/** Ligne de détail d'un check terminé : erreur de l'outil, constats, Voir la sortie, Relancer. */
+function buildCheckExtra(check, item, opts) {
+  if (!FINISHED.has(check.state) || check.output_text === undefined) return;
+  if (check.tool_error_text) item.append(text("p", "check-tool-error", check.tool_error_text));
+  if (check.details.length > 0) item.append(buildDetails(check));
+  const open = Boolean(check.output_text) && opts.expanded.has(check.element_id);
+  if (!check.output_text && !check.can_rerun) return;
+  const actions = el("div", "check-actions");
+  item.append(actions);
+  if (check.output_text) actions.append(outputToggle(check, opts, open));
+  if (check.can_rerun) {
+    const rerun = el("button", "btn btn-secondary btn-small", {
+      type: "button",
+      "data-action": "check-rerun",
+      "data-number": opts.number,
+      "data-job": check.job_id,
+      "data-key": `rerun:${check.element_id}`,
+    });
+    rerun.textContent = RERUN_LABEL;
+    actions.append(rerun); // dans le DOM d'abord : la raison d'un bouton inactif se place après lui
+    bindAction(rerun, opts.busy ? BUSY_TEXT : null);
+  }
+  if (open) item.append(buildCheckOutput(check));
+}
+
+function outputToggle(check, opts, open) {
+  const toggle = el("button", "btn btn-secondary btn-small", {
+    type: "button",
+    "data-action": "toggle-output",
+    "data-check": check.element_id,
+    "data-number": opts.number,
+    "data-job": check.job_id,
+    "data-key": `toggle:${check.element_id}`,
+    "aria-expanded": String(open),
+    "aria-controls": `out-${check.element_id}`,
+  });
+  toggle.textContent = open ? HIDE_OUTPUT_LABEL : SHOW_OUTPUT_LABEL;
+  return toggle;
+}
+
+export function buildCheck(check, opts = { expanded: new Set(), busy: false, number: 0 }) {
   const row = selectable("button", `pr-check is-${check.state}${check.stale ? " is-stale" : ""}`, check.element_id, check.a11y_name_text);
   const glyph = el("span", check.state === "running" ? "check-glyph pending-dot" : "check-glyph");
   glyph.setAttribute("aria-hidden", "true");
@@ -101,14 +199,15 @@ export function buildCheck(check) {
   row.append(text("span", "check-duration", check.duration_text));
   const item = el("li", "pr-check-item");
   item.append(row);
+  buildCheckExtra(check, item, opts);
   return item;
 }
 
-function buildChecks(checks, wanted, className) {
+function buildChecks(checks, wanted, className, opts) {
   const rows = checks.filter(wanted);
   if (rows.length === 0) return null;
   const list = el("ul", `pr-checks ${className}`);
-  for (const check of rows) list.append(buildCheck(check));
+  for (const check of rows) list.append(buildCheck(check, opts));
   return list;
 }
 
@@ -184,7 +283,8 @@ export function buildReviewLog(card) {
 
 // --- carte de PR -----------------------------------------------------------------------------
 
-export function buildCard(card, busy) {
+export function buildCard(card, busy, expanded = new Set()) {
+  const opts = { expanded, busy, number: card.number };
   const article = el("article", `pr-card${card.current ? " is-current" : ""} is-${card.state}`, {
     "data-pr": card.number,
   });
@@ -197,10 +297,10 @@ export function buildCard(card, busy) {
   const branches = el("p", "pr-branches");
   branches.append(text("code", "", card.branches_text));
   article.append(head, branches);
-  const failing = buildChecks(card.checks, (c) => c.state === "failure" || c.state === "error", "is-failing");
+  const failing = buildChecks(card.checks, (c) => c.state === "failure" || c.state === "error", "is-failing", opts);
   if (failing) article.append(failing);
   article.append(buildMerge(card, busy));
-  const others = buildChecks(card.checks, (c) => c.state !== "failure" && c.state !== "error", "is-others");
+  const others = buildChecks(card.checks, (c) => c.state !== "failure" && c.state !== "error", "is-others", opts);
   if (others) article.append(others);
   article.append(buildReviewLog(card));
   return article;
@@ -224,6 +324,8 @@ export function renderRemote(body, ctx, renderEmpty) {
   body.replaceChildren(root);
   let drawn; // dernière vue dessinée
   let drawnBusy;
+  const expanded = new Set(); // checks dont la sortie est dépliée (element_id), gardés entre deux dessins
+  const seen = new Set(); // sorties déjà ouvertes : la preuve n'est envoyée qu'une fois
 
   function refreshSelection() {
     for (const node of root.querySelectorAll("[data-element-id], [data-link]")) {
@@ -237,7 +339,7 @@ export function renderRemote(body, ctx, renderEmpty) {
 
   /** Un seul arrêt de tabulation par vue (workspace.js) : le nôtre ne l'est que si nul autre ne l'est. */
   function settleRoving(preferred) {
-    const mine = [...root.querySelectorAll("button")];
+    const mine = [...root.querySelectorAll("button, [data-roving]")];
     for (const button of mine) button.setAttribute("tabindex", "-1");
     const section = body.parentElement;
     const others = section
@@ -248,10 +350,10 @@ export function renderRemote(body, ctx, renderEmpty) {
     chosen.setAttribute("tabindex", "0");
   }
 
-  function draw(state) {
+  function draw(state, force = false) {
     const remote = state.views.remote;
     const busy = state.engineState !== "idle";
-    if (remote === drawn && busy === drawnBusy) return;
+    if (!force && remote === drawn && busy === drawnBusy) return;
     drawn = remote;
     drawnBusy = busy;
     const active = document.activeElement;
@@ -271,10 +373,10 @@ export function renderRemote(body, ctx, renderEmpty) {
         renderEmpty(none, pane.empty);
         root.append(none);
       }
-      for (const card of remote.pulls) root.append(buildCard(card, busy));
+      for (const card of remote.pulls) root.append(buildCard(card, busy, expanded));
     }
     refreshSelection();
-    const buttons = [...root.querySelectorAll("button")];
+    const buttons = [...root.querySelectorAll("button, [data-roving]")];
     const byKey = (key) => key && buttons.find((b) => b.getAttribute("data-key") === key);
     // Merger (PR mergée) ou Ouvrir une PR (PR ouverte) disparaissent après leur action : le focus
     // passe au titre de la carte, ou à la branche, plutôt que de tomber sur la page.
@@ -284,11 +386,43 @@ export function renderRemote(body, ctx, renderEmpty) {
   }
 
   // Un clic (ou Entrée, Espace) sélectionne ; Merger et Ouvrir une PR envoient leur intention.
+  function toggleOutput(target) {
+    const id = target.getAttribute("data-check");
+    if (expanded.has(id)) {
+      expanded.delete(id);
+    } else {
+      expanded.add(id);
+      if (!seen.has(id)) {
+        seen.add(id);
+        postIntent(store, "check_output_seen", {
+          number: Number(target.getAttribute("data-number")),
+          job_id: target.getAttribute("data-job"),
+        });
+      }
+    }
+    draw(store.state, true);
+  }
+
   root.addEventListener("click", (event) => {
     const target = event.target.closest && event.target.closest("button");
-    if (!target || target.getAttribute("aria-disabled") === "true") return;
+    if (!target) {
+      // Un clic dans le bloc tool-output le désigne, sauf s'il sert à sélectionner du texte.
+      const block = event.target.closest && event.target.closest(".check-output");
+      if (block && !String(globalThis.getSelection?.() ?? "")) {
+        selection.toggle(block.getAttribute("data-element-id"));
+      }
+      return;
+    }
+    if (target.getAttribute("aria-disabled") === "true") return;
     const action = target.getAttribute("data-action");
-    if (action === "merge") {
+    if (action === "toggle-output") {
+      toggleOutput(target);
+    } else if (action === "check-rerun") {
+      postIntent(store, "check_rerun", {
+        number: Number(target.getAttribute("data-number")),
+        job_id: target.getAttribute("data-job"),
+      });
+    } else if (action === "merge") {
       postIntent(store, "pr_merge", { number: Number(target.getAttribute("data-number")) });
     } else if (action === "open-pr") {
       postIntent(store, "pr_open", { head: target.getAttribute("data-head") });
@@ -296,6 +430,14 @@ export function renderRemote(body, ctx, renderEmpty) {
       selection.toggle(target.getAttribute("data-link"));
     } else if (target.hasAttribute("data-select")) {
       selection.toggle(target.getAttribute("data-element-id"));
+    }
+  });
+  root.addEventListener("keydown", (event) => {
+    const block = event.target;
+    if (!block.classList || !block.classList.contains("check-output")) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selection.toggle(block.getAttribute("data-element-id"));
     }
   });
   selection.subscribe(refreshSelection);

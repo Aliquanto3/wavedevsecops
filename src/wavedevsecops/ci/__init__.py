@@ -42,6 +42,10 @@ _TOKEN = re.compile(r"\{([^{}]*)\}")
 TOOL_ERROR_RULE = "tool_error"
 """`rule_id` du constat qui explique une erreur de l'outil (« ⚠ Erreur de l'outil »)."""
 NOT_YOUR_CODE = "Ce n'est pas un défaut de votre code."
+NO_DETAIL_RULE = "no_detail"
+"""Constat d'un échec dont l'exécution machine n'a rien donné : la sortie humaine reste là."""
+MAX_OUTPUT_CHARS = 60_000
+"""Sortie humaine gardée dans `github.json` : le début et surtout la fin (résumé des outils)."""
 
 
 class PipelineError(AppError):
@@ -194,6 +198,9 @@ def prepare_tree(git: Git, layout: Layout, number: int, head_sha: str) -> Path:
         cwd=layout.ci,
     )
     git.internal("-c", "advice.detachedHead=false", "checkout", "--quiet", head_sha, cwd=tree)
+    # Sans remote : un test ou un plugin de l'apprenant ne pousse pas dans `origin.git` hors de
+    # la file (les objets restent partagés en lecture par `--shared`).
+    git.internal("remote", "remove", "origin", cwd=tree)
     return tree
 
 
@@ -275,6 +282,16 @@ def error_result(job: Job, why: str, started: float | None = None) -> JobResult:
     """Check en erreur de l'outil, sans sortie (outil introuvable, arbre ou environnement)."""
     elapsed = 0 if started is None else int((time.monotonic() - started) * 1000)
     return JobResult(job.job_id, "error", findings=[tool_error(job, why)], duration_ms=elapsed)
+
+
+def bound_output(text: str) -> str:
+    """Sortie humaine bornée à `MAX_OUTPUT_CHARS` : début et fin gardés, le milieu signalé."""
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    head = MAX_OUTPUT_CHARS // 4
+    tail = MAX_OUTPUT_CHARS - head
+    omitted = len(text) - head - tail
+    return f"{text[:head]}\n[… {omitted} caractères de sortie omis …]\n{text[-tail:]}"
 
 
 def _spawn(
@@ -365,7 +382,7 @@ def run_job(
     result = toolrun.collect(handle)
     if handle.interrupted:
         return JobResult(job.job_id, "error", interrupted=True)
-    output = result.stdout + result.stderr
+    output = bound_output(result.stdout + result.stderr)
     findings: list[Finding] = []
     if result.timed_out:
         state: CheckState = "error"
@@ -392,13 +409,27 @@ def run_job(
             )
             if stopped:
                 return JobResult(job.job_id, "error", interrupted=True)
+            if found is None and state == "failure":
+                findings.append(
+                    Finding(
+                        rule_id=NO_DETAIL_RULE,
+                        severity="info",
+                        message_text=(
+                            f"Le détail de l'échec (fichier, ligne) n'a pas pu être lu dans le "
+                            f"rapport de {job.tool} : la sortie de l'outil le donne."
+                        ),
+                    )
+                )
             findings.extend(found or [])
     elapsed = int((time.monotonic() - started) * 1000)
     return JobResult(job.job_id, state, output, findings, elapsed)
 
 
 __all__ = [
+    "MAX_OUTPUT_CHARS",
+    "NO_DETAIL_RULE",
     "TOOL_ERROR_RULE",
+    "bound_output",
     "Environment",
     "ExitCodes",
     "GitError",

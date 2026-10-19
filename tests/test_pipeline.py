@@ -435,6 +435,34 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         "pytest": "success",
         "gitleaks": "error",
     }
+    # Vue Distant + PR : sortie verbatim liée, ligne de détail fichier:ligne, erreur de l'outil.
+    opened.engine.submit(Operation("noop", lambda ctx: 0, writes=False)).result(WAIT)
+    rows = {
+        c["job_id"]: c
+        for c in json.loads(json.dumps(opened.engine.last_projection.views, default=str))[
+            "remote"
+        ]["pulls"][0]["checks"]
+    }
+    path_id = f"path:worktree:{FEATURE}"
+    assert rows["ruff"]["output_text"] == RUFF_TEXT
+    assert [s["element_id"] for s in rows["ruff"]["output_spans"]] == [path_id]
+    assert rows["ruff"]["details"] == [
+        {
+            "rule_id": "F401",
+            "message_text": "`os` imported but unused",
+            "location_text": f"{FEATURE}:1",
+            "link": path_id,
+        }
+    ]
+    assert not rows["ruff"]["can_rerun"] and rows["gitleaks"]["can_rerun"]
+    assert rows["gitleaks"]["tool_error_text"] == why.message_text
+    assert rows["gitleaks"]["details"] == []
+    # « Voir la sortie » : la preuve de la barrière du job (une seule fois par parcours).
+    engine_pipeline.register_intents()
+    seen = build_operation(opened.engine, "check_output_seen", {"number": 1, "job_id": "ruff"})
+    opened.engine.submit(seen).result(WAIT)
+    facts = [e.payload["facts"] for e in opened.events if e.kind == Kind.PROGRESS_UPDATED]
+    assert ["evidence_seen"] in facts
 
 
 def test_un_nouveau_sha_annule_le_run_et_rejette_ses_resultats(
@@ -458,6 +486,9 @@ def test_un_nouveau_sha_annule_le_run_et_rejette_ses_resultats(
     monkeypatch.setattr(toolrun, "spawn_tool", tracking)
     opened: Box = box()
     opened.wait(lambda: opened.states().get("ruff") == "running", "ruff en cours")
+    # Le check passe à `running` avant le lancement de l'outil : on attend le ruff lent lancé,
+    # sinon l'ancien run prendrait le ruff rapide et pourrait finir avant le push (test instable).
+    opened.wait(lambda: len(spawned) >= 1, "ruff lent lancé")
     old_sha = opened.pr().head_sha
     behaviour["ruff"] = ("vite\n", 0, "", 0)
     new_sha = opened.push_new_commit("VALEUR = 2\n")
@@ -491,6 +522,7 @@ def test_recommencer_annule_le_run_en_cours(box, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(toolrun, "spawn_tool", tracking)
     opened: Box = box()
     opened.wait(lambda: opened.states().get("ruff") == "running", "ruff en cours")
+    opened.wait(lambda: len(spawned) >= 1, "ruff lent lancé")
     epoch = opened.engine.epoch
     path = opened.settings.scenarios_path() / "pipeline-essai.A.yaml"
     _engine, future = opened.manager.create(load_scenario(path, opened.settings), "no_ai",
@@ -542,6 +574,80 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
     assert [t for t, _m, _c in calls] == ["gitleaks"]
     assert opened.states() == {"ruff": "success", "pytest": "success", "gitleaks": "success"}
     assert opened.pr().mergeable
+
+
+def test_une_erreur_interne_du_run_laisse_des_checks_termines(
+    box, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list = []
+    _fake_tools(
+        monkeypatch,
+        {"ruff": ("", 0, "", 0), "pytest": ("", 0, "", 0), "gitleaks": ("", 0, "", 0)},
+        calls,
+    )
+    crashes = [1]
+
+    def broken(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        if crashes:
+            crashes.pop()
+            raise RuntimeError("panne interne")
+        return real_prepare(*args, **kwargs)
+
+    real_prepare = ci.prepare_tree
+    monkeypatch.setattr(ci, "prepare_tree", broken)
+    opened: Box = box()
+    opened.wait_settled()
+    pr = opened.pr()
+    assert {c.state for c in pr.checks} == {"error"} and not calls
+    for check in pr.checks:
+        (why,) = check.findings
+        assert why.rule_id == ci.TOOL_ERROR_RULE and "erreur interne" in why.message_text
+    # Les checks sont terminés : « Relancer le check » est admis et le job retourne.
+    engine_pipeline.register_intents()
+    op = build_operation(opened.engine, "check_rerun", {"number": 1, "job_id": "ruff"})
+    opened.engine.submit(op).result(WAIT)
+    opened.wait(lambda: opened.states()["ruff"] == "success", "ruff relancé")
+
+
+def test_relancer_un_check_reste_en_cours_sans_run(box, monkeypatch) -> None:
+    calls: list = []
+    _fake_tools(
+        monkeypatch,
+        {"ruff": ("", 0, "", 0), "pytest": ("", 0, "", 0), "gitleaks": ("", 0, "", 0)},
+        calls,
+    )
+    opened: Box = box()
+    opened.wait_settled()
+    opened.runner.stop()  # plus aucun run : un check resté `running` (arrêt brutal) est orphelin
+    git = Git.for_workspace(opened.git_path, opened.layout.root, opened.settings)
+    github_sim.set_check_state(git, opened.layout, 1, "pytest", "running")
+    body = engine_pipeline.CheckRerun(number=1, job_id="pytest")
+    assert engine_pipeline._rerun_refusal(opened.engine, body) == ""
+    pr = opened.pr()
+    run = engine_pipeline.Run(1, pr.head_sha, pr.base_sha, epoch=opened.engine.epoch)
+    run.todo.append("pytest")
+    opened.runner._queue.append(run)  # un run vivant le couvre : la relance est refusée
+    assert "déjà en attente" in engine_pipeline._rerun_refusal(opened.engine, body)
+
+
+def test_ci_borne_la_sortie_et_signale_un_detail_illisible(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    long = "x" * (ci.MAX_OUTPUT_CHARS * 2)
+    bounded = ci.bound_output(long)
+    assert len(bounded) < ci.MAX_OUTPUT_CHARS + 100 and "caractères de sortie omis" in bounded
+    assert ci.bound_output("court\n") == "court\n"
+    calls: list = []
+    _fake_tools(monkeypatch, {"ruff": (RUFF_TEXT, 1, "pas du json", 0)}, calls)
+    settings = Settings(data_dir=tmp_path / "data")
+    job = ci.load_pipeline(settings).job("ruff")
+    assert job is not None
+    result = ci.run_job(
+        job, tree=tmp_path, venv=None, tokens={"repo": str(tmp_path)}, settings=settings
+    )
+    assert result.state == "failure" and result.output == RUFF_TEXT
+    (finding,) = result.findings
+    assert finding.rule_id == ci.NO_DETAIL_RULE and "la sortie de l'outil" in finding.message_text
 
 
 def test_sans_pipeline_declare_aucun_run(

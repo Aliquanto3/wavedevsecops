@@ -17,7 +17,9 @@ from wavedevsecops import github_sim
 from wavedevsecops.contracts import AppError, element_id
 from wavedevsecops.contracts.github import BranchProtection, Check, GithubState, PullRequest, Review
 from wavedevsecops.contracts.remote import (
+    CheckDetail,
     CheckRow,
+    CheckSpan,
     MergeReason,
     MergeState,
     PrCard,
@@ -27,6 +29,7 @@ from wavedevsecops.contracts.remote import (
     ReviewLog,
 )
 from wavedevsecops.gitio import Git, GitError
+from wavedevsecops.projections.spans import Linker
 from wavedevsecops.wsfs import Layout
 
 DEFAULT_BASE = "main"
@@ -50,6 +53,10 @@ REVIEW_ACTION_TEXT = {
 STALE_REVIEW_TEXT = "sur un commit remplacé"
 BLOCKED_TEXT = "Cette PR ne peut pas être mergée."
 NOT_OPEN_TEXT = "Cette PR n'est plus ouverte."
+TOOL_ERROR_RULE = "tool_error"
+"""Même valeur que `ci.TOOL_ERROR_RULE` (la projection n'importe pas `ci`)."""
+MAX_DETAILS = 50
+"""Lignes de détail d'un check dans la vue ; la sortie complète reste dans `tool-output`."""
 
 
 def _short(sha: str) -> str:
@@ -95,7 +102,36 @@ def _protection_text(protection: BranchProtection | None) -> str:
     return " · ".join(parts)
 
 
-def _check_row(pr: PullRequest, check: Check) -> CheckRow:
+def _details(check: Check, linker: Linker | None) -> tuple[list[CheckDetail], str]:
+    """Lignes de détail (fichier:ligne lié s'il existe dans le bac à sable) et texte de
+    l'erreur de l'outil, tirés des constats du check."""
+    details: list[CheckDetail] = []
+    tool_error = ""
+    for finding in check.findings:
+        if finding.rule_id == TOOL_ERROR_RULE:
+            tool_error = tool_error or finding.message_text
+            continue
+        if len(details) >= MAX_DETAILS:
+            continue
+        location = ""
+        link = ""
+        if finding.path:
+            location = f"{finding.path}:{finding.line}" if finding.line else finding.path
+            spans = linker(finding.path) if linker is not None else []
+            if spans and spans[0]["text"] == finding.path:
+                link = spans[0]["element_id"]
+        details.append(
+            CheckDetail(
+                rule_id=finding.rule_id,
+                message_text=finding.message_text,
+                location_text=location,
+                link=link,
+            )
+        )
+    return details, tool_error
+
+
+def _check_row(pr: PullRequest, check: Check, linker: Linker | None = None) -> CheckRow:
     element = check.element(pr.number)
     required = check.required or (
         pr.protection is not None and check.job_id in pr.protection.required_checks
@@ -107,6 +143,8 @@ def _check_row(pr: PullRequest, check: Check) -> CheckRow:
         name += ", obligatoire"
     if stale:
         name += ", calculé sur un ancien commit"
+    details, tool_error = _details(check, linker)
+    spans = linker(check.output) if linker is not None and check.output else []
     return CheckRow(
         element_id=element,
         job_id=check.job_id,
@@ -117,6 +155,14 @@ def _check_row(pr: PullRequest, check: Check) -> CheckRow:
         stale=stale,
         a11y_name_text=name,
         links=[pr.element],
+        output_text=check.output,
+        output_spans=[CheckSpan(**span) for span in spans],
+        details=details,
+        tool_error_text=tool_error,
+        can_rerun=check.state == "error" and pr.state == "open" and not stale,
+        output_element_id=element_id(
+            "output", f"check-{pr.number}-{check.job_id}-{check.head_sha}"
+        ),
     )
 
 
@@ -182,10 +228,10 @@ def _merge_state(pr: PullRequest) -> MergeState:
     return MergeState(enabled=False, disabled_text=BLOCKED_TEXT, reasons=reasons)
 
 
-def _card(pr: PullRequest, current: bool) -> PrCard:
+def _card(pr: PullRequest, current: bool, linker: Linker | None = None) -> PrCard:
     title = pr.title_text or f"PR n°{pr.number} : {pr.head}"
     checks = sorted(
-        (_check_row(pr, c) for c in pr.checks),
+        (_check_row(pr, c, linker) for c in pr.checks),
         key=lambda row: (CHECK_ORDER[row.state], row.job_id),
     )
     state_text = PR_STATE_TEXT[pr.state]
@@ -251,8 +297,11 @@ def _branches(
     return out
 
 
-def build_remote(git: Git, layout: Layout, local_branch: str = "") -> RemoteView:
-    """Vue « Distant + PR » de l'espace ; `local_branch` : nom court de la branche courante."""
+def build_remote(
+    git: Git, layout: Layout, local_branch: str = "", linker: Linker | None = None
+) -> RemoteView:
+    """Vue « Distant + PR » de l'espace ; `local_branch` : nom court de la branche courante ;
+    `linker` lie les fichier:ligne des sorties de checks aux fichiers du bac à sable."""
     try:
         state = github_sim.load(layout)
         heads = github_sim.origin_branches(git, layout) if layout.origin.is_dir() else {}
@@ -264,7 +313,7 @@ def build_remote(git: Git, layout: Layout, local_branch: str = "") -> RemoteView
             error_text="Les refs de origin n'ont pas pu être lues. Relancez une commande git."
         )
     current = _current_number(state.pulls, local_branch)
-    cards = [_card(p, p.number == current) for p in state.pulls]
+    cards = [_card(p, p.number == current, linker) for p in state.pulls]
     order = {"open": 0, "merged": 1, "closed": 2}
     cards.sort(key=lambda c: (not c.current, order[c.state], -c.number))
     return RemoteView(branches=branches, pulls=cards)

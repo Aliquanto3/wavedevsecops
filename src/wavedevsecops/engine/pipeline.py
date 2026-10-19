@@ -49,6 +49,7 @@ PENDING_STATES = frozenset({"queued", "running"})
 STOP_WAIT_S = 10.0
 """Attente maximale de l'arrêt du run en cours (annulation, Recommencer, mise en veille)."""
 PIPELINE_OFF_TEXT = "Le pipeline simulé ne tourne pas dans ce scénario."
+INTERNAL_ERROR_TEXT = "n'a pas pu tourner : le pipeline simulé a rencontré une erreur interne"
 
 RunKey = tuple[int, str, str]
 """`(pr, head_sha, base_sha)`."""
@@ -226,6 +227,7 @@ class PipelineRunner:
                 self._execute(run)
             except Exception:  # noqa: BLE001 - un run en échec ne tue pas le runner
                 log.exception("Run du pipeline de %s", self.engine.workspace_id)
+                self._fail_remaining(run)
             finally:
                 with self._lock:
                     run.done = True
@@ -233,6 +235,45 @@ class PipelineRunner:
                     self._active = None
                     self.history.append(run)
                     self._lock.notify_all()
+
+    def _fail_remaining(self, run: Run) -> None:
+        """Après une erreur interne du run : ses jobs non écrits passent en erreur de l'outil.
+
+        Les checks atteignent ainsi un état terminal (« Relancer le check » possible) au lieu de
+        rester `queued`/`running` sans run pour les faire avancer.
+        """
+        with self._lock:
+            if run.cancelled:
+                return
+            jobs = [*([run.current] if run.current else []), *run.todo]
+            run.todo.clear()
+            run.current = None
+            run.done = True  # un job demandé ensuite part dans un nouveau run
+        try:
+            pipeline = ci.load_pipeline(self.settings)
+        except ci.PipelineError:
+            return
+        ensure: ci.Pipeline | None = pipeline
+        for job_id in jobs:
+            job = pipeline.job(job_id)
+            if job is None:
+                continue
+            result = ci.error_result(job, INTERNAL_ERROR_TEXT)
+            if not self._submit(run, job_id, result=result, ensure=ensure):
+                return
+            ensure = None
+
+    def covers(self, number: int, head_sha: str, base_sha: str, job_id: str) -> bool:
+        """Vrai si un run vivant de l'`epoch` courant fera avancer ce check."""
+        key = (number, head_sha, base_sha)
+        epoch = self.engine.epoch
+        with self._lock:
+            for run in [*self._inflight, *self._queue]:
+                if run.cancelled or not run.matches(key, epoch):
+                    continue
+                if job_id in run.todo or job_id in run.awaiting or job_id == run.current:
+                    return True
+        return False
 
     def _attach(self, run: Run, handle: Any) -> None:
         with self._lock:
@@ -341,13 +382,17 @@ class PipelineRunner:
             ensure=ensure,
         )
         try:
-            self.engine.submit(op)
+            future = self.engine.submit(op)
         except OperationRefused as refused:
             log.info("Run %s arrêté : %s", run.key, refused.reason_text)
             with self._lock:
                 run.awaiting.discard(job_id)
                 self._cancel(run)
             return False
+        if result is not None:
+            # Refusée à l'exécution (autre `epoch`) ou abandonnée à la mise en veille, l'opération
+            # ne passe pas par son corps : le résultat est réglé quand même.
+            future.add_done_callback(lambda _done: self.settle(run, job_id))
         return True
 
     def git(self) -> Git:
@@ -465,7 +510,9 @@ def _rerun_refusal(engine: WorkspaceEngine, body: CheckRerun) -> str:
     check = next((c for c in pr.checks if c.job_id == body.job_id), None)
     if check is None:
         return f"La PR n°{body.number} n'a pas de check « {body.job_id} »."
-    if check.state in PENDING_STATES:
+    if check.state in PENDING_STATES and runner.covers(
+        body.number, pr.head_sha, pr.base_sha, body.job_id
+    ):
         return f"Le check « {body.job_id} » est déjà en attente ou en cours."
     return ""
 
@@ -503,7 +550,41 @@ def build_check_rerun(engine: WorkspaceEngine, body: CheckRerun) -> Operation:
     return Operation("check_rerun", run, writes=False, validate=False)
 
 
+# --- Intention check_output_seen ---------------------------------------------------------------
+
+
+def build_check_output_seen(engine: WorkspaceEngine, body: CheckRerun) -> Operation:
+    """« Voir la sortie » d'un check du pipeline : la preuve `evidence_seen` de sa barrière
+    (`barrier` de `content/pipeline.yaml`) est soumise, si le check a un résultat pour les SHA
+    courants de la PR. Sinon rien : l'ouverture d'une sortie n'est jamais refusée."""
+
+    def run(ctx: OpContext) -> int:
+        runner = RUNNERS.get(engine.workspace_id)
+        if runner is None or not runner._enabled():
+            return 0
+        try:
+            job = ci.load_pipeline(engine.settings).job(body.job_id)
+            pr = github_sim.load(ctx.layout).pull(body.number)
+        except (ci.PipelineError, GithubSimError):
+            return 0
+        if job is None or not job.barrier or pr is None:
+            return 0
+        check = next((c for c in pr.checks if c.job_id == body.job_id), None)
+        if (
+            check is None
+            or check.state in PENDING_STATES
+            or (check.head_sha, check.base_sha) != (pr.head_sha, pr.base_sha)
+        ):
+            return 0
+        ctx.submit_evidence(job.barrier)
+        return 0
+
+    return Operation("check_output_seen", run, writes=False, validate=False)
+
+
 def register_intents() -> None:
-    """Enregistre `check_rerun` (idempotent)."""
+    """Enregistre `check_rerun` et `check_output_seen` (idempotent)."""
     if "check_rerun" not in INTENTS:
         register_intent(Intent("check_rerun", CheckRerun, build_check_rerun))
+    if "check_output_seen" not in INTENTS:
+        register_intent(Intent("check_output_seen", CheckRerun, build_check_output_seen))

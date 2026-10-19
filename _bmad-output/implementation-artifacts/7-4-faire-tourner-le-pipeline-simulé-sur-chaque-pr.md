@@ -36,7 +36,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.4 » ; s
 
 ## Reports
 
-- Vue Distant + PR (3.3, en intégration) : bloc `tool-output` « Voir la sortie » (sortie verbatim), ligne de détail d'un échec avec fichier:ligne en lien (constats `path`/`line`), « ⚠ Erreur de l'outil » et son texte (constat `tool_error`), bouton « Relancer le check » qui poste `check_rerun`, libellés des jobs (`label_text`). Le contrat serveur est prêt ; la preuve `evidence_seen` (champ `barrier`) se soumet à l'ouverture de la sortie.
+- ~~Vue Distant + PR~~ : livrée en revue (voir `## Revue`), libellés `label_text` non affichés (le nom du job sert d'étiquette).
 - `{osv_url}` : `create_app` ne connaît pas le port ; 8.3 passe `Settings.osv_url(port)` à `WorkspaceManager(osv_url=)`.
 - Jobs `bandit`, `pip_audit`, `quality_gate` et leurs lecteurs (`bandit_json`, `pip_audit_json`, `cyclonedx_json`, `coverage_json`, `diff_cover_json`) : 8.1, 8.3, 8.4. Le budget de 45 s du run complet se mesure en 8.4 et 9.5.
 - `pipeline_runs[]` dans l'état public de l'espace (`GET /api/ws/<id>/state`) : les runs sont gardés dans `PipelineRunner.history`, pas encore exposés.
@@ -48,3 +48,23 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.4 » ; s
 2. gitleaks provisionné (installeur) : `dir` sur l'arbre trouve une clé ajoutée par la PR (8.6) et passe sur l'arbre propre.
 3. Réseau coupé : un run avec un `uv.lock` modifié crée son environnement depuis le cache préchargé.
 4. Recommencer pendant un run long sous Windows : `ci/` est vidé sans erreur de verrou.
+
+## Revue
+
+Revue Opus (une passe), après rebase sur `origin/main` (3.3, 3.5, 6.5, 2.9 : aucun conflit).
+
+| Sévérité | Source | Constat | Suite |
+|---|---|---|---|
+| high | revue | Front manquant des critères (3.3 désormais sur main) : « Voir la sortie », fichier:ligne liés, « ⚠ Erreur de l'outil » et son texte, « Relancer le check », preuve `evidence_seen`. | Corrigé : `CheckRow` gagne `output_text`, `output_spans` (liens du `Linker`), `details`, `tool_error_text`, `can_rerun`, `output_element_id` ; `remote.js` déplie `tool-output` (désignable, `data-roving`, gardé déplié entre deux dessins), lignes de détail liées, Relancer → `check_rerun` ; nouvelle intention `check_output_seen` (preuve de la barrière, une fois par sortie ouverte). Tests DOM et projection. |
+| medium | second avis M1 | Erreur interne dans `_execute` : le job courant restait « connu » d'un run fini, ses checks `queued`/`running` sans run, « Relancer » refusé. | Corrigé : `_fail_remaining` écrit les jobs non faits en erreur de l'outil (« erreur interne », état terminal) ; `check_rerun` admis pour un check en attente qu'aucun run vivant ne couvre (`covers`). Le refus à la soumission (`OperationRefused`) est déjà suivi d'un scan (opération qui change l'`epoch`, ou file pleine qui se vide) : pas de blocage. |
+| medium | second avis M1 | `test_un_nouveau_sha_annule_le_run…` instable. | Corrigé : le test changeait l'outil avant que le ruff lent soit lancé (le check passe à `running` avant le lancement) ; l'ancien run pouvait finir avant le push. Attente du lancement ajoutée (et dans le test Recommencer). 5 passages de `test_pipeline.py` verts. |
+| medium | second avis M2 | Exécution machine sans résultat : échec sans détail. | Corrigé : constat `no_detail` (info) qui renvoie à la sortie de l'outil. pytest code 5 : sortie humaine « no tests ran » visible, laissé tel quel. |
+| medium | second avis M3 | Code de l'apprenant exécuté sans bac à sable. | Partiellement corrigé : le clone du run n'a plus de remote (`git remote remove origin`), un test ne pousse plus dans `origin.git` hors file. Le reste est reporté (décision pour Anaël) : même modèle de confiance que le terminal 7.2 (l'apprenant lance déjà son code), environnement hors ligne et réduit, `cwd` = arbre du run ; un vrai confinement d'écriture (hors `ci/`) demande un mécanisme par OS hors du périmètre. |
+| low | second avis L4 | Délais uv sync 600 s, git sans délai. | Rejeté : git est borné par `git_timeout_s` (30 s) ; `uv sync` reçoit `on_start`, donc `terminate` à l'annulation. |
+| low | second avis L5 | Sortie sans borne écrite dans `github.json`. | Corrigé : `ci.bound_output` (60 000 caractères, début et fin gardés, milieu signalé). La sortie entre aussi dans la vue projetée. |
+| low | second avis L6 | Aucun scénario `pipeline: true`. | Reporté à 7.5 (déjà dans les reports). |
+| low | second avis L7 | `StaleOperation` à l'exécution : `settle` non appelé. | Corrigé : `settle` aussi par `add_done_callback` du futur (refus à l'exécution, abandon à la veille). |
+| low | second avis L8 | Coût du scan après chaque opération. | Rejeté : lecture de `run.json`, `pipeline.yaml`, `github.json`, puis O(PR × jobs) ; rien ne grossit avec l'historique (`history` borné à 20). |
+| info | revue | Complexité : 0 constat (structures du runner bornées ou réglées à chaque scan). | — |
+| info | revue | `can_rerun` vaut aussi pour un check déclaré en erreur par un scénario sans pipeline : le serveur refuse alors en 409 avec « Le pipeline simulé ne tourne pas dans ce scénario. ». | Accepté (la projection ne connaît pas le scénario). |
+| décision | revue | `check_output_seen` ajoute une intention au catalogue fixé par AD-17. | À valider par Anaël (alternative : preuve à l'écriture du résultat, sans intention). |
