@@ -45,3 +45,15 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.5 » ; s
 1. Windows, macOS, Linux : le scénario `check-en-echec` joué avec les vrais ruff, pytest et gitleaks (pytest échoue sur le test du scénario, passe après correction) ; la durée du run reste sous le budget (7.4).
 2. `pr-sans-revue` : le bouton « Demander une revue » devient actif quand le dernier check passe au vert, et la réponse du collègue (commentaire puis approbation) apparaît dans le journal.
 3. `push-direct-main` : la sortie réelle du hook s'affiche sur les trois OS (le chemin `core.hooksPath` relatif de `origin.git`), suivie de la phrase de l'application.
+
+## Revue
+
+Revue Opus du 2026-10-19, après rebase sur `main` (seul conflit : `content/fingerprints.json`, version de `main` reprise puis régénérée : six ajouts, aucune autre empreinte modifiée, stable sur deux exécutions).
+
+- **High** · second avis 1 · corrigé : les trois scénarios de station 2 manquaient dans `STATION_ORDER` (rang des scénarios hors ordre, avant les stations : « Scénario suivant » et ordre du rapport faussés ; la garde `test_scenarios_de_station_livres_figurent_dans_l_ordre_conseille` et `test_section_stations_rangee_par_station`, qui supposait un seul groupe, cassaient). Ids ajoutés dans `scenarios/order.py`, test adapté à deux stations.
+- **Medium** · second avis 2 · corrigé : conflits du rebase et empreintes (ci-dessus).
+- **Medium** · second avis 3 · rejeté, décision consignée : `lire_le_blocage` et `constater_la_revue_manquante` se valident sur l'état (check en échec sur les SHA courants, `mergeable: false`, zéro approbation). Aucun autre chemin que celui enseigné n'atteint cet état (il faut pousser la branche non corrigée et ouvrir la PR) ; la leçon 6.2 vise les raccourcis, pas les étapes d'observation. Exiger « Voir la sortie » ferait dépendre l'étape d'un geste d'interface (`check_output_seen` ne valide pas, `validate=False`) et bloquerait l'apprenant qui lit la raison sous « Merger » sans ouvrir la sortie. La preuve `tests` reste soumise par « Voir la sortie ». À trancher par Anaël s'il veut une preuve de lecture.
+- **Low** · second avis 4 · rejeté : la preuve `review` est soumise par `pr_request_review` dans l'opération même qui écrit la revue du collègue et réannonce la PR : la réponse est à l'écran au moment de la preuve.
+- **Low** · second avis 5 · rejeté : `_reaches_hook` (3.5, hors diff) rend vrai sans ref distante ; une création de `main` protégée est elle aussi refusée par le hook, l'explication reste juste.
+- **Low** · second avis 6 · reporté (décision Anaël) : approbation conditionnée au clic « Demander une revue » (voir Décisions et Reports).
+- Complexité : 0 constat (`pending_request` parcourt réactions × déclenchements par PR à chaque projection, tailles bornées par le scénario).
