@@ -32,7 +32,7 @@ from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.registry import load_registry
 from wavedevsecops.wsfs import Layout
 
-Parse = Literal["ruff_json", "junit", "gitleaks_json"]
+Parse = Literal["ruff_json", "junit", "gitleaks_json", "bandit_json"]
 """Lecteurs de constats livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent."""
 
 TOKENS = frozenset({"repo", "base_sha", "osv_url", "report"})

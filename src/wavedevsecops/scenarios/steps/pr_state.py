@@ -9,12 +9,14 @@ n'existe pas encore ou qui n'a pas l'état attendu donne `pending` (rien à dire
 from __future__ import annotations
 
 import logging
+import re
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from wavedevsecops import github_sim
 from wavedevsecops.contracts import RepoState
+from wavedevsecops.contracts.github import JOB_ID_PATTERN, PullRequest
 from wavedevsecops.scenarios.steps._base import StepArgs, StepContext, Verdict
 
 log = logging.getLogger("wavedevsecops")
@@ -29,6 +31,31 @@ class Args(StepArgs):
     """État attendu de la PR."""
     min_approvals: int = Field(default=0, ge=0)
     """Approbations au moins attendues."""
+    checks: dict[str, Literal["success", "failure"]] = Field(default_factory=dict)
+    """État attendu de checks de la PR, par `job_id` : lu sur les SHA courants de la PR (un
+    check calculé pour un ancien SHA ne compte pas). Le résultat vient du pipeline, jamais
+    d'une saisie de l'apprenant."""
+
+    @field_validator("checks")
+    @classmethod
+    def _jobs(cls, value: dict[str, str]) -> dict[str, str]:
+        for job in value:
+            if not re.fullmatch(JOB_ID_PATTERN, job):
+                raise ValueError(f"job_id invalide : « {job} »")
+        return value
+
+
+def _checks_match(pr: PullRequest, expected: dict[str, str]) -> bool:
+    return all(
+        any(
+            c.job_id == job
+            and c.state == state
+            and c.head_sha == pr.head_sha
+            and c.base_sha == pr.base_sha
+            for c in pr.checks
+        )
+        for job, state in expected.items()
+    )
 
 
 def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
@@ -47,6 +74,7 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
             and pr.base == step.base
             and pr.state == step.pr_state
             and pr.approvals >= step.min_approvals
+            and _checks_match(pr, step.checks)
         ):
             return Verdict(status="passed")
     return Verdict(status="pending")

@@ -113,9 +113,34 @@ def parse_gitleaks_json(text: str, tree: Path) -> list[Finding]:
     return found
 
 
+def parse_bandit_json(text: str, tree: Path) -> list[Finding]:
+    """`bandit -f json` : un constat par résultat (règle `test_id`, fichier, ligne)."""
+    try:
+        data = json.loads(text or "{}")
+    except ValueError:
+        raise ValueError("la sortie machine de bandit est illisible") from None
+    if not isinstance(data, dict) or not isinstance(data.get("results", []), list):
+        raise ValueError("la sortie machine de bandit est inattendue")
+    found = []
+    for item in data.get("results", []):
+        if not isinstance(item, dict):
+            continue
+        found.append(
+            Finding(
+                rule_id=_short(item.get("test_id")),
+                severity="error",
+                message_text=_short(item.get("issue_text")),
+                path=relative_posix(str(item.get("filename") or ""), tree),
+                line=_line(item.get("line_number")),
+            )
+        )
+    return found
+
+
 PARSERS: dict[str, Callable[[str, Path], list[Finding]]] = {
     "ruff_json": parse_ruff_json,
     "junit": parse_junit,
     "gitleaks_json": parse_gitleaks_json,
+    "bandit_json": parse_bandit_json,
 }
 """Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée."""

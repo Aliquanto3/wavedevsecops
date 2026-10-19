@@ -40,7 +40,7 @@
 #
 # Lecteurs `parse` livrés : ruff_json (`ruff check --output-format json`), junit (rapport
 # `--junitxml` de pytest : fichier du test en échec), gitleaks_json (`--report-format json`).
-# 8.1 ajoute bandit_json, 8.3 pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
+# 8.1 a livré bandit_json ; 8.3 ajoute pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
 # diff_cover_json : un lecteur par format, dans `ci/findings.py`, et sa valeur dans `ci.Parse`.
 schema_version: 1
 jobs:
@@ -79,3 +79,16 @@ jobs:
       - argv: [dir, --no-banner, --redact, --exit-code, "3", --report-format, json, --report-path, "{report}", .]
         parse: gitleaks_json
     exit_codes: {success: [0], failure: [3]}
+
+  - job_id: bandit
+    label_text: Analyse de sécurité (bandit)
+    tool: bandit
+    required: true
+    barrier: static-analysis
+    # `-r src` analyse le code de l'application, pas les tests (leurs `assert` sont attendus) ;
+    # `-q` retire les lignes d'information de bandit. Il sort 1 quand il trouve un défaut.
+    human: [-r, src, -q]
+    machine:
+      - argv: [-r, src, -q, -f, json]
+        parse: bandit_json
+    exit_codes: {success: [0], failure: [1]}
