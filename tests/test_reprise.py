@@ -13,10 +13,12 @@ import pytest
 
 from wavedevsecops import cli, wsfs
 from wavedevsecops.config import Settings
+from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.resume import check_resume
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.engine.workspace import prepare_workspace
-from wavedevsecops.progress.facts import ProgressStore
+from wavedevsecops.gitio import Git
+from wavedevsecops.progress.facts import RESTART_KIND, ProgressStore
 from wavedevsecops.scenarios import load_scenario
 from wavedevsecops.web.catalogue import catalogue_body
 from wavedevsecops.wsfs import Layout
@@ -95,7 +97,7 @@ def test_reprise_possible_donne_l_etape_n_sur_total(
 ) -> None:
     loaded, layout = prepared
     _at_step(layout, "commiter")
-    check = check_resume(layout, loaded, settings, git_path)
+    check = check_resume(layout, loaded)
     assert (check.can_resume, check.step_number, check.step_total, check.reason) == (
         True,
         2,
@@ -112,7 +114,8 @@ def test_reprise_possible_donne_l_etape_n_sur_total(
         ("hash", "content_changed"),
         ("step", "step_unknown"),
         ("restore_failed", "broken"),
-        ("no_git", "fingerprint"),
+        ("no_git", "repo_broken"),
+        ("no_step_key", "run_unreadable"),
     ],
 )
 def test_reprise_refusee(
@@ -130,10 +133,30 @@ def test_reprise_refusee(
         _at_step(layout, "disparue")
     elif alter == "restore_failed":
         save_run(layout, {**load_run(layout), "restore_failed": {"reason_text": "x"}})
+    elif alter == "no_step_key":
+        run = load_run(layout)
+        del run["step_id"]
+        save_run(layout, run)
     else:
         wsfs.remove_tree(layout.repo / ".git")
-    check = check_resume(layout, loaded, settings, git_path)
+    check = check_resume(layout, loaded)
     assert check.can_resume is False and check.reason == reason
+
+
+def test_modification_externe_du_depot_n_empeche_pas_la_reprise(
+    settings: Settings, git_path: Path, prepared
+) -> None:
+    """AD-6 : un dépôt modifié hors de l'application entre deux séances reste repris ;
+    l'empreinte est recalculée à l'ouverture et l'écart suivi comme un changement externe."""
+    loaded, layout = prepared
+    _at_step(layout, "commiter")
+    git = Git.for_workspace(git_path, layout.root, settings)
+    before = fingerprint(layout, git)
+    (layout.repo / "hors-application.txt").write_text("modifié ailleurs\n", encoding="utf-8")
+    git.internal("add", "hors-application.txt", cwd=layout.repo)
+    assert fingerprint(layout, git) != before
+    check = check_resume(layout, loaded)
+    assert (check.can_resume, check.step_number, check.reason) == (True, 2, "")
 
 
 def test_scenario_termine_n_offre_pas_de_reprise(
@@ -141,7 +164,7 @@ def test_scenario_termine_n_offre_pas_de_reprise(
 ) -> None:
     loaded, layout = prepared
     _at_step(layout, None)
-    check = check_resume(layout, loaded, settings, git_path)
+    check = check_resume(layout, loaded)
     assert check.offered is False
 
 
@@ -260,7 +283,8 @@ def test_api_ouvrir_reprendre_et_recommencer(instance: cli.Instance, settings: S
     blocked = body["sections"][0]["scenarios"][0]["modes"][0]["resume"]
     assert blocked["can_resume"] is False and blocked["restart_text"] == "Recommencer"
 
-    # Recommencer reconstruit l'espace à la première étape.
+    # Recommencer passe par l'intention `restart` de la 4.4 : l'espace est reconstruit à la
+    # première étape et la remise est consignée (rapport 6.5), sans toucher au premier passage.
     status, _ = _call(instance, "POST", "/api/open", {**open_body, "restart": True})
     assert status == 202
     deadline = time.monotonic() + WAIT_S
@@ -275,3 +299,16 @@ def test_api_ouvrir_reprendre_et_recommencer(instance: cli.Instance, settings: S
     time.sleep(0.5)
     status, body = _call(instance, "GET", "/api/catalogue?track=no_ai")
     assert body["sections"][0]["scenarios"][0]["modes"][0]["resume"]["text"] == "Étape 1 sur 3"
+    deadline = time.monotonic() + WAIT_S
+    while True:  # le fait est consigné après la reconstruction, dans la même opération
+        data = json.loads((settings.resolved_data_dir() / "progress.json").read_text("utf-8"))
+        resets = [f for f in data.get("facts", []) if f.get("kind") == RESTART_KIND]
+        if resets:
+            break
+        assert time.monotonic() < deadline, data.get("facts")
+        time.sleep(0.1)
+    assert (resets[0]["track"], resets[0]["scenario_id"], resets[0]["mode"]) == (
+        "no_ai",
+        "add-commit",
+        "A",
+    )

@@ -36,8 +36,8 @@ from wavedevsecops.engine import (
     parse_workspace_id,
     workspace_id_for,
 )
+from wavedevsecops.engine.restart import Restart, build_restart
 from wavedevsecops.engine.resume import CANNOT_RESUME_TEXT, ResumeCheck, check_resume
-from wavedevsecops.engine.workspace import resolve_git
 from wavedevsecops.progress import report as progress_report
 from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
@@ -368,7 +368,7 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
             layout = Layout.for_scenario(
                 settings.workspaces_path(), track, scenario.scenario_id, scenario.mode
             )
-            resume = resume_body(check_resume(layout, loaded, settings, resolve_git(settings)))
+            resume = resume_body(check_resume(layout, loaded))
             if resume is not None:
                 mode["resume"] = resume
         if missing is not None:
@@ -482,11 +482,7 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
         workspace_id = workspace_id_for(track, loaded.scenario.key)
         restart = body.get("restart") is True
         if body.get("resume") is True and not restart:
-            check = await asyncio.to_thread(
-                lambda: check_resume(
-                    manager.layout(workspace_id), loaded, settings, resolve_git(settings)
-                )
-            )
+            check = await asyncio.to_thread(check_resume, manager.layout(workspace_id), loaded)
             if not check.can_resume:
                 return _refusal(409, f"{CANNOT_RESUME_TEXT} Recommencez le scénario.")
 
@@ -501,10 +497,19 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 if pending is not None and not pending.done():
                     return True
                 preparing.pop(workspace_id, None)
-                if manager.layout(workspace_id).root.is_dir() and not restart:
+                exists = manager.layout(workspace_id).root.is_dir()
+                if exists and restart:
+                    # « Recommencer » de l'encart : la même intention `restart` que dans
+                    # l'espace (4.4), placée dans sa file derrière une éventuelle reprise de
+                    # restauration ; elle garde les faits du premier passage et consigne
+                    # `scenario_reset`.
+                    engine = manager.get(workspace_id)
+                    preparing[workspace_id] = engine.submit(build_restart(engine, Restart()))
+                    return True
+                if exists:
                     manager.get(workspace_id)
                     return False
-                _engine, future = manager.create(loaded, track, replace=restart)
+                _engine, future = manager.create(loaded, track)
                 preparing[workspace_id] = future
                 return True
 

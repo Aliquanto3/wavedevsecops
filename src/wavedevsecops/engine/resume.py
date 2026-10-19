@@ -1,25 +1,25 @@
 """Reprise d'un scénario là où l'apprenant l'a laissé (Story 6.4, AD-5, AD-6, AD-20).
 
-`check_resume` lit l'espace conservé sans le modifier : `run.json` (étape courante,
-`content_hash`), puis l'état du dépôt (empreinte recalculée, AD-6). Il ne rouvre rien et ne
-recrée rien : « Reprendre » rouvre l'espace existant.
+`check_resume` lit l'espace conservé sans le modifier ni lancer git : `run.json` (étape
+courante, `content_hash`, restauration en échec). Il ne rouvre rien et ne recrée rien :
+« Reprendre » rouvre l'espace existant.
+
+L'empreinte n'est pas comparée ici. AD-6 : l'empreinte d'un espace repris est recalculée à
+l'ouverture (projection d'ouverture du moteur), et un écart avec la dernière projection est
+un « changement externe » que les vues suivent (2.9), pas un motif de refus : l'apprenant a
+le droit de travailler dans son dépôt hors de l'application entre deux séances. Calculer
+l'empreinte à chaque affichage du catalogue coûterait un parcours complet du dépôt, et un
+verrou git passager (`index.lock`) y donnerait un faux refus.
 """
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from pathlib import Path
 
-from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
-from wavedevsecops.engine.fingerprint import fingerprint
 from wavedevsecops.engine.runfile import load_run
-from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios import LoadedScenario
 from wavedevsecops.wsfs import Layout
-
-log = logging.getLogger("wavedevsecops")
 
 CANNOT_RESUME_TEXT = "Ce scénario ne peut pas reprendre là où vous l'aviez laissé."
 
@@ -32,8 +32,8 @@ class ResumeCheck:
     step_number: int = 0
     step_total: int = 0
     reason: str = ""
-    """`workspace_missing`, `run_unreadable`, `content_changed`, `step_unknown`, `broken`,
-    `finished` ou `fingerprint` ; vide si la reprise est possible."""
+    """`workspace_missing`, `repo_broken`, `run_unreadable`, `content_changed`, `step_unknown`,
+    `broken` ou `finished` ; vide si la reprise est possible."""
 
     @property
     def offered(self) -> bool:
@@ -41,19 +41,24 @@ class ResumeCheck:
         return self.reason != "finished"
 
 
-def check_resume(
-    layout: Layout, loaded: LoadedScenario, settings: Settings, git_path: Path
-) -> ResumeCheck:
-    """Contrôle de la reprise de `loaded` dans l'espace `layout` (lecture seule)."""
+def check_resume(layout: Layout, loaded: LoadedScenario) -> ResumeCheck:
+    """Contrôle de la reprise de `loaded` dans l'espace `layout` (lecture seule, sans git)."""
     total = len(loaded.scenario.steps)
     if not layout.root.is_dir() or not layout.repo.is_dir():
         return ResumeCheck(False, 0, total, "workspace_missing")
+    if not (layout.repo / ".git").exists() or not layout.origin.is_dir():
+        # Le setup crée toujours `repo/.git` et `origin.git/` : sans eux, le bac à sable n'est
+        # plus celui du scénario (contrôle structurel, sans lancer git).
+        return ResumeCheck(False, 0, total, "repo_broken")
     try:
         run = load_run(layout)
     except AppError:
         return ResumeCheck(False, 0, total, "run_unreadable")
+    if "step_id" not in run:
+        return ResumeCheck(False, 0, total, "run_unreadable")
     step_id = run.get("step_id")
     if not step_id:
+        # `step_id: null` : la dernière étape est validée, le scénario est terminé.
         return ResumeCheck(False, total, total, "finished")
     if run.get("content_hash") != loaded.content_hash:
         return ResumeCheck(False, 0, total, "content_changed")
@@ -63,11 +68,4 @@ def check_resume(
     number = ids.index(step_id) + 1
     if run.get("restore_failed") or run.get("restoring"):
         return ResumeCheck(False, number, total, "broken")
-    try:
-        # AD-6 : l'empreinte est recalculée à la reprise ; un dépôt qui ne se lit plus l'écarte.
-        if not fingerprint(layout, Git.for_workspace(git_path, layout.root, settings)):
-            return ResumeCheck(False, number, total, "fingerprint")
-    except Exception as error:  # noqa: BLE001 - tout échec de lecture de l'état écarte la reprise
-        log.warning("Empreinte illisible à la reprise (%s) : %s", layout.root, error)
-        return ResumeCheck(False, number, total, "fingerprint")
     return ResumeCheck(True, number, total)

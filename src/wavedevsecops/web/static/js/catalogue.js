@@ -5,6 +5,7 @@
 // que ce que dit le serveur (AD-2) : ordre, états, textes et disponibilité viennent de
 // `GET /api/catalogue?track=…`.
 import { el } from "./dom.js";
+import { restartFoot } from "./restart.js";
 
 export const NO_SCENARIO_TEXT = "Aucun scénario n'est déclaré dans cette installation.";
 
@@ -126,12 +127,33 @@ function modeColumn(scenario, mode, onOpen) {
       const note = el("p", "scenario-mode-blocked", { role: "status" });
       note.textContent = resume.blocked_text;
       column.append(note);
-      action(
-        resume.restart_text,
-        `${resume.restart_text} ${scenario.title} en mode ${mode.mode}`,
-        { restart: true },
-        { attrs: { "data-action": "restart" } },
-      );
+      // « Recommencer » passe par la confirmation en ligne de la 4.4 avant de remettre à zéro.
+      const slot = el("div", "scenario-mode-restart", { "data-mode": mode.mode });
+      const show = (confirming, focus) => {
+        const foot = restartFoot({
+          confirming,
+          onAsk: () => show(true, true),
+          onCancel: () => show(false, true),
+          onConfirm: async () => {
+            alert.textContent = "";
+            try {
+              await onOpen(scenario, mode, { restart: true });
+            } catch (err) {
+              alert.textContent = err.message;
+            }
+          },
+        });
+        const ask = foot.querySelector('button[data-action="restart-ask"]');
+        if (ask) {
+          ask.textContent = resume.restart_text;
+          ask.setAttribute("aria-label", `${resume.restart_text} ${scenario.title} en mode ${mode.mode}`);
+        }
+        slot.replaceChildren(foot);
+        const target = ask || foot.querySelector('button[data-action="restart-cancel"]');
+        if (focus && target && typeof target.focus === "function") target.focus();
+      };
+      show(false, false);
+      actions.push(slot);
     }
   }
   if (!resume || resume.can_resume) {
