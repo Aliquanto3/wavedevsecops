@@ -396,6 +396,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:33 · 7.3 · second-avis · lancé ; aucun créneau de dev ouvert faute d'éligible sans conflit (6.3 attend 6.2, 5.4 attend 5.5, 7.5/7.6/8.1 attendent 7.4, 9.4 attend 2.10) · —
 - 2026-10-19 04:34 · 6.2 · fusion · CI branche verte (run complet success), commit de fusion sur main, story done ; 6.3 éligible ; identifiants du socle toujours à valider par Anaël (renommage mécanique si besoin) · 817360c
 - 2026-10-19 04:34 · 6.3 · dev · lancé (dev-story Sonnet ; modèle 6.2, identifiants conflit, stash, rebase, recuperation) · —
+- 2026-10-19 04:37 · 7.3 · second-avis · 1 high (secret affiché en clair : pre-commit run sans --redact, test tautologique), 3 medium (--no-verify admis et étape validée quand même, config pre-commit supprimable ou vidée, repo distant dans la config → git clone hors garde réseau), 3 low ; reviewer Opus lancé · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
