@@ -386,6 +386,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:09 · 9.3 · dev · lancé (dev-story Sonnet ; section Stations du catalogue, attendue par 7.2) ; 5.4 attend 5.5 · —
 - 2026-10-19 04:14 · 6.4 · dev · fini, 1277 passed / 46 skipped, CI verte ; last_opened dans progress.json, engine/resume.py check_resume, Reprendre ou encart dans le catalogue, POST /api/open avec resume ou restart ; restart de l'encart sans scenario_reset (à aligner sur 4.4) · ff14fb5
 - 2026-10-19 04:14 · 6.4 · second-avis · lancé ; créneau gardé pour 6.3 dès la fusion de 6.2, 5.4 attend 5.5 · —
+- 2026-10-19 04:19 · 2.10 · second-avis · aucun high, 3 medium (conflit workspace.js, arêtes sans retour pour une sortie d'outil, Tab ne ferme pas le popover), 7 low (taille des DiffLine, explications trop affirmatives, EXPLAIN_PATH appliqué aux non suivis…) ; reviewer Opus lancé · —
+- 2026-10-19 04:19 · 6.4 · second-avis · 2 high (empreinte jamais comparée : sha256 toujours vrai, dépôt modifié accepté ; Recommencer de l'encart hors de la remise 4.4 : ni scenario_reset, ni vérification, ni restoring), 2 medium (faux refus sur git concurrent, resolve_git hors try), 3 low ; reviewer Opus lancé · —
+- 2026-10-19 04:19 · — · outillage · quota API GitHub atteint un moment par les gh run watch en parallèle (403) ; attentes de CI relancées avec --interval 60 ; consigne aux agents à ajouter · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
