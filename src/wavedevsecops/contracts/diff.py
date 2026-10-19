@@ -31,6 +31,8 @@ class DiffLine(_Model):
     """« Ligne ajoutée 12 : texte » : le marqueur « + » / « − » n'est pas la seule information."""
     conflict: bool = False
     """Marqueur de conflit (`<<<<<<<`, `=======`, `>>>>>>>`), à rendre visible."""
+    links: list[str] = []
+    """`element_id` liés (story 2.10) : le commit du diff et le fichier, dans ses trois zones."""
 
 
 class DiffHunk(_Model):
@@ -53,6 +55,10 @@ class DiffFile(_Model):
     summary_text: str
     """« modifié · +3 −1 », « nouveau fichier · +3 −0 »…"""
     a11y_name_text: str
+    explain_ref: str = ""
+    """Clé de `content/explanations.yaml` (story 2.10)."""
+    links: list[str] = []
+    """`element_id` liés : le commit du diff et le fichier dans les autres zones."""
     hunks: list[DiffHunk] = []
 
 

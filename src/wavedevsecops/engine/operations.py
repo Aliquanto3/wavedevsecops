@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
+from wavedevsecops.contracts.views import EXPLAIN_TOOL_OUTPUT
 from wavedevsecops.engine.runfile import load_run, save_run
 from wavedevsecops.events import (
     SEQUENCE_KINDS,
@@ -204,7 +205,14 @@ class OpContext:
         resolved = spans if spans is not None else (linker(text) if linker is not None else [])
         envelope = self._engine.publish(
             Kind.TERMINAL_OUTPUT,
-            TerminalOutput(stream=stream, text=text, lang=lang, spans=resolved, tool=tool),  # type: ignore[arg-type]
+            TerminalOutput(
+                stream=stream,
+                text=text,
+                lang=lang,
+                spans=resolved,  # type: ignore[arg-type]
+                tool=tool,
+                explain_ref=EXPLAIN_TOOL_OUTPUT if tool else "",
+            ),
             op_id=self.op_id,
         )
         if not fixed:

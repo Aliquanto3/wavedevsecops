@@ -309,3 +309,23 @@ console.log(JSON.stringify({ stale, typed: [slotText(), $(".sha-error").textCont
     assert "Aucun élément choisi" in out["typed"][0]
     assert out["typed"][1] == "Cette question n'attend pas de commit."
     assert out["typed"][2] == "true"
+
+
+def test_la_liaison_entre_vues_ne_gene_pas_le_mode_designer(tmp_path: Path) -> None:
+    """Story 2.10 : survol et focus montrent les liens, le clic armé désigne sans sélectionner."""
+    out = _js(
+        tmp_path,
+        """
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 2, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: { ...VIEWS, links: { [C]: [A] }, names: { [C]: "commit ccccccc", [A]: "commit aaaaaaa" } }, step_panel: PANEL });
+await tick();
+const nodes = () => $$(".graph-node");
+$(".designate-button").click();
+nodes()[0].dispatchEvent(makeEvent("pointerover"));
+const hovered = { armed: workspace().classList.contains("is-designating"), linked: nodes().map((n) => n.classList.contains("is-linked")) };
+nodes()[0].click();   // armé : désigne C, ne sélectionne rien
+console.log(JSON.stringify({ hovered, slot: slotText(), selection: selectionFor(store).value }));
+""",
+    )
+    assert out["hovered"] == {"armed": True, "linked": [True, False, True]}
+    assert "ccccccc" in out["slot"] and out["selection"] is None

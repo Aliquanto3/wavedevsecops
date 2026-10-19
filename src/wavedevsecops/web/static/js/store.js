@@ -221,6 +221,7 @@ export function createStore() {
           lang: payload.lang || "",
           // Bloc `tool-output` : nom de l'outil et liens fichier:ligne du serveur (AD-10).
           tool: payload.tool || "",
+          explain: payload.explain_ref || "", // clé d'explication du bloc (story 2.10)
           spans: payload.spans || [],
           opId: envelope.op_id || "",
         });

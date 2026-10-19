@@ -59,6 +59,12 @@ export function splitSpans(text, spans) {
   return parts;
 }
 
+/** Note sur un nœud les éléments que ses passages liables citent (`terminal-lit`, story 2.10). */
+function markSpans(node, spans) {
+  const ids = [...new Set((spans || []).map((span) => span.element_id))];
+  if (ids.length) node.setAttribute("data-span-ids", ids.join(" "));
+}
+
 /** Bloc `tool-output` (UX-DR20) : sortie verbatim, étiquette au nom de l'outil, désignable. */
 function toolOutputNode(entry, selection) {
   const block = el("div", "tool-output", {
@@ -69,6 +75,8 @@ function toolOutputNode(entry, selection) {
   });
   const outputId = entry.opId ? `output:${entry.opId}` : "";
   if (outputId) block.setAttribute("data-element-id", outputId);
+  if (entry.explain) block.setAttribute("data-explain-ref", entry.explain);
+  markSpans(block, entry.spans);
   const label = el("span", "tool-output-label", { "aria-hidden": "true" });
   label.textContent = entry.tool;
   const body = el("pre", "tool-output-text");
@@ -135,6 +143,7 @@ function entryNode(entry, selection) {
   }
   const chunk = el("span", `terminal-chunk terminal-${entry.kind === "stderr" ? "stderr" : "stdout"}`);
   if (entry.lang === "en") chunk.setAttribute("lang", "en");
+  markSpans(chunk, entry.spans);
   if (entry.kind === "stderr") {
     const prefix = el("span", "visually-hidden");
     prefix.textContent = "erreur standard : ";

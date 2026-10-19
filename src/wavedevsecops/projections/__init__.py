@@ -23,6 +23,7 @@ from wavedevsecops.contracts import (
 )
 from wavedevsecops.gitio import Git
 from wavedevsecops.projections.graph import Layout, place
+from wavedevsecops.projections.links import annotate
 from wavedevsecops.projections.remote import announce_remote, build_remote, previous_remote
 from wavedevsecops.projections.spans import Linker
 from wavedevsecops.projections.state import read_repo_state
@@ -105,6 +106,7 @@ def project(
             "announce_text": f"{views.announce_text} {news}".strip(),
         }
     )
+    views = annotate(views)
     return Projected(views, linker)
 
 
