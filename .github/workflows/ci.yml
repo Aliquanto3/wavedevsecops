@@ -71,8 +71,11 @@ jobs:
           WDS_EXERCISE_UV: "1"
           WDS_EXERCISE_DATA: ${{ runner.temp }}/wds-exercise
 
-      # AD-13, contrôle (4) : la suite de scénarios rejouée sans réseau, sous-processus
-      # (git) compris. L'espace de noms est créé par root, les tests tournent en runner.
+      # AD-13, contrôle (4) : la suite de scénarios, stations comprises, rejouée sans réseau,
+      # sous-processus (git, vrais outils de la chaîne) compris. L'espace de noms est créé par
+      # root, qui y rallume la seule boucle locale (`lo`, éteinte dans un espace neuf) : le point
+      # OSV local et le serveur de l'instance y écoutent, comme le permet le hook d'audit
+      # socket.connect. Les tests tournent ensuite en runner.
       - name: Scénarios sans réseau (unshare -n)
         if: runner.os == 'Linux'
         env:
@@ -80,13 +83,15 @@ jobs:
           WDS_EXERCISE_DATA: ${{ runner.temp }}/wds-exercise
         run: >
           sudo unshare --net --
+          sh -c 'ip link set lo up && exec "$@"' sh
           sudo -E -u "$(id -un)" env "PATH=$PATH" "HOME=$HOME"
           "WDS_EXERCISE_UV=$WDS_EXERCISE_UV" "WDS_EXERCISE_DATA=$WDS_EXERCISE_DATA"
           .venv/bin/python -m pytest -q --tb=short
           tests/test_scenarios.py tests/test_setup.py tests/test_fingerprints.py
           tests/test_exercise.py tests/test_terminal_tools.py tests/test_pipeline.py
           tests/test_scenarios_socle.py tests/test_stations_pr.py tests/test_pre_commit_hook.py
-          tests/test_code_vulnerable.py tests/test_outil_trop_puissant.py
+          tests/test_code_vulnerable.py tests/test_outil_trop_puissant.py tests/test_blockers.py
+          tests/test_dependance_vulnerable.py tests/test_quality_gate.py tests/test_llm_scenarios.py
 
       # AD-18 : les empreintes ne bougent pas sur un clone en core.autocrlf=true. Les fichiers
       # du dépôt sont réextraits avec ce réglage, puis les empreintes recomparées.

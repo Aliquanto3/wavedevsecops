@@ -20,10 +20,10 @@ La version 0.2.0 couvre le socle git et les stations 1 à 3 de la chaîne DevSec
   outils, boucle), ou un code minimal sans IA.
 - **Chaîne DevSecOps en quatre stations** (les stations 1 à 3 sont livrées en v0.2, la 4 en v0.3), avec des outils légers (ruff, pytest, pre-commit,
   gitleaks, bandit, pip-audit) : poste local, PR et CI, sécurité et qualité, livraison.
+  Jenkins, GitHub Actions, GitLab CI et Sonar sont montrés comme équivalents.
 - **Barrières de la v0.2**, chacune avec un scénario où elle bloque : gitleaks (secret), ruff et
   pytest, protection de `main` et revue obligatoire, bandit (code vulnérable), pip-audit et SBOM
   (dépendance vulnérable), `uv lock --check`, quality gate de 80 % de couverture du nouveau code.
-  Jenkins, GitHub Actions, GitLab CI et Sonar sont montrés comme équivalents.
 - **Savoir en parler à un RSSI** : scénario d'entretien et fiche barrière → risque → preuve. (v0.3)
 
 ## Installer sous Windows (sans droits administrateur)
