@@ -41,7 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # gitleaks doit être installé sur la machine qui exécute la tâche.
-      - run: gitleaks dir --no-banner --redact --exit-code 3 .
+      # `--config` et `--ignore-gitleaks-allow` : réglages de gitleaks lus hors de votre dépôt ({config} : dossier de la plateforme), donc ni un .gitleaks.toml ni un « gitleaks:allow » n'écartent un secret.
+      - run: gitleaks dir --no-banner --redact --exit-code 3 --ignore-gitleaks-allow --config '{config}/gitleaks.toml' .
   # wds:end
 
   # wds:job bandit

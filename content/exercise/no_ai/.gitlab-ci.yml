@@ -36,7 +36,8 @@ gitleaks:
   stage: gitleaks
   script:
     # gitleaks doit être installé dans l'image qui exécute la tâche.
-    - gitleaks dir --no-banner --redact --exit-code 3 .
+    # `--config` et `--ignore-gitleaks-allow` : réglages de gitleaks lus hors de votre dépôt ({config} : dossier de la plateforme), donc ni un .gitleaks.toml ni un « gitleaks:allow » n'écartent un secret.
+    - gitleaks dir --no-banner --redact --exit-code 3 --ignore-gitleaks-allow --config '{config}/gitleaks.toml' .
 # wds:end
 
 # wds:job bandit

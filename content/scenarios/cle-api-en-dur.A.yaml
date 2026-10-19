@@ -1,0 +1,169 @@
+# Station 3 (Story 8.6) : une clé d'API écrite en dur dans une PR, que gitleaks refuse. Parcours
+# LLM. La branche `feature` porte déjà un commit : la configuration du modèle contient la clé
+# du fournisseur écrite dans le code (`API_KEY`). Le pipeline simulé tourne sur la PR ; le check
+# gitleaks échoue, la PR est bloquée, puis le check repasse au vert quand la clé n'est plus dans
+# les fichiers. La clé ci-dessous est fictive (aucun fournisseur ne la reconnaît).
+schema_version: 1
+scenario_id: cle-api-en-dur
+mode: A
+title_text: Bloquer une clé d'API écrite en dur
+section: stations
+station: 3
+tracks: [llm]
+tools: [git, gitleaks]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: loop
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige le check gitleaks avant tout merge ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_checks: [gitleaks]
+  - op: switch
+    branch: feature
+    create: true
+  - op: replace_in_file
+    path: src/inventory/llm_config.py
+    old: "DEFAULT_PATH = Path(__file__).resolve().parents[2] / \"llm.toml\"\n"
+    new: "DEFAULT_PATH = Path(__file__).resolve().parents[2] / \"llm.toml\"\n\nAPI_KEY = \"m9Kq2LmT7vRb4WnZ8cYd3HsJ6pFa1GeU5xQz\"\n\"\"\"Clé du fournisseur de modèle, envoyée avec chaque appel.\"\"\"\n\nAUTH_HEADERS = {\"Authorization\": f\"Bearer {API_KEY}\"}\n"
+  - op: commit
+    message: Ajoute la clé du fournisseur de modèle
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : la configuration du modèle contient
+      désormais une clé d'API, destinée à l'en-tête de chaque appel. Poussez cette branche vers l'origine pour pouvoir
+      ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline cherchera des secrets dans les fichiers de ce commit avant qu'il
+      n'arrive sur `main`.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      analyse de sécurité du code, audit des dépendances, verrou des dépendances, puis la quality
+      gate.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi gitleaks bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check gitleaks doit passer à « Échec » et « Merger »
+      devenir inactif. Dépliez la ligne de détail du check : elle nomme le fichier, la ligne et
+      la règle. Ouvrez aussi « Voir la sortie » pour lire le rapport de gitleaks : la valeur de
+      la clé y est masquée.
+    explanation_text: >-
+      gitleaks reconnaît la forme des clés d'API, des mots de passe et des jetons dans les
+      fichiers, sans les exécuter. Une clé de fournisseur de modèle donne accès à un compte
+      facturé : écrite dans le code, elle part avec chaque clone, chaque fork et chaque copie de
+      la PR. Le check est obligatoire : tant qu'il échoue, la PR ne peut pas être mergée, et
+      `main` reste protégée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      gitleaks: failure
+    finding_has:
+      gitleaks: [generic-api-key]
+    hints:
+      lead_text: >-
+        Le check gitleaks est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        encore « En attente » ou « En cours », patientez : le pipeline passe d'abord par les
+        contrôles qui le précèdent.
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check gitleaks de la PR, puis « Voir la sortie ». Le secret
+        désigné est la clé `API_KEY` de src/inventory/llm_config.py, règle generic-api-key.
+
+  - step_id: retirer_la_cle
+    type: pr_state
+    title_text: Sortir la clé du code et faire repasser le check au vert
+    instruction_text: >-
+      Retirez la clé de `src/inventory/llm_config.py` : le code doit la lire dans l'environnement
+      (la variable `LLM_API_KEY`), jamais la contenir. Committez la correction sur `feature`, puis
+      poussez-la. Le pipeline repart sur le nouveau commit ; les tests doivent rester verts.
+    explanation_text: >-
+      Le correctif n'a pas besoin d'être validé à la main : le pipeline relance gitleaks sur le
+      nouveau commit, et le check repasse au vert de lui-même quand plus aucun fichier ne
+      contient la clé. gitleaks lit les fichiers du commit, pas l'historique : la clé reste
+      dans le commit précédent de la branche, donc une clé réellement publiée se révoque chez le
+      fournisseur, elle ne se « retire » pas. Les raccourcis ne fonctionnent pas : un
+      commentaire `gitleaks:allow` et un fichier `.gitleaks.toml` de votre dépôt sont ignorés,
+      et déplacer la clé dans un autre fichier ne la cache pas.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      gitleaks: success
+      pytest: success
+    hints:
+      lead_text: >-
+        Le code lit une valeur de configuration au lieu de la contenir : le module `os` donne
+        accès aux variables d'environnement. Corrigez, committez, puis poussez : un push sur la
+        branche de la PR relance le pipeline.
+      partial_text: >-
+        Dans llm_config.py : API_KEY = os.environ.get("___", "") (avec import os) ; puis git add,
+        git commit et git push
+      solution_text: >-
+        Dans src/inventory/llm_config.py : ajouter « import os » en tête, remplacer la clé par
+        API_KEY = os.environ.get("LLM_API_KEY", ""), puis git add, git commit et git push
+
+  - step_id: sans_exception
+    type: repo_state
+    title_text: Ne laisser aucune exception de secret
+    instruction_text: >-
+      Vérifiez que votre dépôt ne contient aucun fichier `.gitleaksignore` et que tout est
+      commité et poussé. Si vous en avez créé un pour faire taire gitleaks, supprimez-le,
+      committez et poussez.
+    explanation_text: >-
+      gitleaks lit un fichier `.gitleaksignore` à la racine du dépôt : y inscrire l'empreinte de
+      la fuite la cache sans la corriger. Cette étape attend un dépôt sans cette exception, dans
+      l'état exact que la PR a vérifié.
+    expect:
+      head:
+        at: origin/feature
+      index:
+        clean: true
+      tree:
+        absent: [.gitleaksignore]
+    hints:
+      lead_text: >-
+        Une exception de secret se range dans un fichier caché à la racine du dépôt, dont le nom
+        commence par un point.
+      partial_text: "git status ; git rm .gitleaksignore (s'il existe) ; git commit ; git push"
+      solution_text: >-
+        Si le fichier .gitleaksignore existe : git rm .gitleaksignore, git commit, git push.
+        Sinon, rien à faire : l'étape est déjà vérifiée.

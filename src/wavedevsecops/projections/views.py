@@ -45,6 +45,7 @@ EXPLAIN_PR = "remote.pr"
 EXPLAIN_CHECK = "remote.check"
 EXPLAIN_REVIEW = "remote.review"
 EXPLAIN_SBOM = "remote.sbom"
+EXPLAIN_REVIEW_LLM = "remote.review_llm"
 EXPLAIN_DIFF_FILE = "code.file"
 EXPLAIN_REFS = (
     EXPLAIN_COMMIT,
@@ -59,6 +60,7 @@ EXPLAIN_REFS = (
     EXPLAIN_CHECK,
     EXPLAIN_REVIEW,
     EXPLAIN_SBOM,
+    EXPLAIN_REVIEW_LLM,
     EXPLAIN_DIFF_FILE,
     EXPLAIN_TOOL_OUTPUT,
 )

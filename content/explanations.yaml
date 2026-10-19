@@ -104,3 +104,11 @@ entries:
       Voici ce que l'outil a affiché, sans retouche. Un échec y est nommé avec le fichier et la
       ligne en cause, que vous pouvez suivre dans les autres vues. Lancée par la CI avec la même
       configuration et les mêmes versions, la même commande devrait donner le même verdict.
+
+  remote.review_llm:
+    title_text: "La revue humaine du code LLM"
+    body_text: >-
+      Sur du code qui appelle un modèle de langage, la revue humaine est aussi la barrière contre
+      l'injection de prompt : un texte reçu (document, message) peut contenir des instructions qui
+      détournent le modèle. Aucun outil automatique ne les repère, c'est la personne qui relit qui
+      vérifie ce que le modèle lit et ce qu'il a le droit de faire.

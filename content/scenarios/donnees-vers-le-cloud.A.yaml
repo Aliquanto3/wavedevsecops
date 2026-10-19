@@ -1,0 +1,191 @@
+# Station 3 (Story 8.6) : une config LLM qui enverrait les données au cloud, que le test du
+# gabarit refuse. Parcours LLM. La branche `feature` porte déjà un commit : `llm.toml` vise un
+# service distant au lieu d'Ollama local, et l'ajoute à la liste des endpoints autorisés. Le
+# pipeline simulé tourne sur la PR ; le check pytest échoue sur les tests de config du gabarit
+# (locale par défaut, endpoints sur la liste autorisée), la PR est bloquée, puis le check repasse
+# au vert quand la config redevient locale. Aucun appel n'est jamais fait : les tests ne lisent
+# que `llm.toml` (AD-13). Le domaine ci-dessous n'existe pas (suffixe réservé `.example`).
+schema_version: 1
+scenario_id: donnees-vers-le-cloud
+mode: A
+title_text: Bloquer une config LLM qui envoie les données au cloud
+section: stations
+station: 3
+tracks: [llm]
+tools: [git, pytest]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: loop
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige le check pytest avant tout merge ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_checks: [pytest]
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: llm.toml
+    content: |
+      # Configuration du modèle de langage : le service du fournisseur, plus rapide.
+      base_url = "https://api.llm-cloud.example/v1"
+      model = "assistant-grande-taille"
+      timeout_seconds = 60
+
+      allowed_endpoints = ["https://api.llm-cloud.example/v1"]
+  - op: commit
+    message: Passe l'assistant sur le service du fournisseur
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : `llm.toml` vise désormais le
+      service d'un fournisseur plutôt que le modèle local. Poussez cette branche vers l'origine
+      pour pouvoir ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline lancera les tests du projet, dont ceux qui gardent la configuration du
+      modèle.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      analyse de sécurité du code, audit des dépendances, verrou des dépendances, puis la quality
+      gate.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi pytest bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check pytest doit passer à « Échec » et « Merger » devenir
+      inactif. Dépliez la ligne de détail du check : elle nomme les tests en échec. Ouvrez aussi
+      « Voir la sortie » pour lire ce qu'ils attendaient de `llm.toml`.
+    explanation_text: >-
+      Le projet garde sa configuration par des tests : le modèle appelé par défaut est local
+      (Ollama), et chaque endpoint autorisé est une adresse de votre poste. Avec une config
+      distante, chaque question posée à l'assistant, avec le contenu du stock, partirait chez un
+      tiers : ces tests échouent avant que cela arrive. Le check est obligatoire : tant qu'il
+      échoue, la PR ne peut pas être mergée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      pytest: failure
+    finding_has:
+      pytest:
+        - test_default_endpoint_is_local_ollama
+        - test_allowed_endpoints_are_loopback_only
+    hints:
+      lead_text: >-
+        Le check pytest est dans la liste des checks de la PR, vue « Distant + PR ». S'il est
+        encore « En attente » ou « En cours », patientez.
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check pytest de la PR, puis « Voir la sortie ». Deux tests de
+        tests/test_llm.py échouent : le modèle par défaut n'est plus local, et l'endpoint autorisé
+        n'est pas une adresse locale.
+
+  - step_id: revenir_a_la_config_locale
+    type: repo_state
+    title_text: Revenir à la config locale et pousser
+    instruction_text: >-
+      Remettez `llm.toml` sur le modèle local : `base_url` et `allowed_endpoints` valent
+      `http://127.0.0.1:11434/v1` (Ollama). Gardez les tests de `tests/test_llm.py` tels quels.
+      Committez la correction sur `feature`, puis poussez-la.
+    explanation_text: >-
+      Un service distant s'ajoute à `allowed_endpoints` après une revue, pas dans une PR qui
+      change tout autre chose : la liste est la décision que la revue doit voir. Les raccourcis ne
+      fonctionnent pas : supprimer ou vider les tests de config, ou les assouplir pour qu'ils
+      acceptent le service distant, ne ramène pas la config locale, et cette étape reste
+      ouverte.
+    expect:
+      head:
+        at: origin/feature
+      index:
+        clean: true
+      tree:
+        contains:
+          - path: llm.toml
+            text: 'base_url = "http://127.0.0.1:11434/v1"'
+          - path: llm.toml
+            text: 'allowed_endpoints = ["http://127.0.0.1:11434/v1"]'
+          - path: tests/test_llm.py
+            text: |-
+              def test_default_endpoint_is_local_ollama() -> None:
+                  config = load_config()
+                  assert config.base_url == "http://127.0.0.1:11434/v1"
+          - path: tests/test_llm.py
+            text: |-
+              def test_allowed_endpoints_are_loopback_only() -> None:
+                  config = load_config()
+                  for url in config.allowed_endpoints:
+                      assert urlsplit(url).hostname in {"127.0.0.1", "localhost", "::1"}, url
+    foreseen:
+      - when:
+          index:
+            unstaged: [llm.toml]
+        reason_text: >-
+          `llm.toml` est modifié mais pas encore committé : ajoutez-le, committez, puis poussez.
+    hints:
+      lead_text: >-
+        La valeur d'origine de `llm.toml` figure dans le commit de `main` : `git show main:llm.toml`
+        l'affiche. Vous pouvez aussi annuler le commit de la branche.
+      partial_text: >-
+        Remettre base_url et allowed_endpoints sur http://127.0.0.1:11434/v1 (ou
+        git checkout main -- llm.toml) ; puis git add, git commit et git push
+      solution_text: >-
+        git checkout main -- llm.toml, git commit -am « Revient au modèle local », git push
+
+  - step_id: voir_le_vert
+    type: pr_state
+    title_text: Voir le check repasser au vert
+    instruction_text: >-
+      Attendez la fin du pipeline sur le nouveau commit : le check pytest repasse à « Succès » et
+      « Merger » redevient actif.
+    explain_ref: remote.review_llm
+    explanation_text: >-
+      Le pipeline relance pytest sur le nouveau commit : c'est ce résultat qui valide l'étape,
+      pas votre commande. Le test garde la config sur deux points, le défaut local et la liste
+      des endpoints : c'est cette liste qu'une revue relit avant qu'un service distant y entre.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      pytest: success
+    hints:
+      lead_text: >-
+        Un push sur la branche de la PR relance le pipeline : le check pytest est dans la liste
+        des checks, vue « Distant + PR ».
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, état « Succès »"
+      solution_text: "Vue « Distant + PR » : check pytest de la PR, état « Succès »"
