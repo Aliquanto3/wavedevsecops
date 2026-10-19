@@ -37,6 +37,7 @@ from wavedevsecops.engine import (
 from wavedevsecops.web.catalogue import install_catalogue_routes
 from wavedevsecops.web.code import install_code_routes
 from wavedevsecops.web.exercise import register_exercise_intent
+from wavedevsecops.web.explanations import install_explanation_routes
 from wavedevsecops.web.shell import CURRENT_MILESTONE, delivered_surfaces, track_options
 from wavedevsecops.web.workspaces import install_workspace_routes
 
@@ -229,6 +230,7 @@ def create_app(
     install_workspace_routes(app, workspaces)
     install_code_routes(app, workspaces)
     install_catalogue_routes(app, workspaces, settings)
+    install_explanation_routes(app, settings)
     app.add_api_route(
         "/espace/{workspace_id}", shell_page, methods=["GET"], include_in_schema=False
     )

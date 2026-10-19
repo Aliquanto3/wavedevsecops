@@ -10,6 +10,7 @@ import { listPanes } from "./panes.js";
 import { createQuizBanner, postIntent, quizStatus } from "./quiz.js";
 import { designationFor, installDesignation } from "./designation.js";
 import { diagnosticLink } from "./restart.js";
+import { mountLinking } from "./linking.js";
 import { createScenarioView } from "./scenario.js";
 import { LOADING } from "./store.js";
 
@@ -83,6 +84,8 @@ export function mountWorkspace(
   workspace.append(panel, zone);
   container.replaceChildren(workspace);
   installDesignation(workspace, designation);
+  // Correspondances entre vues et explications (story 2.10) : lecture seule, sans toucher la désignation.
+  const crossViews = mountLinking(workspace, { store, chipBar, fetchImpl });
 
   // --- panneau Scénario, alimenté par le magasin -----------------------------------------
   // Région role="status" unique du panneau : « Commande terminée. Vues mises à jour : … » (FR-4).
@@ -428,10 +431,15 @@ export function mountWorkspace(
       if (!effective.hidden.has(pane.id)) continue;
       const chip = el("button", "pane-chip", { type: "button", "data-pane": pane.id });
       chip.textContent = `+ ${pane.title}`;
-      chip.addEventListener("click", () => showById(pane.id));
+      chip.addEventListener("click", () => {
+        const anchor = crossViews.anchor(); // l'élément dont la puce annonçait un correspondant
+        showById(pane.id);
+        crossViews.reveal(pane.id, anchor);
+      });
       chipBar.append(chip);
     }
     chipBar.hidden = chipBar.children.length === 0;
+    crossViews.syncChips();
   }
 
   // --- focus itinérant : chaque vue est un seul arrêt de tabulation ----------------------
@@ -626,6 +634,7 @@ export function mountWorkspace(
     destroy() {
       unsubscribe();
       chainView?.close(false);
+      crossViews.destroy();
       if (networkRun) networkRun.destroy();
       document.removeEventListener("keydown", onKeydown);
       if (observer) observer.disconnect();

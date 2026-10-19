@@ -16,6 +16,9 @@ from wavedevsecops.contracts.repo import Actor, RepoState
 
 VIEWS_VERSION = 1
 
+EXPLAIN_TOOL_OUTPUT = "terminal.output"
+"""Clé d'explication du bloc `tool-output` (sortie de ruff, pytest…), émise par la file."""
+
 LabelKind = Literal["branch", "remote", "tag", "head"]
 
 
@@ -136,3 +139,13 @@ class Views(_Model):
     """Résumé des changements pour la région `role="status"`."""
     remote: RemoteView = RemoteView()
     """Vue « Distant + PR » : refs de `origin`, PR, checks, journal de revue."""
+    links: dict[str, list[str]] = {}
+    """Correspondances entre vues (story 2.10, UX « Correspondances entre vues ») : pour un
+    `element_id`, ceux qui lui sont liés. Arêtes déclarées, lues dans les deux sens ; le front
+    ne déduit aucun lien. Les cibles absentes de la vue affichée (un `path:head:…` sans diff
+    ouvert) sont permises : le front les ignore."""
+    names: dict[str, str] = {}
+    """Nom court de chaque élément projeté (« ref origin/main », « PR n°2 », « fichier a.py »),
+    pour le résumé « n éléments liés : … » lu au focus."""
+    explain: dict[str, str] = {}
+    """`explain_ref` de chaque élément projeté (clé de `content/explanations.yaml`)."""

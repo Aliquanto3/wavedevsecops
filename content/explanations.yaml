@@ -1,0 +1,98 @@
+# Explications attachées aux éléments des vues (story 2.10, AD-7, NFR-13).
+# Fichier pivot : chaque clé est un `explain_ref` porté par une projection (voir
+# `projections/views.py`, EXPLAIN_REFS) ; le « i » d'un élément en affiche le titre et le texte
+# dans un `explain-popover`. Deux ou trois phrases, en français, au vouvoiement.
+#
+# `barrier_id` (facultatif) : identifiant d'une barrière de `content/chain.yaml` que l'élément
+# aide à comprendre. La story 9.4 s'en sert pour relier chaque terme à sa barrière ; tant
+# qu'il est vide, l'entrée n'a pas de lien.
+schema_version: 1
+
+entries:
+  graph.commit:
+    title_text: "Un commit"
+    body_text: >-
+      Un commit est une photo de votre projet à un instant donné, avec un message et un auteur.
+      Il pointe vers son ou ses parents : c'est ce chaînage qui forme l'historique.
+      Son identifiant (SHA) est calculé à partir de son contenu, donc il ne change jamais.
+
+  graph.commit_lost:
+    title_text: "Un commit perdu"
+    body_text: >-
+      Plus aucune branche ni aucun tag ne mène à ce commit, mais git le garde encore un moment.
+      `git reflog` le retrouve, et une nouvelle branche posée dessus le rend à nouveau visible.
+
+  graph.branch:
+    title_text: "Une branche locale"
+    body_text: >-
+      Une branche est un simple nom qui pointe vers un commit. Quand vous commitez sur la
+      branche courante, le nom avance avec vous. Créer une branche ne copie rien : cela ne coûte
+      presque rien.
+
+  graph.remote_ref:
+    title_text: "Une référence distante"
+    body_text: >-
+      `origin/main` est la dernière position connue de `main` sur le serveur. Elle ne bouge
+      que lorsque vous poussez ou récupérez, jamais quand vous commitez en local.
+      Comparer votre branche à cette référence montre ce qui reste à pousser.
+
+  graph.tag:
+    title_text: "Un tag"
+    body_text: >-
+      Un tag est une étiquette fixe posée sur un commit, souvent pour marquer une version.
+      Contrairement à une branche, il ne se déplace pas quand vous commitez.
+
+  graph.head:
+    title_text: "HEAD"
+    body_text: >-
+      HEAD indique où vous êtes : la branche courante, donc le commit qui sera le parent du
+      prochain. `git switch` déplace HEAD vers une autre branche.
+
+  graph.head_detached:
+    title_text: "HEAD détachée"
+    body_text: >-
+      HEAD pointe directement vers un commit, sans branche. Vous pouvez y travailler, mais un
+      nouveau commit ne sera retenu par aucun nom : créez une branche pour ne pas le perdre.
+
+  index.path:
+    title_text: "Un fichier et ses trois zones"
+    body_text: >-
+      Git compare chaque fichier à trois endroits : le dernier commit, l'index (ce que
+      `git add` a préparé) et votre arbre de travail. `git status` montre les écarts entre eux,
+      dont les fichiers que git ne suit pas encore. Seul ce qui est dans l'index entre dans le
+      prochain commit.
+
+  remote.pr:
+    title_text: "Une pull request"
+    body_text: >-
+      Une PR propose de fusionner une branche dans une autre, ici dans `main`. Elle réunit la
+      discussion, la revue, les contrôles automatiques et la décision de fusionner.
+      Quand `main` est protégée, c'est le seul chemin pour y faire entrer du code.
+
+  remote.check:
+    title_text: "Un check"
+    body_text: >-
+      Un check est un contrôle automatique lancé sur le commit de la PR : tests, analyse du code,
+      recherche de secrets. Un check obligatoire en échec bloque la fusion.
+      Si vous poussez un nouveau commit, le résultat précédent n'est plus valable.
+
+  remote.review:
+    title_text: "Une revue"
+    body_text: >-
+      Une revue est l'avis d'une autre personne sur la PR : approuvée, modifications demandées
+      ou simple commentaire. Une règle de protection peut exiger qu'une autre personne approuve
+      avant la fusion : c'est le principe des quatre yeux.
+
+  code.file:
+    title_text: "Un fichier du diff"
+    body_text: >-
+      Un diff montre ce qui change entre deux états : les lignes ajoutées avec « + » et les
+      lignes supprimées avec « − ». Les lignes sans marque servent de repère.
+      Lire le diff avant de commiter évite d'embarquer un changement par mégarde.
+
+  terminal.output:
+    title_text: "La sortie d'un outil"
+    body_text: >-
+      Voici ce que l'outil a affiché, sans retouche. Un échec y est nommé avec le fichier et la
+      ligne en cause, que vous pouvez suivre dans les autres vues. Lancée par la CI avec la même
+      configuration et les mêmes versions, la même commande devrait donner le même verdict.

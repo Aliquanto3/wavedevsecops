@@ -317,6 +317,7 @@ def test_ruff_sortie_verbatim_en_bloc_etiquete_liens_machine_et_preuve(
     assert len(blocks) == 1
     (block,) = blocks
     assert block["tool"] == "ruff" and block["text"] == RUFF_TEXT  # verbatim, octet pour octet
+    assert block["explain_ref"] == "terminal.output"  # le « i » du bloc (story 2.10)
     (span,) = block["spans"]
     assert span["text"] == "src/inventory/rapport.py:3"
     assert span["element_id"] == element_id("path", "worktree", RAPPORT)

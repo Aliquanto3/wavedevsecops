@@ -1,0 +1,166 @@
+/* Correspondances entre vues et explications (story 2.10). Jetons seulement (DESIGN.md > link-state,
+   explain-popover). Préséance des marques : verdict, sélection, désignable, puis lié ; le mode
+   Désigner (.is-designating) n'est jamais gêné : aucune marque de lien n'y est posée. */
+
+/* --- état lié : anneau et fond de la discipline, sur les correspondants ------------------- */
+.workspace:not(.is-designating) .is-linked:not(.is-selected):not(.is-designated):not(.pane-chip):not(.terminal-lit) {
+  background-color: var(--color-discipline-harness-soft);
+  box-shadow: inset 0 0 0 var(--stroke-min) var(--color-discipline-harness);
+}
+
+.workspace:not(.is-designating) .graph-commit.is-linked:not(.is-selected) {
+  fill: var(--color-discipline-harness-soft);
+  stroke: var(--color-discipline-harness);
+}
+
+/* --- le reste se met en retrait : décors estompés, texte en ink-soft, jamais d'opacité sur le texte */
+.workspace[data-linking]:not(.is-designating) .views-grid [data-element-id]:not(.is-linked):not(.is-selected) {
+  color: var(--color-ink-soft);
+}
+
+/* Décors du graphe estompés par la couleur (le dépôt interdit toute opacité en CSS). */
+.workspace[data-linking]:not(.is-designating) .graph-edge {
+  stroke: var(--color-line);
+}
+
+.workspace[data-linking]:not(.is-designating) .graph-commit:not(.is-linked):not(.is-selected) {
+  fill: var(--color-surface);
+  stroke: var(--color-line);
+}
+
+.workspace[data-linking]:not(.is-designating) [data-ref]:not(.is-linked) {
+  background: transparent;
+  border-color: var(--color-line);
+}
+
+.workspace[data-linking]:not(.is-designating) .diff-line:not(.is-linked):not(.is-selected) {
+  background: transparent;
+}
+
+/* --- terminal : ligne liée en terminal-lit, les autres en texte secondaire ----------------- */
+.terminal-lit {
+  background: var(--color-terminal-lit-fill);
+  outline: 2px solid var(--color-terminal-lit-ring);
+  outline-offset: -2px;
+}
+
+.workspace[data-linking]:not(.is-designating) .terminal-log > :not(.terminal-lit),
+.workspace[data-linking]:not(.is-designating) .terminal-log > :not(.terminal-lit) .tool-output-text {
+  color: var(--color-terminal-fg-soft);
+}
+
+/* --- vue Code : sélection d'une ligne ou d'un en-tête de diff (contour encre et marque ●) ---- */
+.diff-line.is-selected,
+.diff-file-header.is-selected {
+  outline: 3px solid var(--color-ink);
+  outline-offset: -3px;
+}
+
+.diff-line.is-selected .diff-text::before,
+.diff-file-header.is-selected .diff-path::before {
+  content: "● ";
+}
+
+/* --- puce d'une vue masquée qui contient un correspondant : « + Nom · lié » ---------------- */
+.pane-chip.is-linked {
+  border-style: solid;
+  background: var(--color-discipline-harness-soft);
+  color: var(--color-ink);
+}
+
+/* --- élément mis en évidence après le réaffichage de sa vue -------------------------------- */
+.is-revealed {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* --- « i » : disque de 1,5 em cerclé primary, cible de 24 px, plein au survol ou ouvert ------ */
+.explain-host {
+  position: relative;
+}
+
+.explain-trigger {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit-target-dense);
+  height: var(--hit-target-dense);
+  padding: 0;
+  transform: translateY(-50%);
+  font: italic var(--font-weight-label) var(--font-size-label) / 1 var(--font-family-heading);
+  color: var(--color-primary);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-primary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.explain-trigger:hover,
+.explain-trigger[aria-expanded="true"] {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.diff-file > .explain-trigger,
+.tool-output > .explain-trigger {
+  top: var(--space-1);
+  transform: none;
+}
+
+/* --- explain-popover : deux ou trois phrases, jamais au seul survol ------------------------ */
+.explain-popover {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  width: min(var(--popover-max-width), calc(100vw - 2 * var(--space-2)));
+  padding: var(--space-3) var(--space-4);
+  font: var(--font-weight-body-sm) var(--font-size-body-sm) / var(--line-height-body-sm) var(--font-family-body-sm);
+  color: var(--color-ink);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-relief-overlay);
+}
+
+.explain-title {
+  margin: 0 0 var(--space-1);
+  font: var(--font-weight-heading) var(--font-size-body) / var(--line-height-heading) var(--font-family-heading);
+  color: var(--color-primary-deep);
+}
+
+.explain-body {
+  margin: 0 0 var(--space-2);
+}
+
+.explain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.explain-links-toggle,
+.explain-close,
+.explain-link {
+  min-height: var(--hit-target-dense);
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: var(--color-primary);
+  background: transparent;
+  border: var(--stroke-min) solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.explain-links {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explain-links li {
+  margin-top: var(--space-1);
+}

@@ -6,6 +6,7 @@
 // « Garder ma version » / « Recharger ».
 import { el } from "./dom.js";
 import { conflictLines, createEditor, CONFLICT_MARK } from "./editor.js";
+import { diffSource, linkingFor } from "./linking.js";
 import { selectionFor } from "./selection.js";
 
 export const MARKER = { added: "+", removed: "−", context: " " };
@@ -104,6 +105,11 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   let mode = "file"; // « file » ou « diff »
   let drawnViews;
   let diffToken = 0;
+  const linking = linkingFor(store);
+  // Cible du diff affiché : un commit sélectionné, sinon l'arbre de travail. Une autre sélection
+  // (ligne de diff, ref, PR) laisse le diff en place ; seul l'effacement ramène à l'arbre.
+  let shownTarget = diffTarget(selection.value);
+  let pruning = false;
 
   const root = el("div", "code-view");
   const nav = el("nav", "code-files", { "aria-label": "Fichiers du bac à sable" });
@@ -425,7 +431,7 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   // --- diff ------------------------------------------------------------------------------
   async function loadDiff() {
     const token = (diffToken += 1);
-    const target = diffTarget(selection.value);
+    const target = shownTarget;
     try {
       const response = await send(`${base()}/code/diff?target=${encodeURIComponent(target)}`, {
         cache: "no-store",
@@ -444,6 +450,18 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
         header.append(button("Arbre de travail", "diff-worktree", () => selection.set(null)));
       }
       diffPanel.replaceChildren(header, buildDiff(diff));
+      linking.setSource("diff", diffSource(diff));
+      // Une ligne de diff sélectionnée qui a disparu du diff relu ne reste pas sélectionnée.
+      const picked = selection.value;
+      if (
+        picked &&
+        picked.startsWith("diffline:") &&
+        !diffPanel.querySelector(`[data-element-id="${picked}"]`)
+      ) {
+        pruning = true;
+        selection.set(null);
+        pruning = false;
+      }
       settleRoving();
     } catch (err) {
       if (token === diffToken) say(OFFLINE_TEXT);
@@ -462,8 +480,13 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
 
   // Sélectionner un commit (graphe, liste) montre son diff ; effacer la sélection, l'arbre de travail.
   selection.subscribe((value) => {
+    let target = shownTarget;
+    if (value && value.startsWith("commit:")) target = diffTarget(value);
+    else if (!value && !pruning) target = WORKTREE;
+    const changed = target !== shownTarget;
+    shownTarget = target;
     if (value && value.startsWith("commit:")) setMode("diff");
-    else if (mode === "diff") loadDiff();
+    else if (mode === "diff" && changed) loadDiff();
   });
 
   let seenExternal = store.state.externalChange || 0;

@@ -26,6 +26,7 @@ from wavedevsecops.contracts import (
     Views,
     element_id,
 )
+from wavedevsecops.contracts.views import EXPLAIN_TOOL_OUTPUT
 from wavedevsecops.projections.graph import Cell, Layout, Route, place
 
 SHORT = 7
@@ -39,6 +40,11 @@ EXPLAIN_REMOTE = "graph.remote_ref"
 EXPLAIN_TAG = "graph.tag"
 EXPLAIN_HEAD = "graph.head"
 EXPLAIN_HEAD_DETACHED = "graph.head_detached"
+EXPLAIN_PATH = "index.path"
+EXPLAIN_PR = "remote.pr"
+EXPLAIN_CHECK = "remote.check"
+EXPLAIN_REVIEW = "remote.review"
+EXPLAIN_DIFF_FILE = "code.file"
 EXPLAIN_REFS = (
     EXPLAIN_COMMIT,
     EXPLAIN_COMMIT_LOST,
@@ -47,8 +53,15 @@ EXPLAIN_REFS = (
     EXPLAIN_TAG,
     EXPLAIN_HEAD,
     EXPLAIN_HEAD_DETACHED,
+    EXPLAIN_PATH,
+    EXPLAIN_PR,
+    EXPLAIN_CHECK,
+    EXPLAIN_REVIEW,
+    EXPLAIN_DIFF_FILE,
+    EXPLAIN_TOOL_OUTPUT,
 )
-"""Clés du catalogue d'explications citées par le graphe."""
+"""Clés de `content/explanations.yaml` citées par les projections (le test de contenu vérifie
+que chacune y figure, et que chaque entrée est citée)."""
 
 _ACTOR_TEXT = {"learner": "par vous", "colleague": "par le collègue", "agent": "par l'agent"}
 

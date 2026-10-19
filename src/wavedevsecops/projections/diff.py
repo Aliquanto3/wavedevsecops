@@ -13,6 +13,8 @@ from pathlib import Path
 from wavedevsecops.contracts import AppError, element_id
 from wavedevsecops.contracts.diff import DiffFile, DiffHunk, DiffLine, DiffView
 from wavedevsecops.gitio import Git
+from wavedevsecops.projections.links import diff_links
+from wavedevsecops.projections.views import EXPLAIN_DIFF_FILE
 
 WORKTREE = "worktree"
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -23,6 +25,7 @@ MAX_TEXT = 2000
 MAX_UNTRACKED = 200
 """Fichiers non suivis au plus ajoutés au diff de l'arbre de travail (un appel git chacun)."""
 _TARGET = re.compile(r"^[0-9a-f]{7,40}$")
+_SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _CONFLICT = re.compile(r"^(<<<<<<<|>>>>>>>)( |$)|^=======$")
 _QUIET = {"GIT_OPTIONAL_LOCKS": "0"}
@@ -94,7 +97,9 @@ def _a11y_file(file: _File) -> str:
     )
 
 
-def _line(zone: str, file: _File, kind: str, old_no: int | None, new_no: int | None, raw: str):
+def _line(
+    zone: str, file: _File, kind: str, old_no: int | None, new_no: int | None, raw: str, commit: str
+):
     text = raw[:MAX_TEXT]
     side, number = ("old", old_no) if kind == "removed" else ("new", new_no)
     word = {"added": "ajoutée", "removed": "supprimée", "context": "de contexte"}[kind]
@@ -107,12 +112,14 @@ def _line(zone: str, file: _File, kind: str, old_no: int | None, new_no: int | N
         text=text,
         a11y_name_text=f"Ligne {word} {number} : {shown}",
         conflict=bool(_CONFLICT.match(text)),
+        links=diff_links(commit, file.path),
     )
 
 
 def parse_diff(text: str, target: str) -> DiffView:
     """Découpe un diff unifié de git en `DiffView` (`target` : `worktree` ou SHA complet)."""
     zone = target
+    commit = target if _SHA40.match(target) else ""
     path_zone = "worktree" if target == WORKTREE else "head"
     files: list[_File] = []
     current: _File | None = None
@@ -154,14 +161,14 @@ def parse_diff(text: str, target: str) -> DiffView:
         marker = raw[:1]
         if marker == "+":
             current.added += 1
-            lines.append(_line(zone, current, "added", None, new_no, raw[1:]))
+            lines.append(_line(zone, current, "added", None, new_no, raw[1:], commit))
             new_no += 1
         elif marker == "-":
             current.removed += 1
-            lines.append(_line(zone, current, "removed", old_no, None, raw[1:]))
+            lines.append(_line(zone, current, "removed", old_no, None, raw[1:], commit))
             old_no += 1
         elif marker == " ":
-            lines.append(_line(zone, current, "context", old_no, new_no, raw[1:]))
+            lines.append(_line(zone, current, "context", old_no, new_no, raw[1:], commit))
             old_no += 1
             new_no += 1
         else:
@@ -180,6 +187,12 @@ def parse_diff(text: str, target: str) -> DiffView:
                 removed=f.removed,
                 summary_text=_summary(f),
                 a11y_name_text=_a11y_file(f),
+                explain_ref=EXPLAIN_DIFF_FILE,
+                links=[
+                    i
+                    for i in diff_links(commit, f.path)
+                    if i != element_id("path", path_zone, f.path)
+                ],
                 hunks=[DiffHunk(header_text=head, lines=body) for head, body in f.hunks],
             )
             for f in files

@@ -5,6 +5,17 @@
 
 const registry = new WeakMap();
 
+// Types que la projection énumère en entier (`views.names`) : une sélection de ce type qui n'y
+// figure plus est périmée. Les autres (ligne de diff, sortie d'outil, fichier) sont relus par la
+// vue qui les montre : aucune autre vue ne les efface (story 2.10, report de la story 3.3).
+const ENUMERATED = new Set(["commit", "ref", "tag", "pr", "check", "review"]);
+
+/** Vrai si `id` n'existe plus dans la projection `views` et doit quitter la sélection. */
+export function selectionIsStale(views, id) {
+  if (!id || !ENUMERATED.has(String(id).split(":", 1)[0])) return false;
+  return !(views && views.names && id in views.names);
+}
+
 export function selectionFor(store) {
   if (registry.has(store)) return registry.get(store);
   let current = null;

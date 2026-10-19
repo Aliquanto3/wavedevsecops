@@ -104,6 +104,8 @@ class TerminalOutput(_Payload):
     tool: str = ""
     """Nom de l'outil (`ruff`, `pytest`) dont la sortie verbatim est un bloc `tool-output` ;
     vide pour une sortie ordinaire du terminal."""
+    explain_ref: str = ""
+    """Clé de `content/explanations.yaml` du bloc `tool-output` (story 2.10) ; vide sinon."""
 
 
 class OutputSpans(_Payload):

@@ -5,7 +5,7 @@
 import { el, svg } from "./dom.js";
 import { markCorrection } from "./correction.js";
 import { designationFor, markDesignated } from "./designation.js";
-import { selectionFor } from "./selection.js";
+import { selectionFor, selectionIsStale } from "./selection.js";
 
 export const ROW = 28; // rangée du graphe (graph-row-height)
 export const LANE = 28; // largeur d'une colonne de graphe
@@ -375,7 +375,9 @@ export function renderRepo(body, ctx, renderEmpty) {
     const ids = new Set(
       [...root.querySelectorAll("[data-element-id]")].map((n) => n.getAttribute("data-element-id")),
     );
-    if (selection.value && !ids.has(selection.value)) selection.set(null);
+    if (selection.value && !ids.has(selection.value) && selectionIsStale(state.views, selection.value)) {
+      selection.set(null);
+    }
     refreshSelection();
     markDesignated(root, designation);
     markCorrection(root, designation);
