@@ -24,12 +24,12 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.5 » (FR
 ## Décisions
 
 - Le fichier est produit par le serveur et enregistré par le navigateur : le serveur n'écrit rien sur le disque de l'apprenant, donc aucune route d'écriture à protéger.
-- Contrat partagé avec 4.4 : le fait de remise à zéro s'appelle `scenario_restarted` (constante `progress.facts.RESTART_KIND`), un fait par remise (`op_id` dans l'identité). `derive` l'exclut de l'état, du score et des indices (même ligne que la branche 4.4) ; le rapport compte ces faits bruts. Tant que 4.4 n'a pas ajouté le kind à `FactKind`, le compte vient des faits bruts.
+- Contrat partagé avec 4.4 : le fait de remise à zéro s'appelle `scenario_reset` (constante `progress.facts.RESTART_KIND`), un fait par remise (`op_id` dans l'identité). `derive` l'exclut de l'état, du score et des indices (même ligne que la branche 4.4) ; le rapport compte ces faits bruts. Tant que 4.4 n'a pas ajouté le kind à `FactKind`, le compte vient des faits bruts.
 - Le rapport garde les scénarios en cours en plus des terminés ; seul « aucun terminé » déclenche le texte vide.
 
 ## Reports
 
-- Remises à zéro (story 4.4, non fusionnée) : à la fusion, garder `scenario_restarted` dans `FactKind` et l'identité par `op_id` (déjà sur la branche 4.4), et faire pointer 4.4 sur `RESTART_KIND`.
+- Remises à zéro (story 4.4, non fusionnée) : à la fusion, garder `scenario_reset` dans `FactKind` et l'identité par `op_id` (déjà sur la branche 4.4), et faire pointer 4.4 sur `RESTART_KIND`.
 - État `exporting` (AD-1) : non implémenté, l'export ne passe pas par la file d'opérations d'un espace (aucune opération d'espace concernée).
 - Désignations (5.2) : leur score entrera dans le rapport avec `derive` (voir report de 4.7).
 - Rendu réel (boîte d'enregistrement pywebview, impression PDF, contraste) à vérifier dans un navigateur et dans la fenêtre pywebview.
@@ -39,7 +39,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.5 » (FR
 Revue Opus (une passe), après rebase sur `origin/main`.
 
 - M1 · second avis · corrigé : `render_csv` passe toutes les cellules (dates d'en-tête, mode, état, nombres, date de fin) par `_cell` ; test par colonne et par charge (`=HYPERLINK`, `=cmd|`, `+`, `-`, `@`, tabulation) et dates brutes non ISO.
-- M2 · second avis · corrigé : kind aligné sur la branche 4.4 (`scenario_restarted`, `RESTART_KIND` dans `progress.facts`) ; `derive` ignore les remises, une remise seule laisse le scénario « À faire » (test).
+- M2 · second avis · corrigé : kind aligné sur la branche 4.4 (`scenario_reset`, `RESTART_KIND` dans `progress.facts`) ; `derive` ignore les remises, une remise seule laisse le scénario « À faire » (test).
 - M3 · second avis · corrigé : clé vérifiée dans les sources de pywebview 6.2.1 (`ImmutableDict`, `ALLOW_DOWNLOADS: False`) ; `AttributeError`, `KeyError`, `TypeError` journalisés sans bloquer la fenêtre ; test avec doublure (clé présente, absente, module sans `settings`).
 - L4 · second avis · écarté : la fenêtre ne charge que l'application locale (loopback, CSP, aucune URL externe) ; seuls ses téléchargements sont concernés, chacun via la boîte d'enregistrement.
 - L5 · second avis · écarté : lecture seule, même comportement que le catalogue et le bilan ; l'écriture refuse déjà un fichier futur (`FutureSchemaError`).
