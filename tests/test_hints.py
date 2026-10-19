@@ -175,6 +175,7 @@ def test_un_palier_ne_s_ouvre_qu_apres_le_precedent(make_box) -> None:
         build_operation(box.engine, "hint_open", {"tier": 3})
 
 
+@pytest.mark.slow
 def test_la_solution_attend_un_essai_ou_vingt_secondes(make_box) -> None:
     box = make_box()
     box.hint(1)
@@ -199,6 +200,7 @@ def test_la_solution_attend_un_essai_ou_vingt_secondes(make_box) -> None:
     assert box.tiers()[2]["text"] == "git switch -c feature"
 
 
+@pytest.mark.slow
 def test_un_essai_debloque_la_solution(make_box) -> None:
     box = make_box()
     box.hint(1)
@@ -209,6 +211,7 @@ def test_un_essai_debloque_la_solution(make_box) -> None:
     assert load_run(box.engine.layout)["hints"]["creer_branche"]["attempts"] == 1
 
 
+@pytest.mark.slow
 def test_un_essai_avant_la_commande_partielle_ne_la_contourne_pas(make_box) -> None:
     box = make_box()
     box.act("status")
@@ -218,6 +221,7 @@ def test_un_essai_avant_la_commande_partielle_ne_la_contourne_pas(make_box) -> N
     assert _states(box)[2] == "available"  # l'essai a déjà eu lieu pendant l'étape
 
 
+@pytest.mark.slow
 def test_rouvrir_un_palier_ne_le_compte_pas_deux_fois(make_box) -> None:
     box = make_box()
     box.hint(1)
@@ -232,6 +236,7 @@ def test_rouvrir_un_palier_ne_le_compte_pas_deux_fois(make_box) -> None:
     assert len(box.facts()) == 1
 
 
+@pytest.mark.slow
 def test_le_fait_porte_palier_delai_et_temps_de_lecture(make_box) -> None:
     box = make_box()
     box.wait(5)
@@ -252,6 +257,7 @@ def test_le_fait_porte_palier_delai_et_temps_de_lecture(make_box) -> None:
     assert state.hints == 2
 
 
+@pytest.mark.slow
 def test_la_validation_clot_la_lecture_du_dernier_indice(make_box) -> None:
     box = make_box()
     box.hint(1)
@@ -263,6 +269,7 @@ def test_la_validation_clot_la_lecture_du_dernier_indice(make_box) -> None:
     assert "hint_pending" not in load_run(box.engine.layout)
 
 
+@pytest.mark.slow
 def test_une_etape_sans_indice_refuse_hint_open(make_box) -> None:
     box = make_box()
     box.act("switch", "-c", "feature")
@@ -272,6 +279,7 @@ def test_une_etape_sans_indice_refuse_hint_open(make_box) -> None:
     assert all("hints" not in step for step in panel["steps"])
 
 
+@pytest.mark.slow
 def test_l_etape_suivante_commence_son_propre_chrono(make_box) -> None:
     box = make_box()
     box.wait(30)
@@ -282,6 +290,7 @@ def test_l_etape_suivante_commence_son_propre_chrono(make_box) -> None:
     assert entries["creer_branche"]["opened"]["1"]["delay_ms"] == 30_000
 
 
+@pytest.mark.slow
 def test_rejeu_des_paliers_clos_apres_un_arret_brutal(make_box) -> None:
     box = make_box()
     box.hint(1)
@@ -312,6 +321,7 @@ def test_lint_blanc_manquant_dans_la_commande_partielle() -> None:
     assert not parse_scenario(SCENARIO, "indices.A.yaml").authoring_warnings()
 
 
+@pytest.mark.slow
 def test_recommencer_clot_la_lecture_avant_de_reconstruire(make_box) -> None:
     """Revue M1 : le palier encore en lecture devient un fait avant la reconstruction."""
     box = make_box()
@@ -324,6 +334,7 @@ def test_recommencer_clot_la_lecture_avant_de_reconstruire(make_box) -> None:
     assert "hint_pending" not in load_run(box.engine.layout)
 
 
+@pytest.mark.slow
 def test_une_commande_refusee_compte_comme_essai(make_box) -> None:
     """Revue L5 : une commande tapée, même refusée par la liste blanche, est un essai."""
     from wavedevsecops import terminal  # noqa: PLC0415
@@ -341,6 +352,7 @@ def test_une_commande_refusee_compte_comme_essai(make_box) -> None:
     assert [(f["tier"], f["read_ms"]) for f in box.facts()] == [(1, 0), (2, 3000)]
 
 
+@pytest.mark.slow
 def test_le_temps_de_lecture_est_plafonne(make_box) -> None:
     """Revue L2 : application quittée jusqu'au lendemain, lecture plafonnée."""
     box = make_box()
@@ -351,6 +363,7 @@ def test_le_temps_de_lecture_est_plafonne(make_box) -> None:
     assert fact["read_ms"] == hints.READ_MS_MAX
 
 
+@pytest.mark.slow
 def test_le_bilan_compte_l_indice_ouvert(make_box) -> None:
     """Intégration 4.6 → 4.7 : le fait `hint_opened` émis à la clôture arrive dans le bilan."""
     box = make_box()

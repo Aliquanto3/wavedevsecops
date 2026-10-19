@@ -266,6 +266,7 @@ def test_exigences_propres_a_chaque_scenario() -> None:
 
 
 # ------------------------------------------------------------------------- bout en bout
+@pytest.mark.slow
 @pytest.mark.parametrize("track", TRACKS)
 @pytest.mark.parametrize("scenario_id", IDS)
 def test_scenario_joue_de_bout_en_bout(make_box, scenario_id: str, track: str) -> None:
@@ -422,6 +423,7 @@ def test_pr_state_sans_espace_ou_sans_pr_ne_dit_rien() -> None:
 
 
 # --------------------------------------------------------------------- erreurs réalistes
+@pytest.mark.slow
 def test_branche_la_mauvaise_reponse_reset_hard_est_expliquee_puis_retablie(make_box) -> None:
     box = make_box("branche", "llm")
     for _, gestures in SOLUTIONS["branche"][:2]:
@@ -442,6 +444,7 @@ def test_branche_la_mauvaise_reponse_reset_hard_est_expliquee_puis_retablie(make
     assert box.current() == "fusionner"
 
 
+@pytest.mark.slow
 def test_add_commit_reset_hard_efface_le_commit_puis_est_retabli(make_box) -> None:
     box = make_box("add-commit", "no_ai")
     for _, gestures in SOLUTIONS["add-commit"][:2]:
@@ -459,6 +462,7 @@ def test_add_commit_reset_hard_efface_le_commit_puis_est_retabli(make_box) -> No
     assert box.current() == "second_commit"
 
 
+@pytest.mark.slow
 def test_push_pull_pull_n_est_pas_la_bonne_reponse_du_premier_quiz(make_box) -> None:
     box = make_box("push-pull", "no_ai")
     box.play(quiz("pull"))
@@ -472,6 +476,7 @@ def test_push_pull_pull_n_est_pas_la_bonne_reponse_du_premier_quiz(make_box) -> 
     assert box.current() == "recuperer"
 
 
+@pytest.mark.slow
 def test_pr_merge_la_pr_n_est_pas_mergeable_sans_la_revue(make_box) -> None:
     """La protection de `main` exige l'approbation que le collègue donne à l'ouverture, et la
     vue « Distant + PR » offre les gestes des étapes `ouvrir_pr` et `merger_pr` (story 3.3)."""

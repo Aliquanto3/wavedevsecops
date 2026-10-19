@@ -119,6 +119,7 @@ def test_setup_ecrit_un_github_json_vide_et_versionne(settings: Settings, git_pa
     assert list(data) == sorted(data)
 
 
+@pytest.mark.slow
 def test_ouvrir_des_pr_numerotees_depuis_1(settings: Settings, git_path: Path) -> None:
     extra = """\
   - op: set_protection
@@ -195,6 +196,7 @@ def test_check_obligatoire_declare_par_le_scenario(
         assert reason.element_id == element_id("check", "1", "tests", pr.head_sha)
 
 
+@pytest.mark.slow
 def test_nouveau_sha_remet_les_checks_en_queued(settings: Settings, git_path: Path) -> None:
     extra = """\
   - op: open_pr
@@ -244,6 +246,7 @@ def test_un_vieux_succes_ne_compte_pas(git_path: Path) -> None:
     assert "ancien commit" in new.blocking_reasons[0].text
 
 
+@pytest.mark.slow
 def test_conflit_detecte_par_merge_tree(settings: Settings, git_path: Path) -> None:
     extra = """\
   - op: write_file
@@ -273,6 +276,7 @@ def test_conflit_detecte_par_merge_tree(settings: Settings, git_path: Path) -> N
     assert github_sim.has_conflict(git, prepared.layout, pr.base_sha, orphan)
 
 
+@pytest.mark.slow
 def test_approbations_et_branche_disparue(settings: Settings, git_path: Path) -> None:
     extra = """\
   - op: set_protection
@@ -310,6 +314,7 @@ def test_la_derniere_revue_de_chaque_auteur_fait_foi() -> None:
     assert pr.count_approvals() == 1
 
 
+@pytest.mark.slow
 def test_empreinte_sans_sortie_ni_duree(settings: Settings, git_path: Path) -> None:
     extra = """\
   - op: open_pr
@@ -338,6 +343,7 @@ def test_empreinte_sans_sortie_ni_duree(settings: Settings, git_path: Path) -> N
     assert fingerprint(layout, git) != prepared.fingerprint
 
 
+@pytest.mark.slow
 def test_version_future_ou_fichier_illisible(settings: Settings, git_path: Path) -> None:
     prepared, _ = _prepare(settings, git_path)
     layout = prepared.layout
@@ -422,6 +428,7 @@ def test_refresh_sans_github_json_n_ecrit_rien(settings: Settings, git_path: Pat
         )
 
 
+@pytest.mark.slow
 def test_changement_externe_recalcule_les_pr(settings: Settings, git_path: Path) -> None:
     from types import SimpleNamespace
 

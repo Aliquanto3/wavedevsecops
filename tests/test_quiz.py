@@ -154,6 +154,7 @@ def make_box(tmp_path: Path, git_path: Path) -> Iterator[Callable[[], Box]]:
         box.manager.close()
 
 
+@pytest.mark.slow
 def test_le_panneau_propose_les_commandes_sans_la_bonne_reponse(make_box) -> None:
     box = make_box()
     panel = box.engine.snapshot()["step_panel"]
@@ -169,6 +170,7 @@ def test_le_panneau_propose_les_commandes_sans_la_bonne_reponse(make_box) -> Non
     assert panel["restore_failed"] is None
 
 
+@pytest.mark.slow
 def test_une_mauvaise_reponse_s_execute_puis_l_etat_est_modifie(make_box) -> None:
     box = make_box()
     before = box.fingerprint()
@@ -196,6 +198,7 @@ def test_une_mauvaise_reponse_s_execute_puis_l_etat_est_modifie(make_box) -> Non
     assert "snapshot_id" not in panel["quiz_altered"]
 
 
+@pytest.mark.slow
 def test_en_etat_modifie_les_ecritures_sont_refusees_et_les_lectures_passent(make_box) -> None:
     box = make_box()
     box.choose("branche")
@@ -211,6 +214,7 @@ def test_en_etat_modifie_les_ecritures_sont_refusees_et_les_lectures_passent(mak
     assert QUIZ_REFUSED_TEXT.startswith("Refusée pendant l'état modifié par le quiz")
 
 
+@pytest.mark.slow
 def test_le_retablissement_redonne_la_meme_empreinte(make_box) -> None:
     box = make_box()
     before = box.fingerprint()
@@ -234,6 +238,7 @@ def test_le_retablissement_redonne_la_meme_empreinte(make_box) -> None:
         build_operation(box.engine, "restore_state", {})
 
 
+@pytest.mark.slow
 def test_une_bonne_reponse_garde_l_etat_et_valide_l_etape(make_box) -> None:
     box = make_box()
     events = box.choose("revert")
@@ -250,6 +255,7 @@ def test_une_bonne_reponse_garde_l_etat_et_valide_l_etape(make_box) -> None:
     assert [s.reason for s in list_snapshots(box.engine.layout)] == ["setup", "quiz"]
 
 
+@pytest.mark.slow
 def test_seul_le_premier_essai_est_retenu(make_box) -> None:
     box = make_box()
     first = _of(box.choose("branche"), Kind.QUIZ_ALTERED)[0].payload
@@ -271,6 +277,7 @@ def test_seul_le_premier_essai_est_retenu(make_box) -> None:
     assert [(f["step_id"], f["correct"]) for f in quiz] == [("annuler", False)]
 
 
+@pytest.mark.slow
 def test_le_premier_essai_est_rejoue_au_reveil(make_box, git_path: Path) -> None:
     box = make_box()
     box.choose("revert")
@@ -298,6 +305,7 @@ def test_le_premier_essai_est_rejoue_au_reveil(make_box, git_path: Path) -> None
         reopened.close()
 
 
+@pytest.mark.slow
 def test_l_etat_modifie_survit_a_la_reouverture(make_box, git_path: Path) -> None:
     box = make_box()
     box.choose("branche")
@@ -313,6 +321,7 @@ def test_l_etat_modifie_survit_a_la_reouverture(make_box, git_path: Path) -> Non
         reopened.close()
 
 
+@pytest.mark.slow
 def test_apres_un_retablissement_echoue_seules_les_lectures_passent(make_box) -> None:
     box = make_box()
     run = load_run(box.engine.layout)
@@ -327,6 +336,7 @@ def test_apres_un_retablissement_echoue_seules_les_lectures_passent(make_box) ->
     box.engine.submit(Operation("restart", lambda ctx: 0)).result(WAIT)
 
 
+@pytest.mark.slow
 def test_un_vrai_retablissement_echoue_laisse_recommencer_seulement(make_box) -> None:
     box = make_box()
     box.choose("reset_hard")
@@ -362,6 +372,7 @@ def _blocked(box: Box) -> threading.Event:
     return gate
 
 
+@pytest.mark.slow
 def test_deux_choix_envoyes_d_affilee_n_en_executent_qu_un(make_box) -> None:
     box = make_box()
     before = box.fingerprint()
@@ -381,6 +392,7 @@ def test_deux_choix_envoyes_d_affilee_n_en_executent_qu_un(make_box) -> None:
     assert box.fingerprint() == before
 
 
+@pytest.mark.slow
 def test_une_ecriture_en_file_derriere_un_mauvais_choix_est_refusee(make_box) -> None:
     box = make_box()
     gate = _blocked(box)
@@ -396,6 +408,7 @@ def test_une_ecriture_en_file_derriere_un_mauvais_choix_est_refusee(make_box) ->
     assert box.log() == ["Ajoute les notes", "Ajoute le README"]
 
 
+@pytest.mark.slow
 def test_un_git_en_echec_laisse_l_etat_modifie_coherent(make_box, monkeypatch) -> None:
     box = make_box()
     from wavedevsecops.terminal import quiz as quiz_module
@@ -411,6 +424,7 @@ def test_un_git_en_echec_laisse_l_etat_modifie_coherent(make_box, monkeypatch) -
     assert _of(events, Kind.QUIZ_ALTERED)
 
 
+@pytest.mark.slow
 def test_refus_d_un_choix_hors_quiz_ou_inconnu(make_box) -> None:
     box = make_box()
     with pytest.raises(OperationRefused) as unknown:

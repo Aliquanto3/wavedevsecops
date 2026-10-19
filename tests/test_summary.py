@@ -64,6 +64,7 @@ def _summary(box: Box) -> dict | None:
     return box.engine.snapshot()["step_panel"]["summary"]
 
 
+@pytest.mark.slow
 def test_pas_de_bilan_avant_la_fin(make_box) -> None:  # noqa: F811
     box = make_box()
     assert _summary(box) is None
@@ -71,6 +72,7 @@ def test_pas_de_bilan_avant_la_fin(make_box) -> None:  # noqa: F811
     assert _summary(box) is None
 
 
+@pytest.mark.slow
 def test_bilan_a_la_fin_lu_dans_progress_json(make_box) -> None:  # noqa: F811
     box = make_box()
     box.engine._progress.submit(
@@ -96,6 +98,7 @@ def test_bilan_a_la_fin_lu_dans_progress_json(make_box) -> None:  # noqa: F811
     assert len(done) == 1
 
 
+@pytest.mark.slow
 def test_bilan_identique_apres_redemarrage_et_recommencer(make_box) -> None:  # noqa: F811
     box = make_box()
     box.engine._progress.submit([_fact(box, "quiz_first_attempt", "commiter", correct=True)])
@@ -115,6 +118,7 @@ def test_bilan_identique_apres_redemarrage_et_recommencer(make_box) -> None:  # 
     assert reopened.snapshot()["step_panel"]["summary"] == before
 
 
+@pytest.mark.slow
 def test_scenario_suivant_du_catalogue(make_box) -> None:  # noqa: F811
     box = make_box("no_ai")
     (box.scenario_path.parent / "zeta.A.yaml").write_text(NEXT, encoding="utf-8", newline="\n")

@@ -84,6 +84,7 @@ def test_intention_enregistree_et_catalogue() -> None:
     assert llmrun.INTENT in CATALOGUE and llmrun.INTENT in INTENTS
 
 
+@pytest.mark.slow
 def test_lancement_confirme_snapshot_etat_command_et_sortie(
     instance: cli.Instance,  # noqa: F811
     cookie: dict,  # noqa: F811
@@ -129,6 +130,7 @@ def test_lancement_confirme_snapshot_etat_command_et_sortie(
     assert snapshots[-1].fingerprint == snapshots[0].fingerprint
 
 
+@pytest.mark.slow
 def test_refus_sans_confirmation(instance: cli.Instance, cookie: dict, fake_run: list) -> None:  # noqa: F811
     for body in ({}, {"confirmed": False}, None):
         status, refused = _call(instance, "POST", PATH, cookie, body)
@@ -166,6 +168,7 @@ def test_parcours_sans_ia_refuse() -> None:
     assert refused.value.reason_text == exercise.WRONG_TRACK_TEXT
 
 
+@pytest.mark.slow
 def test_echec_de_lancement_et_delai(
     instance: cli.Instance,  # noqa: F811
     cookie: dict,  # noqa: F811
@@ -203,6 +206,7 @@ def test_echec_de_lancement_et_delai(
     assert exits == [None, exercise.EXIT_TIMEOUT, 1]
 
 
+@pytest.mark.slow
 def test_interruption_arrete_le_code(
     instance: cli.Instance,  # noqa: F811
     cookie: dict,  # noqa: F811
@@ -233,6 +237,7 @@ def test_interruption_arrete_le_code(
     assert exits == [exercise.EXIT_INTERRUPTED]
 
 
+@pytest.mark.slow
 def test_instantane_en_echec_n_execute_rien(
     instance: cli.Instance,  # noqa: F811
     cookie: dict,  # noqa: F811

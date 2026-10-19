@@ -77,6 +77,7 @@ def _origin(git: Git, layout, *args: str) -> str:
     return git.internal(*args, cwd=layout.origin).strip()
 
 
+@pytest.mark.slow
 def test_agent_commit_identite_date_et_fichiers(settings: Settings, git_path: Path) -> None:
     prepared, git = _prepare(settings, git_path, AGENT_COMMIT)
     layout = prepared.layout
@@ -91,6 +92,7 @@ def test_agent_commit_identite_date_et_fichiers(settings: Settings, git_path: Pa
     assert (layout.repo / "app.py").read_text(encoding="utf-8") == "valeur = 3\n"
 
 
+@pytest.mark.slow
 def test_agent_commit_n_indexe_que_ses_fichiers(settings: Settings, git_path: Path) -> None:
     extra = (
         """\
@@ -106,6 +108,7 @@ def test_agent_commit_n_indexe_que_ses_fichiers(settings: Settings, git_path: Pa
     assert _repo(git, layout, "status", "--porcelain") == "?? perso.txt"
 
 
+@pytest.mark.slow
 def test_commit_de_l_agent_porte_le_badge_agent(settings: Settings, git_path: Path) -> None:
     prepared, git = _prepare(settings, git_path, AGENT_COMMIT)
     views = project(git, prepared.layout).views
@@ -115,6 +118,7 @@ def test_commit_de_l_agent_porte_le_badge_agent(settings: Settings, git_path: Pa
     assert ACTORS["agent-b@exemple.test"] == "agent"
 
 
+@pytest.mark.slow
 def test_push_force_reecrit_origin_sans_toucher_au_local(
     settings: Settings, git_path: Path
 ) -> None:
@@ -138,6 +142,7 @@ def test_push_force_reecrit_origin_sans_toucher_au_local(
     assert _repo(git, layout, "rev-parse", "origin/main") == new
 
 
+@pytest.mark.slow
 def test_push_force_sans_force_refuse_une_branche_qui_n_est_pas_le_parent(
     settings: Settings, git_path: Path
 ) -> None:
@@ -160,6 +165,7 @@ def test_push_force_parent_introuvable_refuse(settings: Settings, git_path: Path
         _prepare(settings, git_path, extra)
 
 
+@pytest.mark.slow
 def test_stash_identite_date_et_arbre_propre(settings: Settings, git_path: Path) -> None:
     prepared, git = _prepare(settings, git_path, STASH)
     layout = prepared.layout
@@ -181,6 +187,7 @@ def test_stash_sans_modification_refuse(settings: Settings, git_path: Path) -> N
         _prepare(settings, git_path, extra)
 
 
+@pytest.mark.slow
 def test_rebase_laisse_en_conflit_avec_l_identite_de_l_agent(
     settings: Settings, git_path: Path
 ) -> None:
@@ -221,6 +228,7 @@ def test_rebase_deja_en_cours_refuse(settings: Settings, git_path: Path) -> None
         _prepare(settings, git_path, extra)
 
 
+@pytest.mark.slow
 def test_scenario_rejoue_deux_fois_donne_la_meme_empreinte(
     settings: Settings, git_path: Path, tmp_path: Path
 ) -> None:
@@ -230,6 +238,7 @@ def test_scenario_rejoue_deux_fois_donne_la_meme_empreinte(
     assert first.aliases == second.aliases
 
 
+@pytest.mark.slow
 def test_sha_et_empreinte_de_reference_stables_sur_les_trois_os(
     settings: Settings, git_path: Path
 ) -> None:

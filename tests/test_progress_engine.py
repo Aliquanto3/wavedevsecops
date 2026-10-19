@@ -10,6 +10,7 @@ import json
 import os
 import re
 
+import pytest
 from test_steps import Box, make_box  # noqa: F401 - `make_box` est une fixture
 from test_steps import _kinds as kinds
 
@@ -31,6 +32,7 @@ def _facts(box: Box) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8")).get("facts", [])
 
 
+@pytest.mark.slow
 def test_une_etape_validee_est_enregistree_apres_run_json(make_box) -> None:  # noqa: F811
     box = make_box()
     assert _facts(box) == []
@@ -53,6 +55,7 @@ def test_une_etape_validee_est_enregistree_apres_run_json(make_box) -> None:  # 
     assert len(_facts(box)) == 1
 
 
+@pytest.mark.slow
 def test_fin_du_scenario_et_etats_derives(make_box) -> None:  # noqa: F811
     box = make_box()
     box.run("switch", "-c", "feature")
@@ -72,6 +75,7 @@ def test_fin_du_scenario_et_etats_derives(make_box) -> None:  # noqa: F811
     assert progress.progress("no_ai", "etapes", "A").state == "todo"  # autre parcours
 
 
+@pytest.mark.slow
 def test_arret_brutal_entre_run_json_et_les_faits(make_box) -> None:  # noqa: F811
     """`run.json` avance mais les faits manquent : le redémarrage les soumet, une seule fois."""
     box = make_box()
@@ -94,6 +98,7 @@ def test_arret_brutal_entre_run_json_et_les_faits(make_box) -> None:  # noqa: F8
     assert Kind.PROGRESS_UPDATED not in kinds(events)
 
 
+@pytest.mark.slow
 def test_arret_brutal_apres_la_derniere_etape(make_box) -> None:  # noqa: F811
     """`run.json` antérieur à `validated` : le rejeu retombe sur la position des étapes."""
     box = make_box()
@@ -103,6 +108,7 @@ def test_arret_brutal_apres_la_derniere_etape(make_box) -> None:  # noqa: F811
     assert [f["kind"] for f in _facts(box)] == ["step_validated"] * 3 + ["scenario_completed"]
 
 
+@pytest.mark.slow
 def test_rejouer_l_etape_apres_un_retablissement_ne_compte_pas_deux_fois(make_box) -> None:  # noqa: F811
     """Vrai rétablissement de l'instantané d'installation (nouvel epoch), pointeur d'étape remis
     au début, puis vraie seconde validation de la même étape : le fait du premier passage
@@ -123,6 +129,7 @@ def test_rejouer_l_etape_apres_un_retablissement_ne_compte_pas_deux_fois(make_bo
     assert _facts(box) == [first]  # ni doublon ni remplacement (op_id et epoch d'origine)
 
 
+@pytest.mark.slow
 def test_rejeu_apres_reordonnancement_n_invente_aucune_etape(make_box) -> None:  # noqa: F811
     """Le rejeu cite les étapes validées consignées dans `run.json`, pas leur position : une
     étape déplacée avant l'étape courante (mise à jour du contenu) n'est pas tenue pour faite."""

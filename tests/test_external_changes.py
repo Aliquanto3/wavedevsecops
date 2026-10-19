@@ -164,6 +164,7 @@ def _edit_and_measure(layout: Layout, spy: Spy, *, wait_second: bool = True) -> 
     return stamp - started
 
 
+@pytest.mark.slow
 def test_modification_externe_suivie_en_moins_de_deux_secondes(
     manager: WorkspaceManager, settings: Settings
 ) -> None:
@@ -171,6 +172,7 @@ def test_modification_externe_suivie_en_moins_de_deux_secondes(
     assert _edit_and_measure(layout, spy) < BUDGET_S
 
 
+@pytest.mark.slow
 def test_changement_sous_git_seul_ou_meme_empreinte_sans_operation(
     manager: WorkspaceManager, settings: Settings
 ) -> None:
@@ -181,6 +183,7 @@ def test_changement_sous_git_seul_ou_meme_empreinte_sans_operation(
     assert spy.stamps == []
 
 
+@pytest.mark.slow
 def test_aucune_operation_pendant_une_commande_ni_apres(
     manager: WorkspaceManager, settings: Settings
 ) -> None:
@@ -205,6 +208,7 @@ def test_aucune_operation_pendant_une_commande_ni_apres(
     assert watcher.running
 
 
+@pytest.mark.slow
 def test_ecriture_externe_juste_apres_une_commande_n_est_pas_perdue(
     manager: WorkspaceManager, settings: Settings
 ) -> None:
@@ -256,6 +260,7 @@ def test_ecriture_externe_pendant_la_suspension_proposee_a_la_reprise() -> None:
     watcher.stop()
 
 
+@pytest.mark.slow
 def test_ecriture_externe_pendant_une_commande_vue_apres(
     manager: WorkspaceManager, settings: Settings
 ) -> None:

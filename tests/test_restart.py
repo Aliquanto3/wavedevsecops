@@ -171,6 +171,7 @@ def make_box(tmp_path: Path, git_path: Path, monkeypatch) -> Iterator[Callable[[
 
 
 # ------------------------------------------------------------ l'AC : retour à l'instantané 0
+@pytest.mark.slow
 def test_recommencer_rend_l_empreinte_de_l_instantane_0_et_l_etape_1(make_box) -> None:
     box = make_box()
     setup_digest = get_snapshot(box.engine.layout, 0).fingerprint
@@ -196,6 +197,7 @@ def test_recommencer_rend_l_empreinte_de_l_instantane_0_et_l_etape_1(make_box) -
     assert _of(events, Kind.APP_ERROR) == []
 
 
+@pytest.mark.slow
 def test_restoring_est_pose_avec_le_run_json_remis_a_zero(make_box, monkeypatch) -> None:
     """Un arrêt entre la réécriture de `run.json` et la copie reste repris au démarrage (4.3)."""
     box = make_box()
@@ -216,6 +218,7 @@ def test_restoring_est_pose_avec_le_run_json_remis_a_zero(make_box, monkeypatch)
     assert box.run_json()["restoring"] is None
 
 
+@pytest.mark.slow
 def test_recommencer_n_est_pas_un_retablissement_marque(make_box) -> None:
     box = make_box()
     box.run("quiz_choice", {"choice_id": "revert"})
@@ -225,6 +228,7 @@ def test_recommencer_n_est_pas_un_retablissement_marque(make_box) -> None:
 
 
 # --------------------------------------------------------- 4.5 : quiz et restore_failed
+@pytest.mark.slow
 def test_recommencer_efface_restore_failed_quiz_et_quiz_first(make_box) -> None:
     box = make_box()
     setup_digest = get_snapshot(box.engine.layout, 0).fingerprint
@@ -253,6 +257,7 @@ def test_recommencer_efface_restore_failed_quiz_et_quiz_first(make_box) -> None:
     assert box.run("quiz_choice", {"choice_id": "revert"})
 
 
+@pytest.mark.slow
 def test_recommencer_sort_de_quiz_altered_sans_retablir_d_abord(make_box) -> None:
     box = make_box()
     setup_digest = get_snapshot(box.engine.layout, 0).fingerprint
@@ -266,6 +271,7 @@ def test_recommencer_sort_de_quiz_altered_sans_retablir_d_abord(make_box) -> Non
     assert not box.run_json().get("quiz")
 
 
+@pytest.mark.slow
 def test_une_vraie_restauration_ratee_ne_laisse_pas_restore_failed(make_box) -> None:
     """L'instantané 0 est corrompu : Recommencer reconstruit par le setup."""
     box = make_box()
@@ -285,6 +291,7 @@ def _tiers(box: Box) -> list[str]:
     return [t["state"] for t in current["hints"]["tiers"]]
 
 
+@pytest.mark.slow
 def test_recommencer_clot_la_lecture_puis_remet_les_paliers_a_zero(make_box) -> None:
     box = make_box()
     box.run("hint_open", {"tier": 1})
@@ -305,6 +312,7 @@ def test_recommencer_clot_la_lecture_puis_remet_les_paliers_a_zero(make_box) -> 
     assert len(box.facts("hint_opened")) == 1
 
 
+@pytest.mark.slow
 def test_les_essais_de_la_solution_sont_remis_a_zero(make_box) -> None:
     box = make_box()
     box.run("hint_open", {"tier": 1})
@@ -316,6 +324,7 @@ def test_les_essais_de_la_solution_sont_remis_a_zero(make_box) -> None:
 
 
 # ---------------------------------------------------------------- 5.2 : désignation
+@pytest.mark.slow
 def test_recommencer_vide_les_reponses_de_designation(make_box) -> None:
     box = make_box()
     run = box.run_json()
@@ -328,6 +337,7 @@ def test_recommencer_vide_les_reponses_de_designation(make_box) -> None:
 
 
 # -------------------------------------------------------- 4.2 : le score est conservé
+@pytest.mark.slow
 def test_les_faits_du_premier_passage_sont_conserves(make_box) -> None:
     box = make_box()
     box.run("quiz_choice", {"choice_id": "branche"})  # mauvais premier choix
@@ -357,6 +367,7 @@ def test_les_faits_du_premier_passage_sont_conserves(make_box) -> None:
     assert (score.quiz_total, score.quiz_correct) == (1, 0)
 
 
+@pytest.mark.slow
 def test_le_second_passage_ne_compte_ni_dans_le_score_ni_dans_les_indices(make_box) -> None:
     """Une étape jamais répondue au premier passage ne prend pas de « premier essai » ensuite."""
     box = make_box()
@@ -391,6 +402,7 @@ def test_derive_ne_compte_que_les_faits_d_avant_la_premiere_remise_a_zero() -> N
     assert (got.state, got.steps_validated) == ("in_progress", ["b"])
 
 
+@pytest.mark.slow
 def test_chaque_remise_a_zero_ajoute_son_fait(make_box) -> None:
     box = make_box()
     box.run("restart")
@@ -404,6 +416,7 @@ def test_une_remise_a_zero_ne_fait_pas_commencer_un_scenario() -> None:
 
 
 # ------------------------------------------------------------------ 4.7 : le bilan
+@pytest.mark.slow
 def test_le_bilan_disparait_apres_recommencer_et_revient_identique(make_box) -> None:
     box = make_box()
     box.finish()
@@ -423,6 +436,7 @@ def test_le_bilan_disparait_apres_recommencer_et_revient_identique(make_box) -> 
 
 
 # ------------------------------------------------------- reconstruction par le setup
+@pytest.mark.slow
 def test_sans_instantane_0_l_espace_est_reconstruit_et_compare_a_la_reference(make_box) -> None:
     box = make_box()
     write_references(compute_references(box.settings, box.git_path), box.settings)
@@ -437,6 +451,7 @@ def test_sans_instantane_0_l_espace_est_reconstruit_et_compare_a_la_reference(ma
     assert box.run_json()["epoch"] == box.engine.epoch
 
 
+@pytest.mark.slow
 def test_une_reconstruction_qui_ne_correspond_pas_a_la_reference_est_signalee(make_box) -> None:
     box = make_box()
     write_references({"llm/reprise.A": "0" * 64}, box.settings)
@@ -450,6 +465,7 @@ def test_une_reconstruction_qui_ne_correspond_pas_a_la_reference_est_signalee(ma
         box.run("quiz_choice", {"choice_id": "revert"})
 
 
+@pytest.mark.slow
 def test_un_scenario_disparu_donne_une_erreur_avec_le_diagnostic(make_box) -> None:
     box = make_box()
     box.path.unlink()
@@ -459,6 +475,7 @@ def test_un_scenario_disparu_donne_une_erreur_avec_le_diagnostic(make_box) -> No
 
 
 # ------------------------------------------------------- AD-20 : le contenu a changé
+@pytest.mark.slow
 def test_un_contenu_incompatible_propose_recommencer_puis_reconstruit(make_box) -> None:
     box = make_box()
     assert box.panel()["content_changed"] is None
@@ -486,6 +503,7 @@ def test_un_contenu_incompatible_propose_recommencer_puis_reconstruit(make_box) 
     assert [s["step_id"] for s in panel["steps"]] == ["annuler", "entre", "ensuite"]
 
 
+@pytest.mark.slow
 def test_une_retouche_de_texte_ne_propose_rien(make_box) -> None:
     box = make_box()
     box.path.write_text(
@@ -505,6 +523,7 @@ def test_l_intention_restart_est_enregistree_par_l_application(tmp_path: Path) -
     assert "restart" in INTENTS
 
 
+@pytest.mark.slow
 def test_les_ecritures_sont_toujours_refusees_hors_restart(make_box) -> None:
     """Garde : seule `restart` est exemptée des refus d'écriture (4.5)."""
     box = make_box()

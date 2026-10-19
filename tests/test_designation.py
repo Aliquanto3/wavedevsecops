@@ -195,6 +195,7 @@ def test_lint_des_cases_de_designation() -> None:
     assert any("@fantome" in m for m in _lint(alias).values())
 
 
+@pytest.mark.slow
 def test_le_panneau_montre_la_question_jamais_les_bonnes_reponses(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -217,6 +218,7 @@ def _flags(views: dict) -> dict[str, set[bool]]:
     return {"commits": commits, "refs": refs}
 
 
+@pytest.mark.slow
 def test_la_projection_marque_designables_les_types_acceptes_seulement(make_box) -> None:
     box = make_box()
     assert _flags(box.engine.snapshot()["views"]) == {"commits": {True}, "refs": {True}}
@@ -238,6 +240,7 @@ def test_la_projection_marque_designables_les_types_acceptes_seulement(make_box)
     assert _flags(box.engine.snapshot()["views"]) == {"commits": {True}, "refs": {False}}
 
 
+@pytest.mark.slow
 def test_une_etape_sans_designation_laisse_tout_designable(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -251,6 +254,7 @@ def test_une_etape_sans_designation_laisse_tout_designable(make_box) -> None:
     assert _flags(box.engine.snapshot()["views"]) == {"commits": {True}, "refs": {True}}
 
 
+@pytest.mark.slow
 def test_le_reveil_d_un_espace_garde_les_marques(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -262,6 +266,7 @@ def test_le_reveil_d_un_espace_garde_les_marques(make_box) -> None:
 
 
 # ---------------------------------------------------------------- correction
+@pytest.mark.slow
 def test_une_mauvaise_reponse_est_corrigee_une_seule_fois(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -298,6 +303,7 @@ def test_une_mauvaise_reponse_est_corrigee_une_seule_fois(make_box) -> None:
     assert load_run(box.engine.layout)["answers"]["qui_a_casse"]["correct"] is False
 
 
+@pytest.mark.slow
 def test_la_bonne_reponse_et_un_equivalent(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -315,6 +321,7 @@ def test_la_bonne_reponse_et_un_equivalent(make_box) -> None:
     assert verdict["passed"] is True and verdict["next_step_id"] == "deux_commits"
 
 
+@pytest.mark.slow
 def test_principal_juste_sans_equivalent(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -323,6 +330,7 @@ def test_principal_juste_sans_equivalent(make_box) -> None:
     assert mark["correct"] and not mark["equivalent"] and "c'est bien" in mark["text"]
 
 
+@pytest.mark.slow
 def test_plusieurs_cases_correction_par_case(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -339,6 +347,7 @@ def test_plusieurs_cases_correction_par_case(make_box) -> None:
     assert fact["kind"] == "quiz_first_attempt" and fact["correct"] is False
 
 
+@pytest.mark.slow
 def test_refus_connus_d_avance_sans_consommer_l_essai(make_box) -> None:
     box = make_box()
     # Étape 1 : ce n'est pas une désignation.
@@ -366,6 +375,7 @@ def test_refus_connus_d_avance_sans_consommer_l_essai(make_box) -> None:
     assert box.step_id() == "qui_a_casse"
 
 
+@pytest.mark.slow
 def test_deux_soumissions_en_file_la_seconde_est_dite_a_l_ecran(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -388,6 +398,7 @@ def test_deux_soumissions_en_file_la_seconde_est_dite_a_l_ecran(make_box) -> Non
     assert len([f for f in _facts(box) if f["kind"] == "quiz_first_attempt"]) == 1
 
 
+@pytest.mark.slow
 def test_arret_entre_la_reponse_et_la_fermeture_de_l_etape(make_box) -> None:
     """`run.json` garde la réponse mais l'étape n'est pas fermée : la soumission suivante
     termine la fermeture avec la correction consignée, sans nouvelle correction."""
@@ -406,6 +417,7 @@ def test_arret_entre_la_reponse_et_la_fermeture_de_l_etape(make_box) -> None:
     assert box.step_id() == "deux_commits"
 
 
+@pytest.mark.slow
 def test_le_rejeu_apres_arret_brutal_rend_le_premier_essai(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -429,6 +441,7 @@ def test_le_rejeu_apres_arret_brutal_rend_le_premier_essai(make_box) -> None:
 
 
 # --------------------------------------------------------------- resolve_sha
+@pytest.mark.slow
 def test_resolve_sha_apercu_sans_consommer_l_essai(make_box) -> None:
     box = make_box()
     _to_first_designation(box)
@@ -445,6 +458,7 @@ def test_resolve_sha_apercu_sans_consommer_l_essai(make_box) -> None:
     assert "answers" not in load_run(box.engine.layout) and box.step_id() == "qui_a_casse"
 
 
+@pytest.mark.slow
 def test_resolve_sha_refus_clairs_en_francais(make_box) -> None:
     box = make_box()
     views = box.engine.last_projection.views
@@ -490,6 +504,7 @@ def _http(inst: cli.Instance, method: str, path: str, cookie: str, body: object 
     return resp.status, json.loads(raw) if raw else {}
 
 
+@pytest.mark.slow
 def test_http_resolve_sha_et_seconde_soumission_en_409(
     instance: cli.Instance, git_path: Path
 ) -> None:

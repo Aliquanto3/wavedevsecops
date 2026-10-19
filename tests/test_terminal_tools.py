@@ -268,6 +268,7 @@ def _fake_tool(
     return calls
 
 
+@pytest.mark.slow
 def test_outil_non_declare_refuse_avec_son_explication(
     tmp_path: Path, git_path: Path, no_sync: None
 ) -> None:
@@ -284,6 +285,7 @@ def test_outil_non_declare_refuse_avec_son_explication(
         box.manager.close()
 
 
+@pytest.mark.slow
 def test_le_scenario_ne_declare_que_ses_outils(lint_box: Box) -> None:
     assert terminal.declared_tools(lint_box.engine) == {"git", "ruff"}
     _op, code, events = lint_box.run("pytest")  # pytest n'est pas déclaré par ce scénario
@@ -292,6 +294,7 @@ def test_le_scenario_ne_declare_que_ses_outils(lint_box: Box) -> None:
     assert "« pytest » n'est pas disponible dans ce scénario" in text
 
 
+@pytest.mark.slow
 def test_ruff_sortie_verbatim_en_bloc_etiquete_liens_machine_et_preuve(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -333,6 +336,7 @@ def test_ruff_sortie_verbatim_en_bloc_etiquete_liens_machine_et_preuve(
     assert len([f for f in lint_box.facts() if f["kind"] == "evidence_seen"]) == 1
 
 
+@pytest.mark.slow
 def test_sortie_machine_en_echec_garde_la_sortie_sans_liens(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -345,6 +349,7 @@ def test_sortie_machine_en_echec_garde_la_sortie_sans_liens(
     assert notices and "Les liens vers le code ne sont pas disponibles" in notices[0]
 
 
+@pytest.mark.slow
 def test_succes_sans_execution_machine_et_preuve_vue(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -360,6 +365,7 @@ def test_succes_sans_execution_machine_et_preuve_vue(
     assert [f["barrier_id"] for f in lint_box.facts() if f["kind"] == "evidence_seen"] == ["lint"]
 
 
+@pytest.mark.slow
 def test_outil_indisponible_renvoie_au_diagnostic(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -376,6 +382,7 @@ def test_outil_indisponible_renvoie_au_diagnostic(
     assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
 
 
+@pytest.mark.slow
 def test_ctrl_c_arrete_l_outil_sans_preuve(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -400,6 +407,7 @@ def test_ctrl_c_arrete_l_outil_sans_preuve(
     assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
 
 
+@pytest.mark.slow
 def test_ctrl_c_arrete_aussi_l_execution_machine(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -436,6 +444,7 @@ def test_ctrl_c_arrete_aussi_l_execution_machine(
     assert not [f for f in lint_box.facts() if f["kind"] == "evidence_seen"]
 
 
+@pytest.mark.slow
 def test_delai_depasse_arrete_l_outil(
     tmp_path: Path, git_path: Path, no_sync: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -450,12 +459,14 @@ def test_delai_depasse_arrete_l_outil(
         box.manager.close()
 
 
+@pytest.mark.slow
 def test_seule_l_option_fix_est_une_ecriture(lint_box: Box) -> None:
     assert build_terminal_line(lint_box.engine, TerminalLine(line="ruff check .")).writes is False
     fix = build_terminal_line(lint_box.engine, TerminalLine(line="ruff check --fix ."))
     assert fix.writes is True  # refusée en `quiz_altered` (AD-1)
 
 
+@pytest.mark.slow
 def test_environnement_d_exercice_cree_a_l_ouverture_si_le_scenario_declare_un_outil(
     tmp_path: Path, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -476,6 +487,7 @@ def test_environnement_d_exercice_cree_a_l_ouverture_si_le_scenario_declare_un_o
     assert calls == []
 
 
+@pytest.mark.slow
 def test_echec_de_la_creation_de_l_environnement_n_empeche_pas_l_ouverture(
     tmp_path: Path, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -489,6 +501,7 @@ def test_echec_de_la_creation_de_l_environnement_n_empeche_pas_l_ouverture(
     assert (prepared.layout.repo / "tests" / "test_rupture.py").is_file()
 
 
+@pytest.mark.slow
 def test_secours_cree_l_environnement_et_s_arrete_sur_ctrl_c(
     lint_box: Box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -535,6 +548,7 @@ USE_TEMPLATE_LOCK = os.environ.get("WDS_EXERCISE_UV") == "1"
         (BROKEN, "llm", "pytest -q --tb=short", "test_rupture", "tests/test_rupture.py", "tests"),
     ],
 )
+@pytest.mark.slow
 def test_vrais_outils_dans_le_terminal(
     git_path: Path,
     scenario: Path,

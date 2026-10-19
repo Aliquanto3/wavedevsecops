@@ -190,6 +190,7 @@ def test_le_moteur_ne_connait_aucun_type_d_etape() -> None:
 
 
 # ------------------------------------------------------- vrai git, bout en bout
+@pytest.mark.slow
 @pytest.mark.parametrize("command", [("switch", "-c", "feature"), ("checkout", "-b", "feature")])
 def test_etape_reussie_quelle_que_soit_la_commande(make_box, command: tuple[str, ...]) -> None:
     box = make_box()
@@ -222,6 +223,7 @@ def test_etape_reussie_quelle_que_soit_la_commande(make_box, command: tuple[str,
     assert [s["state"] for s in panel["steps"]] == ["done", "current", "todo"]
 
 
+@pytest.mark.slow
 def test_la_suite_des_etapes_et_la_fin(make_box) -> None:
     box = make_box()
     box.run("switch", "-c", "feature")
@@ -240,6 +242,7 @@ def test_la_suite_des_etapes_et_la_fin(make_box) -> None:
     assert Kind.STEP_VERDICT not in _kinds(box.run("commit", "-q", "--allow-empty", "-m", "Suite"))
 
 
+@pytest.mark.slow
 def test_etat_prevu_mais_insuffisant(make_box) -> None:
     box = make_box()
     events = box.run("branch", "feature")
@@ -255,6 +258,7 @@ def test_etat_prevu_mais_insuffisant(make_box) -> None:
     assert next(e for e in events if e.kind == Kind.STEP_VERDICT).payload["passed"] is True
 
 
+@pytest.mark.slow
 def test_etat_inattendu(make_box) -> None:
     box = make_box()
     events = box.run("switch", "-c", "autre")
@@ -270,12 +274,14 @@ def test_etat_inattendu(make_box) -> None:
     assert box.step_id() == "creer_branche"  # rien n'est bloqué : l'étape reste ouverte
 
 
+@pytest.mark.slow
 def test_commande_de_lecture_sans_verdict(make_box) -> None:
     box = make_box()
     assert Kind.STEP_VERDICT not in _kinds(box.run("status"))
     assert Kind.STEP_VERDICT not in _kinds(box.run("log", "--oneline"))
 
 
+@pytest.mark.slow
 def test_step_id_stable_si_les_etapes_sont_reordonnees(make_box) -> None:
     """La progression cite le `step_id`, pas la position : insérer ou déplacer ne la perd pas."""
     box = make_box()
@@ -300,6 +306,7 @@ def test_step_id_stable_si_les_etapes_sont_reordonnees(make_box) -> None:
     assert next(e for e in events if e.kind == Kind.STEP_VERDICT).payload["step_id"] == "commiter"
 
 
+@pytest.mark.slow
 def test_panneau_ne_devoile_que_les_explications_des_etapes_reussies(make_box) -> None:
     box = make_box()
     panel = box.engine.snapshot()["step_panel"]
@@ -313,6 +320,7 @@ def test_panneau_ne_devoile_que_les_explications_des_etapes_reussies(make_box) -
     assert steps[0]["explanation_text"] and not steps[1]["explanation_text"]
 
 
+@pytest.mark.slow
 def test_le_sandbox_sans_etape_n_a_pas_de_panneau(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "data")
     manager = WorkspaceManager(settings, git_path=git_path, watch=False)
@@ -639,6 +647,7 @@ def test_lint_type_d_etape_alias_cle_d_explication_et_step_id() -> None:
 
 
 # ------------------------------------------------------------------ revue 4.1
+@pytest.mark.slow
 def test_lecture_seule_dans_un_etat_prevu_ne_republie_rien(make_box) -> None:
     box = make_box()
     events = box.run("branch", "feature")
@@ -676,6 +685,7 @@ def test_depot_illisible_rien_a_dire() -> None:
     assert check(None, StepContext(step)).status == "pending"
 
 
+@pytest.mark.slow
 def test_un_type_recoit_l_intention_et_les_vues(make_box, monkeypatch) -> None:
     """Un type qui ne juge pas le dépôt (quiz, désignation) lit l'opération : le moteur ne
     change pas."""
@@ -701,6 +711,7 @@ def test_un_type_recoit_l_intention_et_les_vues(make_box, monkeypatch) -> None:
     ]
 
 
+@pytest.mark.slow
 def test_scenario_devenu_invalide_ne_fait_pas_d_erreur(make_box) -> None:
     box = make_box()
     box.scenario_path.write_text("schema_version: [", encoding="utf-8")

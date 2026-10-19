@@ -60,6 +60,7 @@ def _origin_sha(space: Space, git_path: Path, branch: str) -> str:
     return _git(space, git_path).internal("rev-parse", branch, cwd=space.layout.origin).strip()
 
 
+@pytest.mark.slow
 def test_ouvrir_puis_merger_une_pr(space: Space, git_path: Path) -> None:
     _sh(space, "git switch main")
     _push_branch(space, "feat", "feat.txt", "x\n")
@@ -89,12 +90,14 @@ def test_ouvrir_puis_merger_une_pr(space: Space, git_path: Path) -> None:
     assert remote == merged.merge_sha
 
 
+@pytest.mark.slow
 def test_branche_absente_d_origin_refusee_en_409(space: Space) -> None:
     with pytest.raises(OperationRefused, match="Poussez d'abord"):
         build_operation(space.engine, "pr_open", {"head": "fantome"})
     assert github_sim.load(space.layout).pulls == []
 
 
+@pytest.mark.slow
 def test_pr_en_conflit_refusee(space: Space, git_path: Path) -> None:
     _sh(space, "git switch main")
     space.write("x.txt", "a\n")
@@ -112,6 +115,7 @@ def test_pr_en_conflit_refusee(space: Space, git_path: Path) -> None:
         build_operation(space.engine, "pr_merge", {"number": 9})
 
 
+@pytest.mark.slow
 def test_base_qui_bouge_pendant_le_merge(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -137,6 +141,7 @@ def test_base_qui_bouge_pendant_le_merge(
     assert pr.base_sha == _origin_sha(space, git_path, "main") != main_before
 
 
+@pytest.mark.slow
 def test_un_push_du_terminal_rafraichit_les_pr(space: Space, git_path: Path) -> None:
     _sh(space, "git switch main")
     _push_branch(space, "feat", "feat.txt", "x\n")
@@ -160,6 +165,7 @@ def test_intentions_enregistrees_et_corps_invalides() -> None:
         build_operation(None, "pr_merge", {"number": 0})
 
 
+@pytest.mark.slow
 def test_merge_interrompu_constate_sans_nouveau_commit(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -190,6 +196,7 @@ def test_merge_interrompu_constate_sans_nouveau_commit(
     assert _origin_sha(space, git_path, "main") == merge_sha
 
 
+@pytest.mark.slow
 def test_head_deja_contenue_dans_base_refusee(space: Space, git_path: Path) -> None:
     _sh(space, "git switch main")
     _push_branch(space, "feat", "feat.txt", "x\n")
@@ -201,6 +208,7 @@ def test_head_deja_contenue_dans_base_refusee(space: Space, git_path: Path) -> N
     assert _origin_sha(space, git_path, "main") == before
 
 
+@pytest.mark.slow
 def test_update_ref_en_echec_sans_course(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -217,6 +225,7 @@ def test_update_ref_en_echec_sans_course(
     assert _origin_sha(space, git_path, "main") == before
 
 
+@pytest.mark.slow
 def test_course_par_l_intention_annonce_les_pr(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

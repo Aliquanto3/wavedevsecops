@@ -107,6 +107,7 @@ def _js(tmp_path: Path, snapshots: dict, body: str) -> dict:
         del os.environ["SNAPS"]
 
 
+@pytest.mark.slow
 def test_graphe_dessine_noeuds_aretes_refs_et_marques(tmp_path: Path, snapshots: dict) -> None:
     views = snapshots["merged"]
     out = _js(
@@ -488,6 +489,7 @@ def _segment_distance(
     return ((px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2) ** 0.5
 
 
+@pytest.mark.slow
 def test_aretes_ne_traversent_aucun_disque_quand_deux_commits_partagent_un_rang(
     tmp_path: Path, git_path: Path
 ) -> None:

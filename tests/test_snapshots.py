@@ -123,6 +123,7 @@ def test_verrous_de_git_non_copies(prepared, git: Git, settings: Settings) -> No
     assert (snapshot.path / "repo" / ".git" / "index").exists()
 
 
+@pytest.mark.slow
 def test_retention(prepared, git: Git, settings: Settings) -> None:
     layout = prepared.layout
     small = settings.model_copy(update={"max_snapshots": 3})
@@ -281,6 +282,7 @@ def _node(views: dict, sha: str) -> dict:
     return next(n for n in views["graph"]["nodes"] if n["sha"] == sha)
 
 
+@pytest.mark.slow
 def test_restauration_dans_la_file(
     prepared, git: Git, manager: WorkspaceManager, watchers: list[FakeWatcher]
 ) -> None:
@@ -329,6 +331,7 @@ def test_restauration_dans_la_file(
     assert engine.state == "idle"
 
 
+@pytest.mark.slow
 def test_restauration_admise_en_quiz_altered(prepared, manager: WorkspaceManager) -> None:
     engine = manager.get(WS)
     engine.submit(
@@ -371,6 +374,7 @@ def test_exception_inattendue_donne_restore_failed(
     assert run["restoring"]["phase"] == "verify"
 
 
+@pytest.mark.slow
 def test_reprise_au_demarrage(prepared, git: Git, manager: WorkspaceManager) -> None:
     """Arrêt pendant `restoring` : au redémarrage, la copie reprend puis est vérifiée."""
     layout = prepared.layout

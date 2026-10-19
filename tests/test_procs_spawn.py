@@ -88,6 +88,7 @@ def test_sortie_au_fil_de_l_eau_et_flux_distincts() -> None:
     assert not handle.timed_out and not handle.interrupted
 
 
+@pytest.mark.slow
 def test_spawn_ne_bloque_pas_et_rend_des_battements() -> None:
     handle = procs.spawn([PYTHON, "-c", "import time; time.sleep(1.5)"], timeout=WAIT)
     assert handle.returncode is None  # rendu aussitôt, le processus tourne encore
