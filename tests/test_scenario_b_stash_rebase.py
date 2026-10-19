@@ -177,6 +177,9 @@ def test_stash_designation_juste_puis_fausse(make_box) -> None:
         wrong["slots"][0]["expected_element_id"]
         == f"commit:{other.git_out('rev-parse', 'refs/stash').strip()}"
     )
+    # La correction nomme l'entrée du stash, pas un SHA court nu.
+    assert "stash@{0}" in wrong["slots"][0]["text"]
+    assert "WIP : fonction au_revoir" in wrong["slots"][0]["text"]
     assert other.step_id() == "reprendre"
 
 
@@ -240,6 +243,16 @@ def test_stash_drop_puis_reecriture_differente_ne_valide_pas(make_box) -> None:
     box.line("git stash drop")
     box.line('echo "# autre chose" >> src/bonjour.py')
     box.line('git commit -a -m "Travail refait"')
+    _open(box, "reprendre")
+
+
+@pytest.mark.slow
+def test_stash_ignore_et_fonction_ecrite_a_la_main_ne_valide_pas(make_box) -> None:
+    # Leçon 6.2 : le nom de la fonction seul ne suffit pas, il faut le travail de l'agent.
+    box = make_box("stash")
+    _to_resume(box)
+    box.line('echo "def au_revoir(): pass" >> src/bonjour.py')
+    box.line('git commit -a -m "Ajoute au_revoir"')
     _open(box, "reprendre")
 
 

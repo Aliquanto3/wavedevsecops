@@ -105,7 +105,11 @@ def describe(element: str, state: RepoState | None) -> str:
         return element
     if kind == "commit":
         commit = next((c for c in state.commits if c.sha == segments[0]), None) if state else None
-        return f"{segments[0][:7]} « {commit.subject} »" if commit else segments[0][:7]
+        if commit:
+            return f"{segments[0][:7]} « {commit.subject} »"
+        # Story 5.8 : une entrée du stash n'est pas dans l'historique, on la nomme par sa place.
+        entry = next((s for s in state.stash if s.sha == segments[0]), None) if state else None
+        return f"stash@{{{entry.index}}} « {entry.message} »" if entry else segments[0][:7]
     if kind == "ref":
         ref = next((r for r in state.refs if r.name == segments[0]), None) if state else None
         return f"la référence {ref.short_name if ref else segments[0]}"

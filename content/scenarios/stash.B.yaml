@@ -90,7 +90,7 @@ steps:
       tree:
         contains:
           - path: src/bonjour.py
-            text: "def au_revoir"
+            text: 'return f"Au revoir, {nom} !"'
     foreseen:
       - when:
           stash:

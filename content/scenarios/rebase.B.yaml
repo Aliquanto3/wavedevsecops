@@ -101,8 +101,9 @@ steps:
         command_text: git rebase --skip
         effect_text: >-
           `--skip` a écarté « Raccourcit le salut » : le rebase s'est terminé sans lui, et le
-          travail de l'agent n'est plus dans la branche. Ce n'est pas un retour en arrière :
-          rétablissez l'état d'avant, puis choisissez `--abort`.
+          travail de l'agent n'est plus dans la branche. Ce n'est pas un retour en arrière, et
+          `--abort` n'a plus de rebase à annuler : recommencez le scénario pour retrouver le
+          rebase en conflit, puis choisissez `--abort`.
       - choice_id: continue
         command_text: git rebase --continue
         effect_text: >-
