@@ -255,8 +255,8 @@ $('[data-action="continue"]').click();
 console.log(JSON.stringify({ marked, pill, after: node().getAttribute("aria-label") }));
 """,
     )
-    # L'étiquette n'est plus dans le bouton du commit : sa marque est dans son propre texte.
-    assert out["marked"] == "Commit aaaaaaa"
+    # L'étiquette est à côté du bouton du commit : son verdict reste dans le nom du bouton.
+    assert out["marked"] == "Commit aaaaaaa — main : ✓ Attendu"
     assert out["pill"].endswith("✓ Attendu")
     assert out["after"] == "Commit aaaaaaa"
 

@@ -47,12 +47,22 @@ def _is_root(arg: str) -> bool:
     return arg != "" and not _parts(arg) and not arg.startswith("/")
 
 
+def _matches_every_name(arg: str) -> bool:
+    """Vrai pour un motif d'un seul segment qui prend tout nom non caché (`*`, `**`, `?*`, `*?`) :
+    que des `*` et `?`, au moins une `*`, au plus un `?` (tout nom a au moins un caractère)."""
+    parts = _parts(arg)
+    if len(parts) != 1 or arg.startswith("/"):
+        return False
+    seg = parts[0]
+    return set(seg) <= {"*", "?"} and "*" in seg and seg.count("?") <= 1
+
+
 def clears_root(command: FileCommand) -> bool:
-    """Vrai pour un `rm` récursif qui vide la racine du bac à sable (`*`, `.`, `./*`) : la
+    """Vrai pour un `rm` récursif qui vide la racine du bac à sable (`*`, `?*`, `.`, `./*`) : la
     commande demande alors une confirmation avant de s'exécuter."""
     if command.name != "rm" or not command.options & {"-r", "-R"}:
         return False
-    return any(_is_root(arg) or _parts(arg) == ["*"] for arg in command.args)
+    return any(_is_root(arg) or _matches_every_name(arg) for arg in command.args)
 
 
 def _check(path: str) -> str:

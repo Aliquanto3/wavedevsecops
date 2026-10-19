@@ -437,6 +437,14 @@ def test_refus_de_chemin_et_code_de_sortie_par_le_terminal(space: Space) -> None
         ("rm -rf ./*", True),
         ("rm -r ./", True),
         ("rm -R *", True),
+        ("rm -rf ?*", True),
+        ("rm -rf **", True),
+        ("rm -rf *?", True),
+        ("rm -r -f *", True),
+        ("rm -fr *", True),
+        ("rm -rf note.txt *", True),
+        ("rm -rf ??*", False),  # laisse les noms d'un caractère
+        ("rm -rf .*", False),  # fichiers cachés seulement
         ("rm -rf build", False),
         ("rm -rf src/*", False),
         ("rm *", False),  # sans -r, les dossiers restent

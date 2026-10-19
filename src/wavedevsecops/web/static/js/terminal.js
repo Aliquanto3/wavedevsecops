@@ -133,8 +133,7 @@ function confirmNode(entry, choose) {
   const confirm = el("button", "btn btn-primary", { type: "button", "data-action": "terminal-confirm" });
   confirm.textContent = CONFIRM_LABEL;
   const settle = (confirmed) => {
-    actions.remove(); // une seule réponse par demande
-    choose(confirmed);
+    if (choose(confirmed)) actions.remove(); // une seule réponse par demande ; occupé : on garde les boutons
   };
   cancel.addEventListener("click", () => settle(false));
   confirm.addEventListener("click", () => settle(true));
@@ -252,8 +251,14 @@ export function createTerminal(body, { store, timers = globalThis }) {
 
   let lastLine = ""; // la ligne en attente d'une confirmation en ligne
 
-  async function choose(confirmed, line) {
-    if (!line || isBusy(store.state)) return;
+  /** Envoie la réponse ; rend faux (sans rien envoyer) quand elle ne peut pas partir maintenant. */
+  function choose(confirmed, line) {
+    if (!line || isBusy(store.state)) return false;
+    send(confirmed, line);
+    return true;
+  }
+
+  async function send(confirmed, line) {
     const payload = confirmed ? { line, confirmed: true } : { line, cancelled: true };
     try {
       const response = await post("terminal_line", payload);
