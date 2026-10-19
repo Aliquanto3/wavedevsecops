@@ -360,6 +360,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:56 · 6.2 · dev · fini, 1108 passed / 42 skipped, CI verte ; scénarios add-commit, push-pull, branche, pr-merge (.A, deux parcours, indices à 3 paliers, quiz), type d'étape pr_state, 8 empreintes ; setup identique entre parcours ; libellés « vue Distant » à réaligner sur 3.3 ; relecture pédagogique pour Anaël · 48fd7a7
 - 2026-10-19 02:56 · 6.2 · second-avis · lancé · —
 - 2026-10-19 02:56 · 2.10 · dev · lancé (dev-story Sonnet ; 2.7, 2.8, 3.3 done ; ouvre 9.4) ; 5.4, 7.3, 6.4 éligibles en attente de créneau · —
+- 2026-10-19 03:04 · 6.5 · fusion · suite complète 1265 passed / 46 skipped, CI branche en cours · —
+- 2026-10-19 03:04 · 6.2 · second-avis · 1 high lu sur une base sans 3.3 (vue Distant vide ; levé par le rebase), 2 medium (libellé « vue Distant » ≠ « Distant + PR », tutoiement du collègue), 5 low (« signé » faux, réévaluation d'étape, pr_state silencieux, -u non exigé, restauration add-commit non testée) ; reviewer Opus lancé · —
+- 2026-10-19 03:04 · 2.9 · review · rebase sans conflit, M1 (écriture pendant la suspension retenue et proposée), M2 (mesure stricte des 2 s ; cause : mtime à la seconde en polling), L4-L7 corrigés ; L3 reporté, L8 écarté ; 1151 passed, CI branche verte · 58a1fa7
+- 2026-10-19 03:04 · — · décision pour Anaël · 2.9 : message « fichier supprimé sur le disque » ? effacement de la notice après enregistrement ou commande ? · —
+- 2026-10-19 03:04 · 2.9 · fusion · empilée sur 6.5 sans conflit, branche poussée, suite complète du sommet et CI en cours · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
