@@ -108,7 +108,7 @@ development_status:
   epic-7-retrospective: optional
 
   epic-8: in-progress
-  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: in-progress
+  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: review
   8-2-servir-une-base-de-vulnérabilités-locale-et-figée: done
   8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: backlog
   8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: backlog
