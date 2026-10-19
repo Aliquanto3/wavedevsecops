@@ -296,3 +296,31 @@ def test_methodes_non_sures_controlent_l_origine(instance: cli.Instance) -> None
 
 def test_wds_data_dir_vide_vaut_dossier_par_defaut() -> None:
     assert Settings.from_env({"WDS_DATA_DIR": ""}).data_dir is None
+
+
+class _Settings(dict):
+    """Doublure de `webview.settings` de pywebview 6.2.1 : clés existantes seulement."""
+
+    def __setitem__(self, key, value):
+        if key not in self:
+            raise KeyError(key)
+        super().__setitem__(key, value)
+
+
+@pytest.mark.parametrize("settings", [_Settings(ALLOW_DOWNLOADS=False), _Settings(), None])
+def test_window_active_les_telechargements_sans_bloquer(
+    monkeypatch: pytest.MonkeyPatch, settings
+) -> None:
+    import types
+
+    calls: list[object] = []
+    fake = types.ModuleType("webview")
+    if settings is not None:
+        fake.settings = settings  # type: ignore[attr-defined]
+    fake.create_window = lambda title, url: calls.append(("window", url))  # type: ignore[attr-defined]
+    fake.start = lambda: calls.append("start")  # type: ignore[attr-defined]
+    monkeypatch.setitem(__import__("sys").modules, "webview", fake)
+    assert cli._run_window("http://127.0.0.1:1/") is True
+    assert calls == [("window", "http://127.0.0.1:1/"), "start"]
+    if settings is not None and "ALLOW_DOWNLOADS" in settings:
+        assert settings["ALLOW_DOWNLOADS"] is True

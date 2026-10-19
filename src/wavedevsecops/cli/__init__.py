@@ -233,6 +233,16 @@ def _run_window(url: str) -> bool:
         import webview
     except ImportError:
         return False
+    # Les exports du rapport (Story 6.5) passent par la boîte d'enregistrement du système.
+    # Clé présente dans pywebview 6.2.1 ; une autre version ne doit pas empêcher la fenêtre.
+    try:
+        webview.settings["ALLOW_DOWNLOADS"] = True
+    except (AttributeError, KeyError, TypeError) as error:
+        logging.getLogger("wavedevsecops").warning(
+            "Téléchargements non activés dans la fenêtre (%r) : utilisez le navigateur pour "
+            "exporter le rapport.",
+            error,
+        )
     webview.create_window("WaveDevSecOps", url)
     webview.start()
     return True

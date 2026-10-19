@@ -110,3 +110,38 @@
   color: var(--color-primary-deep);
   text-decoration: underline;
 }
+
+/* Export du rapport (Story 6.5) : pied du catalogue et report-preview. */
+.report-entry {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: var(--stroke-min) solid var(--color-muted);
+}
+
+.report-privacy {
+  margin: var(--space-2) 0;
+}
+
+.report-preview {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  border: var(--stroke-min) solid var(--color-muted);
+  border-radius: var(--radius-md);
+}
+
+.report-dates,
+.report-rows {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-4);
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.report-notice {
+  margin-top: var(--space-3);
+}
