@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from wavedevsecops.config import Settings, get_settings
+from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import workspace_id_for
 from wavedevsecops.progress.facts import ProgressStore
 from wavedevsecops.web.catalogue import load_catalogue, load_chain_texts
@@ -117,28 +118,39 @@ def open_station_workspace(
 ) -> str | None:
     """Espace du dernier scénario de station ouvert, s'il existe encore sur disque.
 
-    Seul un scénario de station (1 à 4) a des PR et des checks à montrer ; un scénario du socle ou
-    un espace disparu ne donne pas de lien (jamais de lien mort).
+    Seul un scénario de station qui passe par le pipeline (`pipeline: true`) a des PR et des checks
+    à montrer ; un scénario du socle, un scénario de station sans pipeline (poste local, push
+    direct), un espace disparu ou un `progress.json` illisible ne donnent pas de lien (jamais de
+    lien mort, et la page Vocabulaire reste servie).
     """
-    last = ProgressStore.for_dir(settings.resolved_data_dir()).last_opened()
-    if last is None:
-        return None
-    track, scenario_id, mode = last
-    for loaded in load_catalogue(settings):
-        scenario = loaded.scenario
-        if scenario.catalogue and scenario.scenario_id == scenario_id and scenario.mode == mode:
-            if not scenario.station:
-                return None
-            workspace_id = workspace_id_for(track, scenario.key)
-            return workspace_id if workspace_exists(workspace_id) else None
+    try:
+        last = ProgressStore.for_dir(settings.resolved_data_dir()).last_opened()
+        if last is None:
+            return None
+        track, scenario_id, mode = last
+        for loaded in load_catalogue(settings):
+            scenario = loaded.scenario
+            if scenario.catalogue and scenario.scenario_id == scenario_id and scenario.mode == mode:
+                if not (scenario.station and scenario.pipeline):
+                    return None
+                workspace_id = workspace_id_for(track, scenario.key)
+                return workspace_id if workspace_exists(workspace_id) else None
+    except AppError as exc:  # progress.json illisible, parcours ou identifiant invalide
+        log.warning("glossaire : espace ouvert introuvable (%s)", exc)
     return None
+
+
+TRACE_PANE = "remote"
+"""Vue que le lien « traçabilité » montre à l'ouverture de l'espace (paramètre `vue`)."""
 
 
 def _trace(term: GlossaryTerm, open_workspace: str | None) -> dict[str, Any] | None:
     if not term.trace_text:
         return None
     if open_workspace:
-        return {"link": {"href": f"/espace/{open_workspace}", "text": term.trace_link_text}}
+        # `?vue=remote` : l'espace s'ouvre sur la vue Distant + PR (ses PR et ses checks).
+        href = f"/espace/{open_workspace}?vue={TRACE_PANE}"
+        return {"link": {"href": href, "text": term.trace_link_text}}
     return {"link": None, "none_text": term.trace_none_text}
 
 

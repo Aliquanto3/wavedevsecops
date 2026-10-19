@@ -75,7 +75,7 @@ terms:
       modification laisse une trace : commit, pull request, checks et revue.
     trace_text: "Vous la retrouvez dans les PR et les checks de l'espace de travail."
     trace_link_text: "Voir les PR et les checks de votre espace"
-    trace_none_text: "Aucun espace de station n'est ouvert : ouvrez un scénario de station pour voir des PR et des checks."
+    trace_none_text: "Aucun espace ouvert n'a de PR ni de checks : ouvrez un scénario de station qui passe par une pull request pour voir des PR et des checks."
   - id: dast
     term_text: "DAST"
     definition_text: >-
