@@ -337,6 +337,12 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:08 · 6.5 · second-avis · lancé · —
 - 2026-10-19 02:08 · 6.2 · dev · lancé (dev-story Sonnet ; identifiants du socle de scenarios/order.py gardés en attendant la décision d'Anaël) · —
 - 2026-10-19 02:08 · — · note · les heures de 00:10 à 01:45 consignées par lots dans cette session sont des heures de réception estimées (± 5 min) ; les heures des fusions et des commits cités sont exactes · —
+- 2026-10-19 02:16 · 6.5 · second-avis · aucun high, 3 medium (neutralisation CSV partielle prouvée, scenario_reset seul rend « En cours » et nom non partagé avec 4.4, ALLOW_DOWNLOADS pywebview non vérifié), 5 low ; reviewer Opus lancé ; 4.4 prévenue du nom scenario_reset · —
+- 2026-10-19 02:16 · 3.5 · review · rebase sans conflit, high trouvé en revue (empreinte de hooks/ dépendante du chemin Python → canonical_script), M1 (message seulement si le hook a été atteint, d'après les refs), M2 (hooks.refresh avant chaque push), M3, L4, L5, L7 corrigés ; L6 écarté (AD-9), L8 reporté ; 1085 passed, CI branche verte · 7d8d19c
+- 2026-10-19 02:16 · — · décision pour Anaël · 3.5 : erreur imprévue du hook = push refusé, github.json illisible = push accepté (asymétrie voulue) · —
+- 2026-10-19 02:16 · 2.9 · dev · fini, 1051 passed, CI verte ; lot retenu pendant le silence post-commande, notice « Modifié hors de l'application », conflit dès que le disque change ; watch_quiet_ms 300 · 1e17ef0
+- 2026-10-19 02:16 · 2.9 · second-avis · lancé · —
+- 2026-10-19 02:16 · 7.4 ★ · dev · lancé (dev-story Opus ; pivot Sprint 2, ouvre 7.5, 7.6, 8.1) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
