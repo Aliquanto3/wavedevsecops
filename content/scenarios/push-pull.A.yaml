@@ -140,7 +140,8 @@ steps:
     instruction_text: Envoyez votre commit vers l'origine pour que le collègue puisse le récupérer.
     explanation_text: >-
       `git push` envoie vos commits vers l'origine et avance `origin/main`. Comme vous aviez
-      récupéré le commit du collègue d'abord, git accepte l'envoi sans conflit.
+      d'abord récupéré le commit du collègue, l'origine n'a qu'à avancer jusqu'au vôtre : git
+      accepte l'envoi.
     explain_ref: graph.remote_ref
     expect:
       head:

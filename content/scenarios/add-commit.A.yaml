@@ -60,7 +60,8 @@ steps:
       Enregistrez le contenu de l'index dans un commit, avec un message qui dit ce que vous
       avez fait (par exemple « Ajoute les notes »).
     explanation_text: >-
-      Un commit est un instantané de l'index, daté, signé et relié au commit précédent. Il
+      Un commit est un instantané de l'index, daté, attribué à son auteur et relié au commit
+      précédent. Il
       reste local : personne d'autre ne le voit tant que vous ne le poussez pas.
     explain_ref: graph.commit
     expect:

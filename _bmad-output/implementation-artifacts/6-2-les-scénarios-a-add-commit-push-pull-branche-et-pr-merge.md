@@ -2,7 +2,7 @@
 story: "6.2"
 key: 6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge
 title: Les scénarios A « add / commit », « push / pull », « branche » et « PR / merge »
-status: review
+status: done
 branch: story/6-2-scenarios-a-socle
 ad: [AD-7, AD-8, AD-18]
 ---
@@ -33,8 +33,25 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.2 » ; F
 
 ## Reports
 
-- **Texte de l'interface de PR** : les consignes et indices des étapes « ouvrir la PR » et « merger » parlent de la « vue Distant » (story 3.3, en intégration). À réaligner sur les libellés réels des boutons une fois 3.3 fusionnée.
+- ~~**Texte de l'interface de PR**~~ : réaligné en revue sur les libellés de 3.3 (« Distant + PR », « Ouvrir une PR », « Merger »).
 - **Identifiants** `add-commit`, `push-pull`, `branche`, `pr-merge` : imposés, en attente de validation d'Anaël ; un renommage touche les quatre fichiers, `SOCLE_ORDER`, `fingerprints.json` et `SOLUTIONS` du test.
 - **Setup par parcours** : si le contenu doit un jour s'appuyer sur le code d'exercice dans ces scénarios, il faudra une op conditionnelle au parcours (modèle partagé) : hors périmètre.
 - Les scénarios B correspondants et les quatre suivants (6.3) ne sont pas livrés ici.
 - Relecture pédagogique du français (ton, vouvoiement, justesse des effets des mauvaises réponses) à faire par Anaël ; les effets décrits ont été vérifiés en jouant les mauvaises réponses de `reset --hard` et `pull`.
+
+## Revue
+
+Revue Opus (une passe), après rebase sur `origin/main` (3.3, 3.5, 7.2, 5.3, 5.1) : conflit de `content/fingerprints.json` résolu par `scripts/update_fingerprints.py`, empreintes stables sur deux générations ; celles de `pr-merge` changent avec le texte de la revue du collègue.
+
+- High · second avis · rejeté · « Distant + PR » rendait `renderEmpty` : lu sur une base sans 3.3. Après rebase, la vue existe ; le test `test_pr_merge_la_pr_n_est_pas_mergeable_sans_la_revue` vérifie désormais dans `views.remote` le `can_open_pr` de `origin/feature` (bouton « Ouvrir une PR ») puis `merge.enabled` (bouton « Merger »), et les gestes passent par les intentions `pr_open` / `pr_merge` que poste `remote.js`.
+- Medium · second avis · corrigé · libellé « vue Distant » : consignes et indices alignés sur « Distant + PR », « Ouvrir une PR », « Merger ».
+- Medium · second avis · corrigé · « Tu peux merger » : vouvoiement (« Vous pouvez merger »).
+- Low · second avis · corrigé · « daté, signé » : un commit n'est pas signé par défaut ; « daté, attribué à son auteur ».
+- Low · second avis · reporté · après un `pull` (mauvaise réponse) non rétabli puis `fetch`, l'étape `recuperer` déjà satisfaite n'est validée qu'à l'opération suivante : comportement général du moteur (une étape jugée par opération), hors périmètre ; à traiter dans `engine/steps.py` si l'on veut enchaîner les étapes déjà satisfaites.
+- Low · second avis · rejeté · `github.json` illisible : `pending` est voulu (AD-8, jamais d'échec), et la vue « Distant + PR » affiche déjà `error_text` ; la trace sert au diagnostic.
+- Low · second avis · corrigé (texte) · `-u` non exigé : `repo_state` n'a pas de condition d'upstream (code partagé) ; l'explication dit maintenant « conseillé ».
+- Low · second avis · corrigé · restauration non testée pour add-commit : `test_add_commit_reset_hard_efface_le_commit_puis_est_retabli`.
+- Low · revue · corrigé · branche : « les deux branches ont divergé d'un commit » était faux (avance rapide possible) ; « `feature` a un commit d'avance sur `main` ».
+- Low · revue · corrigé · push-pull : « accepte l'envoi sans conflit » confondait conflit et refus non fast-forward ; reformulé.
+- Low · revue · corrigé · branche, `supprimer_feature` : le premier palier d'indice donnait déjà la réponse (`-d`) ; reformulé.
+- Complexité : 0 constat (`pr_state` parcourt les PR de l'espace, quelques unités, une fois par opération).

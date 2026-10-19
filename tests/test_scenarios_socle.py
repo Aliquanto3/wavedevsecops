@@ -350,6 +350,23 @@ def test_branche_la_mauvaise_reponse_reset_hard_est_expliquee_puis_retablie(make
     assert box.current() == "fusionner"
 
 
+def test_add_commit_reset_hard_efface_le_commit_puis_est_retabli(make_box) -> None:
+    box = make_box("add-commit", "no_ai")
+    for _, gestures in SOLUTIONS["add-commit"][:2]:
+        for gesture in gestures:
+            box.play(gesture)
+    assert box.current() == "corriger_le_message"
+    notes = box.engine.layout.repo / "notes.txt"
+    tip = box.log("main").splitlines()
+    box.play(quiz("reset_dur"))
+    assert box.verdicts("corriger_le_message")[-1]["passed"] is False
+    assert not notes.exists() and box.log("main").splitlines() != tip  # l'effet a eu lieu
+    box.engine.submit(build_operation(box.engine, "restore_state", {})).result(WAIT)
+    assert notes.exists() and box.log("main").splitlines() == tip
+    box.play(quiz("amend"))
+    assert box.current() == "second_commit"
+
+
 def test_push_pull_pull_n_est_pas_la_bonne_reponse_du_premier_quiz(make_box) -> None:
     box = make_box("push-pull", "no_ai")
     box.play(quiz("pull"))
@@ -364,12 +381,30 @@ def test_push_pull_pull_n_est_pas_la_bonne_reponse_du_premier_quiz(make_box) -> 
 
 
 def test_pr_merge_la_pr_n_est_pas_mergeable_sans_la_revue(make_box) -> None:
-    """La protection de `main` exige l'approbation que le collègue donne à l'ouverture."""
+    """La protection de `main` exige l'approbation que le collègue donne à l'ouverture, et la
+    vue « Distant + PR » offre les gestes des étapes `ouvrir_pr` et `merger_pr` (story 3.3)."""
     box = make_box("pr-merge", "llm")
-    for _, gestures in SOLUTIONS["pr-merge"][:3]:
+
+    def remote() -> dict:
+        return box.engine.snapshot()["views"]["remote"]
+
+    def feature() -> dict:
+        return next(b for b in remote()["branches"] if b["name_text"] == "origin/feature")
+
+    for _, gestures in SOLUTIONS["pr-merge"][:2]:
         for gesture in gestures:
             box.play(gesture)
+    # Bouton « Ouvrir une PR » de remote.js : affiché pour une branche distante où `can_open_pr`.
+    assert box.current() == "ouvrir_pr"
+    assert feature()["can_open_pr"] is True
+    for gesture in SOLUTIONS["pr-merge"][2][1]:
+        box.play(gesture)
     pr = github_sim.load(box.engine.layout).pull(1)
     assert [r.state for r in pr.reviews] == ["commented", "approved"]
     assert pr.mergeable and pr.approvals == 1
     assert box.current() == "merger_pr"
+    # Bouton « Merger » de remote.js : actif quand `merge.enabled`.
+    card = next(c for c in remote()["pulls"] if c["number"] == 1)
+    assert (card["head"], card["base"], card["state"]) == ("feature", "main", "open")
+    assert card["merge"]["enabled"] is True
+    assert feature()["can_open_pr"] is False

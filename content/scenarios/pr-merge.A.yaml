@@ -39,7 +39,7 @@ setup:
       - state: commented
         body_text: Merci pour cette PR ! Le changement est petit et clair, c'est facile à relire.
       - state: approved
-        body_text: Je valide. Tu peux merger.
+        body_text: Je valide. Vous pouvez merger.
 steps:
   - step_id: commiter_sur_feature
     type: repo_state
@@ -90,7 +90,8 @@ steps:
       connaît.
     explanation_text: >-
       `git push -u origin feature` crée la branche côté origine et relie votre branche locale à
-      elle (`-u`). Les `git push` et `git pull` suivants n'auront plus besoin de préciser où.
+      elle (`-u`, conseillé) : depuis `feature`, les `git push` et `git pull` suivants n'auront
+      plus besoin de préciser où.
     explain_ref: graph.remote_ref
     expect:
       head:
@@ -106,8 +107,8 @@ steps:
     type: pr_state
     title_text: Ouvrir la pull request
     instruction_text: >-
-      Ouvrez une pull request de `feature` vers `main` depuis l'interface (vue « Distant »).
-      Le collègue relira votre changement aussitôt.
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR »
+      de la vue « Distant + PR ». Le collègue relira votre changement aussitôt.
     explanation_text: >-
       Une pull request demande de fusionner une branche dans une autre, après relecture. Le
       collègue a laissé un commentaire puis une approbation : `main` exige cette approbation
@@ -118,15 +119,16 @@ steps:
     hints:
       lead_text: >-
         L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
-        « Distant », depuis la branche poussée.
-      partial_text: "Vue « Distant » : ouvrir une PR de ___ vers main"
-      solution_text: "Vue « Distant » : ouvrir une PR de feature vers main"
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
 
   - step_id: merger_pr
     type: pr_state
     title_text: Merger la pull request approuvée
     instruction_text: >-
-      Lisez la revue du collègue, puis mergez la PR depuis l'interface.
+      Lisez la revue du collègue, puis mergez la PR avec le bouton « Merger » de la
+      vue « Distant + PR ».
     explanation_text: >-
       Le merge intègre `feature` dans `main` sur l'origine, avec un commit de fusion. Il n'était
       possible qu'avec l'approbation demandée par la protection de `main`.
@@ -137,10 +139,10 @@ steps:
     min_approvals: 1
     hints:
       lead_text: >-
-        La PR est approuvée et rien ne bloque : le bouton de merge de la vue « Distant » est
-        disponible.
-      partial_text: "Vue « Distant » : ___ la PR"
-      solution_text: "Vue « Distant » : merger la PR"
+        La PR est approuvée et rien ne bloque : le bouton « Merger » de la vue « Distant + PR »
+        est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"
 
   - step_id: recuperer_main
     type: repo_state

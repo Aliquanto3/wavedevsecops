@@ -63,8 +63,8 @@ steps:
       Créez un fichier (par exemple avec `echo "Salut" > salut.txt`), indexez-le et commitez-le
       depuis `feature`.
     explanation_text: >-
-      Le commit avance `feature` ; `main` reste où elle était. Les deux branches ont maintenant
-      divergé d'un commit.
+      Le commit avance `feature` ; `main` reste où elle était. `feature` a maintenant un commit
+      d'avance sur `main`.
     explain_ref: graph.commit
     expect:
       head:
@@ -173,6 +173,7 @@ steps:
           Cette commande vous a placé sur `feature`, rien n'est supprimé.
     hints:
       lead_text: >-
-        L'option qui supprime une branche (et refuse si elle n'est pas fusionnée) est `-d`.
+        Les branches se gèrent avec `git branch` ; une option d'une lettre supprime, et refuse
+        si la branche n'est pas fusionnée.
       partial_text: git branch ___ feature
       solution_text: git branch -d feature
