@@ -391,6 +391,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:19 · — · outillage · quota API GitHub atteint un moment par les gh run watch en parallèle (403) ; attentes de CI relancées avec --interval 60 ; consigne aux agents à ajouter · —
 - 2026-10-19 04:20 · 5.5 · review · rebase sans conflit, L2 relevé en medium et corrigé (marques de N suspendues pendant que N+1 est armée), L3 (marque de ref dans le nom accessible) corrigés ; L1, L4, L9 écartés ; L8 reporté (4.4 absente au rebase) ; 1286 passed, CI verte sur le code · 731e7f0
 - 2026-10-19 04:20 · 5.5 · fusion · empilée sur 6.2 en conflit de fond (scenario.js : Recommencer de la correction contre la confirmation de 4.4 ; workspace.css) → dev-story Opus pour le rebase · —
+- 2026-10-19 04:33 · 6.2 · fusion · suite complète 1333 passed / 46 skipped ; CI en attente de lecture (quota GitHub) · —
+- 2026-10-19 04:33 · 7.3 · dev · fini, 1283 passed / 48 skipped, CI verte ; hook pre-commit lançant pre-commit run (gitleaks --exit-code 3 --redact), trace cache/hook-pre-commit.json, evidence_seen secret-scan, scénario secret-dans-un-commit.A, step CI de provisionnement gitleaks · fc42d12
+- 2026-10-19 04:33 · 7.3 · second-avis · lancé ; aucun créneau de dev ouvert faute d'éligible sans conflit (6.3 attend 6.2, 5.4 attend 5.5, 7.5/7.6/8.1 attendent 7.4, 9.4 attend 2.10) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
