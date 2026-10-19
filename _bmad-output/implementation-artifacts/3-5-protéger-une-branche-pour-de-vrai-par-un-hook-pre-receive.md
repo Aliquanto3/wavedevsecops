@@ -28,12 +28,14 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.5 » ; F
 - Push forcé de 5.7 : `--force` ne contourne pas `pre-receive`. Sur une branche non protégée, le hook laisse passer ; l'écrasement du collègue se joue sur `origin` (fast-forward refusé par git sans `--force`).
 - Sur le dépôt `origin.git`, git retire `GIT_CONFIG_COUNT` de l'environnement de `receive-pack` pour un push vers un chemin local : le `core.hooksPath` forcé par `gitio` n'y arrive pas. `install_hooks` écrit donc `core.hooksPath=../hooks` (relatif, espace déplaçable) dans la configuration d'`origin.git`. Un hook côté `origin` n'est actif que si `install_hooks` a été joué.
 - Le merge de `github_sim` (`update-ref` sur `origin.git`) ne passe pas par `receive-pack` : il n'est jamais bloqué par le hook ; ni `commit_on_origin` (collègue, agent).
-- L'empreinte (AD-6) couvre le contenu de `hooks/` : il contient le chemin de Python de la machine ; un instantané ne se rejoue donc pas d'un poste à un autre (les instantanés sont locaux).
+- L'empreinte (AD-6) couvre le contenu de `hooks/` sans le chemin de Python (`hooks.canonical_script`) : la référence d'AD-18 d'un scénario qui joue `install_hooks` vaut sur les trois systèmes.
 
 ## Décisions
 
 - `hooks_enabled` dans `run.json` n'est pas livré : aucune étape ne le déclare encore ; la présence du script dans `hooks/` vaut activation. À ajouter avec la première étape qui active un hook à la volée.
-- Message du terminal ciblé par l'état (branche protégée) et non par la raison réelle du refus : un push en échec vers une branche protégée est expliqué même si la cause est autre (non fast-forward). Cas accepté : sur une branche protégée, le push direct est refusé de toute façon.
+- Message du terminal : il n'apparaît que si la mise à jour a atteint le hook (suppression, push forcé, création ou avance rapide, d'après les refs de `repo/` et d'`origin.git/`). Un push sans avance rapide, refusé par git avant tout hook, n'est pas attribué à la protection (revue). La sortie de git n'est toujours pas analysée (AD-2).
+- Pannes : `github.json` illisible laisse passer avec un avertissement en français ; toute autre erreur du hook refuse le push avec un texte en français qui renvoie au diagnostic (AD-9), sans trace Python.
+- Interpréteur figé dans le script : le terminal appelle `hooks.refresh` avant chaque `git push`, qui réécrit un hook dont le chemin de Python n'est plus celui de l'application (environnement recréé ou déplacé). Le chemin est échappé pour sh (`\`, `"`, `$`, accent grave).
 
 ## Reports
 
@@ -43,3 +45,22 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 3.5 » ; F
 ## Tests
 
 `tests/test_hooks.py` : script d'une ligne en LF sans bash (et bit d'exécution hors Windows), hook inconnu refusé, push direct sur `main` refusé par git (`remote:`, ref inchangée), branche non protégée ou `block_direct_push: false` acceptées, merge de PR hors hook, point d'entrée muet depuis `repo/`, `github.json` illisible sans blocage. `tests/test_terminal.py` : refus du terminal et message explicatif, push d'une autre branche intact. La CI de branche exécute ces tests sur Windows (sh de PortableGit), macOS et Linux.
+
+## Revue
+
+Revue Opus (une passe), sur la branche rebasée sur `origin/main`. Second avis Haiku repris constat par constat.
+
+| Sév. | Source | Constat | Suite |
+|---|---|---|---|
+| high | revue | Empreinte de `hooks/` dépendante du chemin de Python : le premier scénario qui jouera `install_hooks` aurait une référence d'AD-18 différente sur chaque système (CI rouge), au-delà des seuls instantanés (L9 sous-estimé). | Corrigé : `hooks.canonical_script` dans `engine/fingerprint.py`. |
+| medium | second avis M1 | Message « Refusé par la protection » affiché pour un push refusé sans avance rapide, avant le hook (prouvé). | Corrigé autrement que proposé : décision tirée des refs (le push a-t-il atteint le hook ?), pas de la sortie de git, pour respecter AD-2. |
+| medium | second avis M2 | Interpréteur figé : environnement recréé ailleurs, `exec` en 127, tous les pushes refusés avec un message sh en anglais. | Corrigé : `hooks.refresh` avant chaque `git push` du terminal (le script reste d'une ligne, critère d'AD-9). |
+| medium | second avis M3 | Exception imprévue du hook : trace Python en anglais sous `remote:`. | Corrigé : refus en français avec renvoi au diagnostic (AD-9) ; refus conservé par prudence. |
+| low | second avis L4 | `github.json` illisible ignoré sans avertissement. | Corrigé : avertissement en français, le push passe. |
+| low | second avis L5 | `git push --all` sans message de protection. | Corrigé : `--all` vise toutes les branches locales ; `--tags` seul n'en vise aucune. |
+| low | second avis L6 | Texte du refus du hook en français en dur. | Rejeté : AD-9 exige un refus en français ; c'est une sortie de git, affichée telle quelle. |
+| low | second avis L7 | Chemin de Python non échappé pour sh. | Corrigé : `\`, `"`, `$` et accent grave échappés (test). |
+| low | second avis L8 | 2 à 4 s par push (import de pydantic via `github_sim`). | Reporté : AD-8 veut une lecture par `github_sim` ; à mesurer avec la story de performance avant d'alléger. |
+| low | second avis L9 | Empreinte de `hooks/` dépendante du poste. | Voir le constat high, corrigé. |
+| info | second avis | Contournements (HEAD:refs/heads/main, +main, suppression, --no-verify, tags, -c/-C/--git-dir/--receive-pack, confinement). | Confirmé sans faille. |
+| — | revue | Complexité : 0 constat (le hook lit `github.json` une fois par push, au lieu d'une fois par ref). | — |

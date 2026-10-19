@@ -119,3 +119,48 @@ def test_github_json_illisible_ne_bloque_rien(settings: Settings, git_path: Path
     layout, _ = _prepare(settings, git_path)
     layout.github_json.write_bytes(b"{pas du json")
     assert github_sim.direct_push_blocked(layout, "main") is False
+
+
+def test_github_json_illisible_laisse_passer_avec_un_avertissement(
+    settings: Settings, git_path: Path
+) -> None:
+    layout, _ = _prepare(settings, git_path)
+    layout.github_json.write_bytes(b"{pas du json")
+    err = io.StringIO()
+    line = io.StringIO(f"{'0' * 40} {'1' * 40} refs/heads/main\n")
+    assert hooks.pre_receive(layout.origin, line, err) == 0
+    assert "illisible" in err.getvalue()
+
+
+def test_une_erreur_imprevue_refuse_en_francais(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(cwd: Path, stdin: object, stderr: object) -> int:
+        raise RuntimeError("bogue")
+
+    monkeypatch.setitem(hooks.HANDLERS, "pre-receive", boom)
+    err = io.StringIO()
+    assert hooks.main(["pre-receive"], io.StringIO(), err) == hooks.EXIT_REFUSED
+    assert "Le hook « pre-receive » a échoué (RuntimeError)" in err.getvalue()
+    assert "Traceback" not in err.getvalue()
+
+
+def test_le_chemin_de_python_est_echappe_pour_sh(tmp_path: Path) -> None:
+    """Revue 3.5 : `$`, accent grave et guillemet du chemin restent littéraux pour sh."""
+    script = hooks.hook_script("pre-receive", Path('/opt/a$b`c"d/python'))
+    assert script.splitlines()[1] == (
+        r'exec "/opt/a\$b\`c\"d/python" -m wavedevsecops.hooks pre-receive "$@"'
+    )
+
+
+def test_l_empreinte_ne_depend_pas_du_chemin_de_python(settings: Settings, git_path: Path) -> None:
+    """Revue 3.5 : la référence d'AD-18 d'un scénario avec hooks vaut sur tout poste."""
+    from wavedevsecops.engine.fingerprint import fingerprint
+    from wavedevsecops.wsfs import write_executable
+
+    layout, git = _prepare(settings, git_path)
+    before = fingerprint(layout, git)
+    other = hooks.hook_script("pre-receive", Path("/autre/poste/bin/python3"))
+    write_executable(layout.hooks, "pre-receive", other)
+    assert fingerprint(layout, git) == before
+    assert hooks.refresh(layout.hooks) == ["pre-receive"]
+    assert hooks.refresh(layout.hooks) == []
+    assert fingerprint(layout, git) == before

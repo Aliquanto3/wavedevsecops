@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from wavedevsecops import github_sim, gitio
+from wavedevsecops import github_sim, gitio, hooks
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import (
     INTENTS,
@@ -98,6 +98,9 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
             ctx.output(f"{reason} {allow.accepted_options(command.sub)}", "refused")
             return EXIT_REFUSED
 
+    if command.sub == "push":
+        # Le chemin de Python porté par les hooks suit l'application (environnement recréé).
+        hooks.refresh(ctx.layout.hooks)
     try:
         handle = gitio.spawn_learner(
             tool,
@@ -147,27 +150,77 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     return code if code is not None else EXIT_INTERRUPTED
 
 
-def _pushed_branches(tool: gitio.Git, repo: Path, command: GitCommand) -> list[str]:
-    """Branches visées par un `git push` : cibles des refspecs, ou branche courante sans refspec."""
-    names = []
+FORCE_OPTIONS = frozenset({"-f", "--force", "--force-with-lease"})
+DELETE_OPTIONS = frozenset({"-d", "--delete"})
+
+
+def _pushed_updates(tool: gitio.Git, repo: Path, command: GitCommand) -> list[tuple[str, str]]:
+    """Mises à jour visées par un `git push` : `(source locale, branche d'origin)`, source vide
+    pour une suppression ; sans refspec, la branche courante (ou toutes avec `--all`)."""
+    delete = bool(command.options & DELETE_OPTIONS)
+    updates = []
     for spec in command.positionals[1:]:
-        target = spec.lstrip("+").rpartition(":")[2]
-        names.append(target.removeprefix("refs/heads/"))
-    if names and "HEAD" not in names:
-        return names
+        source, colon, target = spec.removeprefix("+").partition(":")
+        if not colon:
+            target = source
+        if delete:
+            source = ""
+        if target == "HEAD":
+            head = tool.run("symbolic-ref", "-q", "--short", "HEAD", cwd=repo)
+            target = head.stdout.strip() if head.ok else ""
+        if target:
+            updates.append((source, target.removeprefix("refs/heads/")))
+    if command.positionals[1:] or "--tags" in command.options:
+        return updates  # `--tags` sans refspec ne pousse que des étiquettes
+    if "--all" in command.options:
+        listed = tool.run("for-each-ref", "--format=%(refname:short)", "refs/heads", cwd=repo)
+        return [(name, name) for name in listed.stdout.split()] if listed.ok else []
     head = tool.run("symbolic-ref", "-q", "--short", "HEAD", cwd=repo)
     current = head.stdout.strip() if head.ok else ""
-    return [current if name == "HEAD" else name for name in names] or ([current] if current else [])
+    return [(current, current)] if current else []
+
+
+def _reaches_hook(
+    tool: gitio.Git, ctx: OpContext, command: GitCommand, source: str, branch: str
+) -> bool:
+    """Vrai si git a transmis cette mise à jour à `origin`, donc à son hook `pre-receive` :
+    suppression, push forcé, création, ou avance rapide. Un push sans avance rapide est
+    refusé par git lui-même avant tout hook ; la protection n'en est alors pas la cause."""
+    if (
+        not source
+        or command.options & FORCE_OPTIONS
+        or any(spec.startswith("+") for spec in command.positionals[1:])
+    ):
+        return True
+    ref = f"refs/heads/{branch}"
+    remote = tool.run("rev-parse", "-q", "--verify", f"{ref}^{{commit}}", cwd=ctx.layout.origin)
+    if not remote.ok:
+        return True
+    local = tool.run("rev-parse", "-q", "--verify", f"{source}^{{commit}}", cwd=ctx.layout.repo)
+    if not local.ok:
+        return False
+    ancestor = tool.run(
+        "merge-base",
+        "--is-ancestor",
+        remote.stdout.strip(),
+        local.stdout.strip(),
+        cwd=ctx.layout.repo,
+    )
+    return ancestor.ok
 
 
 def _explain_protection(
     ctx: OpContext, tool: gitio.Git, command: GitCommand, allow: Allowlist
 ) -> None:
-    """Après un `push` en échec : si la branche visée est protégée, dit pourquoi git l'a refusé.
+    """Après un `push` en échec : si une mise à jour transmise à `origin` vise une branche
+    protégée, dit pourquoi git l'a refusée.
 
-    Lu dans l'état du GitHub simulé (AD-8), jamais dans la sortie de git (AD-2)."""
-    for branch in _pushed_branches(tool, ctx.layout.repo, command):
-        if github_sim.direct_push_blocked(ctx.layout, branch):
+    Lu dans l'état du GitHub simulé (AD-8) et dans les refs, jamais dans la sortie de git
+    (AD-2)."""
+    for source, branch in _pushed_updates(tool, ctx.layout.repo, command):
+        if github_sim.direct_push_blocked(ctx.layout, branch) and _reaches_hook(
+            tool, ctx, command, source, branch
+        ):
             ctx.output(allow.message("protected_branch", branch=branch), "app")
             return
 

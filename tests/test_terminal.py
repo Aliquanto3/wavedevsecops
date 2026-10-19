@@ -334,6 +334,76 @@ def test_push_sur_une_branche_protegee_est_refuse_et_explique(
     assert ok.code == 0 and ok.text("app") == ""
 
 
+def _protect_main(space: Space, git_path: Path) -> gitio.Git:
+    from wavedevsecops import github_sim, hooks, wsfs
+    from wavedevsecops.contracts.github import BranchProtection
+
+    git = gitio.Git.for_workspace(git_path, space.layout.root, space.settings)
+    git.internal("config", "core.hooksPath", "../hooks", cwd=space.layout.origin)
+    wsfs.write_executable(
+        space.layout.hooks, "pre-receive", hooks.hook_script("pre-receive", Path(sys.executable))
+    )
+    github_sim.set_protection(git, space.layout, BranchProtection(branch="main"))
+    return git
+
+
+def test_un_refus_sans_avance_rapide_n_est_pas_attribue_a_la_protection(
+    space: Space, english: None, git_path: Path
+) -> None:
+    """Revue 3.5 : git refuse un push sans avance rapide avant le hook ; le terminal ne
+    l'attribue pas à la protection. Avec `--force`, le hook refuse, et le terminal le dit."""
+    space.identify()
+    space.write("a.md", "a\n")
+    assert space.run("git add a.md").code == 0
+    assert space.run("git commit -m a").code == 0
+    assert space.run("git push origin main").code == 0
+    git = _protect_main(space, git_path)
+    git.internal("reset", "-q", "--hard", "HEAD~1", cwd=space.layout.repo)
+    space.write("b.md", "b\n")
+    assert space.run("git add b.md").code == 0
+    assert space.run("git commit -m b").code == 0
+    behind = space.run("git push origin main")
+    assert behind.code != 0
+    assert "protégée" not in behind.text("stderr") and behind.text("app") == ""
+    forced = space.run("git push --force origin main")
+    assert forced.code != 0
+    assert "protection de `main`" in forced.text("app")
+
+
+def test_push_all_explique_la_protection(space: Space, english: None, git_path: Path) -> None:
+    """Revue 3.5 : `git push --all` depuis une autre branche vise aussi `main`."""
+    space.identify()
+    space.write("c.md", "c\n")
+    assert space.run("git add c.md").code == 0
+    assert space.run("git commit -m c").code == 0
+    _protect_main(space, git_path)
+    assert space.run("git switch -c feature").code == 0
+    refused = space.run("git push --all origin")
+    assert refused.code != 0
+    assert "protection de `main`" in refused.text("app")
+
+
+def test_le_terminal_repare_un_hook_dont_python_a_disparu(
+    space: Space, english: None, git_path: Path
+) -> None:
+    """Revue 3.5 : un hook qui vise un Python disparu refuserait tout push ; le terminal le
+    réécrit avec l'interpréteur de l'application avant `git push`."""
+    from wavedevsecops import hooks, wsfs
+
+    space.identify()
+    _protect_main(space, git_path)
+    stale = hooks.hook_script("pre-receive", space.layout.root / "ancien-venv" / "python")
+    wsfs.write_executable(space.layout.hooks, "pre-receive", stale)
+    assert space.run("git switch -c libre").code == 0
+    space.write("d.md", "d\n")
+    assert space.run("git add d.md").code == 0
+    assert space.run("git commit -m d").code == 0
+    assert space.run("git push origin libre").code == 0
+    assert (space.layout.hooks / "pre-receive").read_text(encoding="utf-8") == (
+        hooks.hook_script("pre-receive", Path(sys.executable))
+    )
+
+
 def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None) -> None:
     def alter(ctx: OpContext) -> int:
         ctx.set_rest_state("quiz_altered")
@@ -379,9 +449,7 @@ def test_ctrl_c_arrete_l_arbre_et_supprime_l_index_lock(
     assert alive(pid)
     assert space.engine.interrupt() is True  # intention `interrupt`, hors file
     future.result(WAIT)
-    result = Result(
-        op.op_id, None, [e for e in space.events if e.op_id == op.op_id]
-    )
+    result = Result(op.op_id, None, [e for e in space.events if e.op_id == op.op_id])
     assert result.text("app") == "Commande interrompue."
     exit_event = next(e for e in result.events if e.kind == Kind.OP_EXIT)
     assert exit_event.payload["code"] == terminal.EXIT_INTERRUPTED
@@ -493,5 +561,3 @@ def test_intentions_terminal_line_et_interrupt_par_http(
         assert status == 422
     finally:
         stream.close()
-
-
