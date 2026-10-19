@@ -25,10 +25,16 @@ def test_section_stations_rangee_par_station(tmp_path: Path, monkeypatch) -> Non
     assert {"defaut-de-lint", "test-casse"}.isdisjoint(s["scenario_id"] for s in socle)
     stations = body["sections"][1]
     assert stations["title"] == "Stations"
-    (group,) = stations["groups"]
+    group, pr_ci = stations["groups"]
     assert (group["station"], group["text"]) == (1, "Station 1 · Poste local")
+    assert (pr_ci["station"], pr_ci["text"]) == (2, "Station 2 · PR et CI")
     lint, test, secret = group["scenarios"]
-    assert [s["scenario_id"] for s in (lint, test, secret)] == list(STATION_ORDER)
+    assert [s["scenario_id"] for s in (lint, test, secret)] == list(STATION_ORDER[:3])
+    assert [s["scenario_id"] for s in pr_ci["scenarios"]] == [
+        "check-en-echec",
+        "pr-sans-revue",
+        "push-direct-main",
+    ]
     assert lint["description"].startswith("Lancez ruff") and test["description"]
     # Un outil absent rend la carte indisponible, avec l'outil nommé.
     (lint_mode,) = lint["modes"]

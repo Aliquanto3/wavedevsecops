@@ -23,7 +23,7 @@ CheckState = Literal["queued", "running", "success", "failure", "error"]
 PrState = Literal["open", "merged", "closed"]
 ReviewState = Literal["approved", "changes_requested", "commented"]
 BlockKind = Literal["check", "approvals", "conflict", "head_missing"]
-ReactionTrigger = Literal["pr_opened", "checks_green"]
+ReactionTrigger = Literal["pr_opened", "checks_green", "review_requested"]
 """Événements de PR qui déclenchent une réaction du collègue simulé (AD-8) : l'ouverture
 de la PR, et le passage au vert de tous ses checks obligatoires."""
 
@@ -112,7 +112,8 @@ class Reaction(_Model):
     """Réaction déclarée par le scénario : à un événement de PR, le collègue publie ses revues.
 
     `pr_opened` joue une fois par PR ; `checks_green` joue une fois par `head_sha` (un nouveau
-    push la réarme)."""
+    push la réarme) ; `review_requested` joue quand l'apprenant demande la revue (checks
+    obligatoires verts), une fois par `head_sha`."""
 
     reaction_id: int = Field(ge=1)
     trigger: ReactionTrigger

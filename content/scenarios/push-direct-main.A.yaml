@@ -1,0 +1,132 @@
+# Station 2 (Story 7.5) : `main` est protégée, un push direct est refusé par le hook
+# `pre-receive` de l'origine. Un fichier neuf attend dans le dépôt ; l'apprenant le committe sur
+# `main`, tente de pousser, lit le refus, puis passe par une branche et une PR.
+schema_version: 1
+scenario_id: push-direct-main
+mode: A
+title_text: Voir la protection de main refuser un push direct
+section: stations
+station: 2
+tracks: [llm, no_ai]
+tools: [git]
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  - op: install_hooks
+  - op: set_protection
+    branch: main
+  - op: write_file
+    path: CHANGELOG.md
+    content: |
+      # Journal des changements
+
+      - Premier suivi des changements du projet d'inventaire.
+steps:
+  - step_id: committer_sur_main
+    type: repo_state
+    title_text: Committer le journal des changements sur main
+    instruction_text: >-
+      Le fichier `CHANGELOG.md` vient d'être ajouté, et vous êtes sur `main`. Indexez-le et
+      committez-le, sans changer de branche.
+    explanation_text: >-
+      Un commit local ne touche pas l'origine : rien n'est encore envoyé. C'est le `push` qui
+      confronte `main` à la protection de l'origine.
+    explain_ref: graph.commit
+    expect:
+      head:
+        branch: main
+      commits:
+        - ahead_of: origin/main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            staged: [CHANGELOG.md]
+        reason_text: Le fichier est dans l'index, mais pas encore committé.
+    hints:
+      lead_text: >-
+        Deux commandes : l'une met le fichier dans l'index, l'autre enregistre le commit.
+      partial_text: git ___ CHANGELOG.md
+      solution_text: git add CHANGELOG.md, puis git commit -m "Ajoute le journal des changements"
+
+  - step_id: pousser_sur_main
+    type: push_refused
+    title_text: Pousser directement sur main
+    instruction_text: >-
+      Poussez `main` vers l'origine et lisez la réponse.
+    explanation_text: >-
+      L'origine protège `main` : son hook `pre-receive` refuse toute mise à jour directe de la
+      branche. git affiche le refus de l'origine tel quel, puis l'application le résume : sur une
+      branche protégée, tout passe par une pull request.
+    explain_ref: graph.remote_ref
+    branch: main
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `main`.
+      partial_text: git push ___ main
+      solution_text: git push origin main
+
+  - step_id: pousser_une_branche
+    type: repo_state
+    title_text: Passer par une branche
+    instruction_text: >-
+      Votre commit reste utile : créez la branche `ajout-changelog` à partir de l'état actuel,
+      puis poussez-la vers l'origine, qui l'accepte.
+    explanation_text: >-
+      Une branche ordinaire n'est pas protégée : le même commit y est accepté. Le merge dans
+      `main` se fera depuis une pull request.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/ajout-changelog
+    hints:
+      lead_text: >-
+        Créez la branche en vous y plaçant d'un coup, puis poussez-la avec le lien `-u`.
+      partial_text: git switch ___ ajout-changelog
+      solution_text: git switch -c ajout-changelog, puis git push -u origin ajout-changelog
+
+  - step_id: ouvrir_la_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `ajout-changelog` vers `main` avec le bouton « Ouvrir une PR »
+      de la vue « Distant + PR ».
+    explanation_text: >-
+      La pull request est le chemin que la protection de `main` autorise.
+    explain_ref: graph.remote_ref
+    head: ajout-changelog
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/ajout-changelog"
+
+  - step_id: merger_la_pr
+    type: pr_state
+    title_text: Merger la pull request
+    instruction_text: >-
+      Aucune règle ne bloque cette PR : mergez-la avec le bouton « Merger » de la vue
+      « Distant + PR ».
+    explanation_text: >-
+      Le même changement, arrivé par une PR, entre dans `main` : la protection n'interdit pas
+      d'y écrire, elle impose le chemin.
+    explain_ref: graph.remote_ref
+    head: ajout-changelog
+    base: main
+    pr_state: merged
+    hints:
+      lead_text: >-
+        Rien ne bloque la PR : le bouton est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"

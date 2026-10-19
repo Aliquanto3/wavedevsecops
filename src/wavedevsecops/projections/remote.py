@@ -195,7 +195,12 @@ def _review_entry(pr: PullRequest, review: Review, stale_dismissed: bool) -> Rev
     )
 
 
-def _review_log(pr: PullRequest) -> ReviewLog:
+REQUEST_WAITING_TEXT = (
+    "Le collègue relit une PR dont la CI passe : attendez que les checks soient verts."
+)
+
+
+def _review_log(pr: PullRequest, can_request: bool = False) -> ReviewLog:
     stale_dismissed = pr.protection is not None and pr.protection.dismiss_stale_reviews
     required = pr.required_approvals
     counter = (
@@ -217,6 +222,11 @@ def _review_log(pr: PullRequest) -> ReviewLog:
         required=required,
         counter_text=counter,
         required_text=required_text,
+        can_request=can_request,
+        request_enabled=can_request and github_sim.checks_green(pr),
+        request_disabled_text=(
+            REQUEST_WAITING_TEXT if can_request and not github_sim.checks_green(pr) else ""
+        ),
     )
 
 
@@ -239,6 +249,7 @@ def _card(
     current: bool,
     linker: Linker | None = None,
     pipeline_jobs: frozenset[str] = frozenset(),
+    can_request: bool = False,
 ) -> PrCard:
     title = pr.title_text or f"PR n°{pr.number} : {pr.head}"
     checks = sorted(
@@ -257,7 +268,7 @@ def _card(
         state_text=state_text,
         current=current,
         checks=checks,
-        review=_review_log(pr),
+        review=_review_log(pr, can_request),
         merge=_merge_state(pr),
         a11y_name_text=(
             f"PR n°{pr.number}, {title}, de {pr.head} vers {pr.base}, {state_text.lower()}"
@@ -329,7 +340,16 @@ def build_remote(
             error_text="Les refs de origin n'ont pas pu être lues. Relancez une commande git."
         )
     current = _current_number(state.pulls, local_branch)
-    cards = [_card(p, p.number == current, linker, pipeline_jobs) for p in state.pulls]
+    cards = [
+        _card(
+            p,
+            p.number == current,
+            linker,
+            pipeline_jobs,
+            can_request=github_sim.pending_request(state, p),
+        )
+        for p in state.pulls
+    ]
     order = {"open": 0, "merged": 1, "closed": 2}
     cards.sort(key=lambda c: (not c.current, order[c.state], -c.number))
     return RemoteView(branches=branches, pulls=cards)

@@ -18,6 +18,7 @@ export const REFS_TITLE = "Refs de origin";
 export const NO_REFS_TEXT = "Rien n'a encore été poussé sur origin.";
 export const OPEN_PR_LABEL = "Ouvrir une PR";
 export const MERGE_LABEL = "Merger";
+export const REQUEST_REVIEW_LABEL = "Demander une revue";
 export const BUSY_TEXT = "Une action est en cours.";
 export const NO_REVIEW_TEXT = "Aucune revue pour l'instant.";
 export const REQUIRED_TEXT = "Obligatoire";
@@ -269,7 +270,7 @@ function buildMerge(card, busy) {
 
 // --- journal de revue ------------------------------------------------------------------------
 
-export function buildReviewLog(card) {
+export function buildReviewLog(card, busy = false) {
   const log = card.review;
   const section = el("section", "review-log", { "aria-label": REVIEW_TITLE });
   const head = el("div", "review-head");
@@ -277,6 +278,17 @@ export function buildReviewLog(card) {
   const counter = el("p", "review-counter");
   counter.append(text("span", "number", log.counter_text), " ", text("span", "review-required", log.required_text));
   head.append(counter);
+  if (log.can_request) {
+    const ask = el("button", "btn", {
+      type: "button",
+      "data-action": "request-review",
+      "data-number": card.number,
+      "data-key": `request-review:${card.number}`,
+    });
+    ask.textContent = REQUEST_REVIEW_LABEL;
+    head.append(ask);
+    bindAction(ask, log.request_enabled ? (busy ? BUSY_TEXT : null) : log.request_disabled_text);
+  }
   section.append(head);
   if (log.entries.length === 0) {
     section.append(text("p", "review-none", NO_REVIEW_TEXT));
@@ -322,7 +334,7 @@ export function buildCard(card, busy, expanded = new Set()) {
   article.append(buildMerge(card, busy));
   const others = buildChecks(card.checks, (c) => c.state !== "failure" && c.state !== "error", "is-others", opts);
   if (others) article.append(others);
-  article.append(buildReviewLog(card));
+  article.append(buildReviewLog(card, busy));
   return article;
 }
 
@@ -449,6 +461,8 @@ export function renderRemote(body, ctx, renderEmpty) {
         number: Number(target.getAttribute("data-number")),
         job_id: target.getAttribute("data-job"),
       });
+    } else if (action === "request-review") {
+      postIntent(store, "pr_request_review", { number: Number(target.getAttribute("data-number")) });
     } else if (action === "merge") {
       postIntent(store, "pr_merge", { number: Number(target.getAttribute("data-number")) });
     } else if (action === "open-pr") {

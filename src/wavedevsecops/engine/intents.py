@@ -28,12 +28,14 @@ CATALOGUE = (
     "hint_open",
     "pr_open",
     "pr_merge",
+    "pr_request_review",
     "check_rerun",
     "check_output_seen",
     "run_exercise_code",
 )
 """Intentions fixées par AD-17 (`interrupt` sera traité hors file) ; `check_output_seen`
-(« Voir la sortie » d'un check, preuve `evidence_seen`) est un ajout de la story 7.4."""
+(« Voir la sortie » d'un check, preuve `evidence_seen`) est un ajout de la story 7.4 ;
+`pr_request_review` (« Demander une revue »), de la 7.5."""
 
 _NAME = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 

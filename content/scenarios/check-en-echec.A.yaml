@@ -1,0 +1,152 @@
+# Station 2 (Story 7.5) : un check obligatoire en échec bloque la PR.
+# Le dépôt d'exercice est celui du parcours (sans IA ou LLM) ; la branche `seuil-rupture` porte
+# déjà un commit, avec un test qui attend un résultat faux. Le pipeline simulé (ruff, pytest,
+# gitleaks) tourne sur la PR : pytest échoue, `main` n'accepte pas le merge.
+schema_version: 1
+scenario_id: check-en-echec
+mode: A
+title_text: Voir un check en échec bloquer la PR
+section: stations
+station: 2
+tracks: [llm, no_ai]
+tools: [git, pytest]
+template: empty
+pipeline: true
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige les trois checks du pipeline ; aucune approbation n'est demandée ici.
+  - op: install_hooks
+  - op: set_protection
+    branch: main
+    required_checks: [ruff, pytest, gitleaks]
+  - op: switch
+    branch: seuil-rupture
+    create: true
+  - op: write_file
+    path: tests/test_reapprovisionnement.py
+    content: |
+      from inventory import Stock
+
+
+      def test_article_sous_le_seuil_est_a_recommander() -> None:
+          stock = Stock()
+          stock.add("vis", 2, threshold=5)
+          assert stock.below_threshold() == []
+  - op: commit
+    message: Ajoute le test du seuil de réapprovisionnement
+steps:
+  - step_id: pousser_la_branche
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      La branche `seuil-rupture` porte un commit qui ajoute un test. Poussez-la vers l'origine :
+      une PR ne se crée que pour une branche que l'origine connaît.
+    explanation_text: >-
+      Le pipeline ne tourne pas sur votre poste mais sur la pull request : il lui faut d'abord
+      la branche sur l'origine.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/seuil-rupture
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `seuil-rupture`.
+      partial_text: git push -u ___ seuil-rupture
+      solution_text: git push -u origin seuil-rupture
+
+  - step_id: ouvrir_la_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `seuil-rupture` vers `main` avec le bouton « Ouvrir une PR »
+      de la vue « Distant + PR ». Le pipeline démarre aussitôt : trois checks apparaissent.
+    explanation_text: >-
+      L'ouverture de la PR déclenche l'intégration continue : ruff, pytest et gitleaks
+      tournent sur le code de la branche. Chaque check passe de « En attente » à « En cours »,
+      puis à son résultat.
+    explain_ref: graph.remote_ref
+    head: seuil-rupture
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/seuil-rupture"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi Merger reste inactif
+    instruction_text: >-
+      Attendez la fin des checks. Quand l'un d'eux échoue, ouvrez « Voir la sortie » sur ce check
+      et lisez ce que l'outil a affiché. Regardez ensuite la raison donnée sous « Merger » :
+      le bouton reste inactif.
+    explanation_text: >-
+      Le check « pytest » est obligatoire : tant qu'il n'est pas vert sur le dernier commit de la
+      PR, `main` refuse le merge. La sortie de l'outil, affichée telle quelle, dit quel test
+      échoue et à quelle ligne ; la raison sous « Merger » nomme le check en cause.
+    explain_ref: graph.remote_ref
+    head: seuil-rupture
+    base: main
+    pr_state: open
+    check_states:
+      pytest: failure
+    mergeable: false
+    hints:
+      lead_text: >-
+        Les checks tournent l'un après l'autre : laissez-leur quelques secondes. Celui qui porte
+        la marque ✗ est celui qui bloque.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » sur le check en échec"
+      solution_text: "Vue « Distant + PR » : « Voir la sortie » sur le check pytest"
+
+  - step_id: corriger_et_pousser
+    type: pr_state
+    title_text: Corriger le test et repasser au vert
+    instruction_text: >-
+      Le test attend une liste vide alors que deux vis sont sous le seuil de cinq. Corrigez
+      l'assertion de `tests/test_reapprovisionnement.py`, committez, puis poussez à nouveau
+      sur la même branche. Les checks repartent sur le nouveau commit.
+    explanation_text: >-
+      Un nouveau commit remet les checks à zéro : un résultat obtenu sur l'ancien commit ne
+      compte plus. Quand pytest passe au vert sur le dernier commit, plus rien ne bloque
+      « Merger ».
+    explain_ref: graph.commit
+    head: seuil-rupture
+    base: main
+    pr_state: open
+    check_states:
+      pytest: success
+    mergeable: true
+    hints:
+      lead_text: >-
+        Deux vis pour un seuil de cinq : l'article est à recommander, et `below_threshold()`
+        rend la liste des noms de ces articles.
+      partial_text: git ___ tests/test_reapprovisionnement.py
+      solution_text: >-
+        Remplacer l'assertion par `assert stock.below_threshold() == ["vis"]`, puis git add
+        tests/test_reapprovisionnement.py, git commit -m "Corrige le test du seuil" et git push
+
+  - step_id: merger_la_pr
+    type: pr_state
+    title_text: Merger la pull request
+    instruction_text: >-
+      Les checks sont verts : mergez la PR avec le bouton « Merger » de la vue « Distant + PR ».
+    explanation_text: >-
+      Le merge intègre `seuil-rupture` dans `main` sur l'origine. Il n'était possible qu'une fois
+      les checks obligatoires verts sur le dernier commit.
+    explain_ref: graph.remote_ref
+    head: seuil-rupture
+    base: main
+    pr_state: merged
+    hints:
+      lead_text: >-
+        Plus aucune raison ne s'affiche sous le bouton : il est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"
