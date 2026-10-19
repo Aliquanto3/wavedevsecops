@@ -589,35 +589,28 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 17:01 Â· 9.5 Â· CI Â· verte sur les trois OS (1819 passed sous Ubuntu) Â· d5f81d6
 - 2026-10-19 17:01 Â· 9.5 Â· fusion Â· prÃ©paration fusionnÃ©e sur main (sans tag) ; story en review Â· 62a1583
 - 2026-10-19 17:01 Â· 9.5 Â· attente humaine Â· mesure des 45 s sur le poste de rÃ©fÃ©rence, recette SM-9 (12 scÃ©narios, deux parcours, rÃ©seau coupÃ©, sans indice) Ã  consigner dans docs/releases/v0.2.0.md ; accord d'AnaÃ«l pour le tag v0.2.0 et la release Â· â€”
+- 2026-10-19 17:17 Â· â€” Â· docs Â· fiche de recette v0.2.0 publiÃ©e (artifact et docs/recette/v0.2.0.html, liÃ©e au README) ; poste de rÃ©fÃ©rence = HP EliteBook professionnel 16 Go ; prompt d'installation et de guidage remis Ã  AnaÃ«l pour le Claude Code de l'EliteBook Â· 0a160ed
+- 2026-10-19 17:17 Â· â€” Â· arrÃªt propre Â· pause demandÃ©e par AnaÃ«l en attendant sa recette sur l'EliteBook ; aucun agent actif ; Ã©tat dans Â« Reprise Â» Â· â€”
 
-## Reprise (arrêt propre du 2026-10-19 12:39)
+## Reprise (arrêt propre du 2026-10-19 17:17)
 
-État : 58 stories `done` (Epics 1 à 5 et 7 complets, 6.1 à 6.6, 8.1 à 8.3, 9.1 à 9.4). **v0.1.0 publiée** (tag annoté sur f940716, release GitHub, topics `ai-portfolio` + `status-test`). `main` poussé (98e6117). Aucun agent actif. Règle 5 révisée : la CI de branche est la seule suite complète.
+État : 61 stories `done` ; Epics 1 à 5, 7 et 8 complets, Epic 9 complet hors 9.5. **v0.1.0 publiée** ; **v0.2.0 préparée et fusionnée sur main, non taguée** (version 0.2.0, `CURRENT_MILESTONE = "v0.2"`, README, `docs/releases/v0.2.0.md`). CI de main verte. Aucun agent actif, aucune branche en attente de fusion.
 
-Arbitrages d'Anaël du 2026-10-19 : toutes les recommandations de la liste acceptées (journal, ligne « décision Anaël · accord sur toutes les recommandations »). Le spine et epics.md sont alignés (db75c3f).
+En attente d'Anaël (recette sur le HP EliteBook professionnel, 16 Go, poste de référence) :
+- 9.5 `review` : mesure du run complet du pipeline (45 s au plus) et SM-9 (12 scénarios, deux parcours, réseau coupé, sans indice), à consigner dans `docs/releases/v0.2.0.md` et pousser sur main depuis l'EliteBook ; puis accord explicite dans cette session.
+- 6.7 `review` : recette SM-1 à SM-4 avec deux collègues, mesure d'installation sur poste réel (`docs/releases/v0.1.0.md`).
+- Poste réel : 1.6 (Windows sans admin, proxy), 1.7, 6.6 (Ollama), 2.8 (Bloc-notes).
+- Navigateur : confirmation de rm -rf *, graphe et refs, commit perdu en tirets et Stash, encart 5.9, popover du Vocabulaire, « i » du pipeline et Traçabilité (9.6), NVDA.
+Fiche : `docs/recette/v0.2.0.html` (et l'artifact https://claude.ai/artifact/KJrqWxA56ULzvnURy1aFo4).
 
-À faire, dans l'ordre :
+À la reprise, dans l'ordre :
+1. `git pull --ff-only` ; lire le résumé de l'EliteBook et le diff de `docs/releases/v0.2.0.md` ; si la mesure dépasse 45 s ou si un scénario SM-9 n'a pas bloqué, proposer la suite à Anaël avant toute publication.
+2. Avec l'accord explicite d'Anaël, CI de main verte : `git tag -a v0.2.0 -m "WaveDevSecOps v0.2.0 : stations 1 à 3 de la chaîne DevSecOps, deux parcours, hors ligne"`, `git push origin v0.2.0`, `gh release create v0.2.0 --verify-tag --title "WaveDevSecOps v0.2.0" --notes-file docs/releases/v0.2.0.md`, puis `curl -fsI https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/v0.2.0/install.sh`. Topic `status-test` déjà posé. 9.5 passe `done` quand SM-9 est consigné.
+3. Écarts rapportés par l'EliteBook : un correctif par écart (dev-story → second-avis → reviewer), version 0.2.1 si publiés après le tag.
+4. Après le Sprint 2 : arrêt du run et notification ; 10.2 à 10.5 en backlog (UX et spine de la station 4 d'abord).
 
-| Ordre | Story / branche | Étape suivante |
-|---|---|---|
-| 1 | `chore/arbitrages-ui` (711da2e) · worktree agent-a03e688e9c016e8b6 | second avis puis reviewer, puis fusion. Contenu : confirmation avant `rm -r` de la racine (nouveau flux `confirm` dans events/catalog.py, champs `confirmed`/`cancelled` de TerminalLine), Échap quitte d'abord Désigner, notice de changement externe effacée à l'enregistrement, « i » des refs à côté de l'étiquette (span.graph-refs). CI 39238881035. |
-| 2 | 8.4 (couverture < 80 %) | dev-story Sonnet depuis main. **Inclure** : bandit lancé avec `--ini` vers un fichier hors de l'arbre de l'apprenant (ferme le contournement `src/.bandit`) et un job ou contrôle `uv lock --check` (cohérence pyproject.toml / uv.lock, arbitrage 8.3). |
-| 3 | 8.5 (Flow 4, LLM) | après 8.4 (pivot pipeline.yaml) ; sans vrai modèle (règle 2). |
-| 4 | 8.6 | après 8.4. |
-| 5 | 5.9 (encart « Ce qui l'aurait bloqué ») | dev, indépendante de l'Epic 8 ; 4 scénarios B (add-commit.B, push-pull.B, stash.B, rebase.B). |
-| 6 | 9.6 (explications vue pipeline, lien Traçabilité) | dev, après 8.4 pour éviter les conflits d'explanations.yaml. |
-| 7 | 9.5 (mixte, release v0.2.0) | quand Epics 7 à 9 en `done` ; passer `CURRENT_MILESTONE` à `v0.2` (web/shell.py) et réaligner test_surfaces_declarees_par_le_serveur / test_surface_non_livree_absente ; mesure des 45 s et SM-9 par Anaël. |
+Suites notées après v0.2.0 (accord d'Anaël) : constat des tests réellement exécutés (rapport junit) pour le test de config LLM ; refus de `.gitleaksignore` dès l'étape de PR via `head_files` ; limite « seuil sur un total, pas par fichier » au débrief de couverture-sous-le-seuil ; test instable sous Windows `test_check_en_echec_bloque_le_merge_puis_se_corrige[no_ai]` (RunFileError) à surveiller.
 
-6.7 reste `review` : attente humaine (recette SM-1 à SM-4 avec deux collègues, mesure d'installation sur poste réel, notes de release à compléter). 10.2 à 10.5 en backlog.
+Contrats partagés (inchangés pour la suite) : identifiants dans `scenarios/order.py` ; `RESTART_KIND = "scenario_reset"` ; `answer_submit` avec `step_id` ; `pr_state` : `check_states`, `sbom_has`, `finding_has`, `head_files` ; pipeline 7 jobs (ruff, pytest, gitleaks, bandit, pip_audit, uv_lock, quality_gate) balisés `wds:job`/`wds:end` dans les 6 fichiers CI des gabarits, outils configurés par `{config}` hors de l'arbre ; `osv_url` par create_app ; `unscanned_file` = échec ; empreintes stables sur deux passes ; glossaire et `EXPLAIN_REFS` en égalité exacte avec `explanations.yaml` ; registre des barrières et seule source « station livrée » = `content/chain.yaml` ; leçon 6.2 ; limites non fermables nommées au débrief.
 
-Contrats partagés à rappeler dans chaque prompt :
-- Identifiants dans `scenarios/order.py` (`SOCLE_ORDER`, `STATION_ORDER` ; un scénario B = id du socle + `.B`) ; `RESTART_KIND = "scenario_reset"` ; `answer_submit` avec `step_id` obligatoire ; conditions de `repo_state` de 6.3.
-- `pr_state` : champ `check_states` (unique, fusion 7.5/8.1) et `sbom_has` (8.3) ; `required_checks` du scénario.
-- Pipeline : 5 jobs (ruff, pytest, gitleaks, bandit, pip_audit) ; chaque nouveau job est balisé `wds:job <id>` / `wds:end` dans les 6 fichiers CI des gabarits (content/exercise/{no_ai,llm}/{.github/workflows/ci.yml, Jenkinsfile, .gitlab-ci.yml}) ; les scénarios qui attendent tous les checks verts (pr-sans-revue) doivent attendre le nouveau job ; `osv_url` passé par create_app.
-- Constat `unscanned_file` = échec ; empreintes : `uv run python scripts/update_fingerprints.py`, stables sur deux passes.
-- Glossaire (9.4) : chaque `scenario_id` de glossary.yaml doit exister au catalogue.
-- Leçon 6.2 : aucune étape validable par un autre chemin que le geste enseigné (tests de contournement).
-
-Méthode : empiler les branches revues sur une branche `integ/pile-N` (merges --no-ff, conflits résolus par l'orchestrateur), CI sur la pile, avance rapide de `main` quand elle est verte. Instabilités connues corrigées (lecture de github.json sous Windows, test d'intention d'exercice). En local : `uv run pytest -q -m "not slow" -n auto` ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees en fin de run seulement.
-
-Pour Anaël : recette v0.1.0 ; script d'exclusions Defender en administrateur ; contrôles navigateur (graphe et refs, commit perdu en tirets, section Stash, popover du vocabulaire, carte de confirmation du terminal) ; vérification sur poste réel de 1.6, 1.7, 6.6 et 2.8.
+Méthode : piles `integ/pile-N` (merges --no-ff), CI de la pile, avance rapide de main. Local : ruff et `uv run pytest -q -m "not slow" -n auto <fichiers>` ; `gh run watch <id> --interval 60` ; `git worktree prune` avant un agent ; worktrees supprimés en fin de run seulement.
