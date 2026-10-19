@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Recette WaveDevSecOps v0.2.0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,750&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : une fiche de recette, comme un run de CI. Une colonne de lecture, une barre de progression collante, des étapes cochables groupées par ce qu'elles débloquent. */
+:root {
+  --bg: #f2f5f6;
+  --surface: #ffffff;
+  --ink: #14232b;
+  --muted: #55666f;
+  --line: #d6dfe2;
+  --accent: #0b7480;
+  --accent-soft: #dcefef;
+  --block: #b4530b;
+  --block-soft: #fbeadb;
+  --ok: #2c7a3f;
+  --ok-soft: #dff0e3;
+  --warn: #9a6a00;
+  --warn-soft: #f7edd1;
+  --bad: #b3261e;
+  --code-bg: #e9eef0;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171b; --surface: #16222828; --surface: #172228; --ink: #e3ecee; --muted: #9db0b6; --line: #2b3a41;
+    --accent: #4fc1c9; --accent-soft: #143439; --block: #f0a060; --block-soft: #3a2614;
+    --ok: #6fcf86; --ok-soft: #173322; --warn: #e2b54a; --warn-soft: #362b10; --bad: #ff8a80; --code-bg: #1f2d33;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171b; --surface: #172228; --ink: #e3ecee; --muted: #9db0b6; --line: #2b3a41;
+  --accent: #4fc1c9; --accent-soft: #143439; --block: #f0a060; --block-soft: #3a2614;
+  --ok: #6fcf86; --ok-soft: #173322; --warn: #e2b54a; --warn-soft: #362b10; --bad: #ff8a80; --code-bg: #1f2d33;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 1rem/1.6 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 4rem;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 52rem; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.7rem); font-weight: 750; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 750; }
+h3 { font-size: 1.08rem; font-weight: 600; font-family: var(--font-body); }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* En-tête */
+header.top { padding-block: 2.2rem 1.2rem; display: grid; gap: 0.8rem; }
+.eyebrow { font: 500 0.78rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { color: var(--muted); max-width: 62ch; }
+.runline { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; font: 400 0.85rem/1.4 var(--font-mono); color: var(--muted); }
+.runline b { color: var(--ink); font-weight: 500; }
+
+/* Barre collante */
+.sticky { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 0.7rem; border-bottom: 1px solid var(--line); display: grid; gap: 0.6rem; }
+.progress-row { display: flex; align-items: center; gap: 0.8rem; }
+.bar { flex: 1; height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; display: flex; }
+.bar span { display: block; height: 100%; transition: width .3s ease; }
+.bar .b { background: var(--block); }
+.bar .o { background: var(--accent); }
+.count { font: 500 0.85rem/1 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip { font: 500 0.82rem/1 var(--font-body); padding: 0.45rem 0.7rem; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip .n { font-family: var(--font-mono); opacity: .7; margin-left: .3rem; }
+
+/* Ordre conseillé */
+.order { margin-top: 1.8rem; display: grid; gap: 0.6rem; }
+.order ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 0.35rem; }
+.order li { counter-increment: s; display: grid; grid-template-columns: 2rem 1fr; gap: 0.5rem; align-items: baseline; }
+.order li::before { content: counter(s); font: 500 0.85rem/1.6 var(--font-mono); color: var(--accent); }
+.order li.done { color: var(--muted); text-decoration: line-through; }
+
+/* Groupes et tâches */
+section.group { margin-top: 2.4rem; display: grid; gap: 0.9rem; }
+.group-head { display: grid; gap: 0.35rem; }
+.group-head p { color: var(--muted); max-width: 62ch; }
+.tag { justify-self: start; font: 500 0.72rem/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: .35rem .5rem; border-radius: 4px; }
+.tag.block { background: var(--block-soft); color: var(--block); }
+.tag.later { background: var(--accent-soft); color: var(--accent); }
+.tag.opt { background: var(--code-bg); color: var(--muted); }
+
+.task { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.task.is-block { border-left: 4px solid var(--block); }
+.task.done { opacity: .72; }
+.task-head { display: grid; grid-template-columns: auto 1fr auto; gap: 0.8rem; align-items: start; padding: 0.95rem 1rem; }
+.check { width: 1.35rem; height: 1.35rem; margin-top: .15rem; accent-color: var(--ok); cursor: pointer; }
+.task-title { display: grid; gap: .2rem; min-width: 0; }
+.task.done .task-title h3 { text-decoration: line-through; text-decoration-color: var(--muted); }
+.meta { font: 400 0.8rem/1.4 var(--font-mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: .2rem .9rem; }
+.toggle { font: 500 .82rem/1 var(--font-body); background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: .45rem .6rem; cursor: pointer; white-space: nowrap; }
+.task-body { padding: 0 1rem 1.1rem 3.15rem; display: grid; gap: .8rem; min-width: 0; }
+.task-body ol, .task-body ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .35rem; }
+.why { color: var(--muted); }
+.where { font-size: .9rem; background: var(--code-bg); border-radius: 6px; padding: .55rem .7rem; }
+.where b { font-weight: 600; }
+
+/* Outils interactifs */
+.tool { border: 1px dashed var(--line); border-radius: 8px; padding: .9rem; display: grid; gap: .8rem; min-width: 0; }
+.tool h4 { margin: 0; font: 600 .9rem/1.3 var(--font-body); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; }
+.field { display: grid; gap: .25rem; font-size: .82rem; color: var(--muted); }
+.field input { font: 400 .95rem/1.2 var(--font-body); padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); width: 100%; min-width: 0; }
+.verdict { font: 500 .9rem/1.4 var(--font-body); padding: .55rem .7rem; border-radius: 6px; }
+.verdict.ok { background: var(--ok-soft); color: var(--ok); }
+.verdict.warn { background: var(--warn-soft); color: var(--warn); }
+.verdict.bad { background: var(--block-soft); color: var(--bad); }
+.verdict.idle { background: var(--code-bg); color: var(--muted); }
+.out { position: relative; }
+.out pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: .7rem; font: 400 .78rem/1.5 var(--font-mono); overflow-x: auto; white-space: pre; }
+.copy { font: 500 .8rem/1 var(--font-body); background: var(--accent); color: var(--bg); border: 0; border-radius: 6px; padding: .5rem .7rem; cursor: pointer; justify-self: start; }
+.copy.done { background: var(--ok); }
+.row-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.small { font-size: .82rem; color: var(--muted); }
+
+.sm9 { overflow-x: auto; }
+.sm9 table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: .88rem; }
+.sm9 th, .sm9 td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.sm9 th { font: 500 .75rem/1.2 var(--font-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.sm9 td.c { text-align: center; width: 6.5rem; }
+.sm9 input { width: 1.15rem; height: 1.15rem; accent-color: var(--ok); cursor: pointer; }
+.na { font: 400 .78rem/1 var(--font-mono); color: var(--muted); }
+.sm9 tr.full td:first-child code { background: var(--ok-soft); color: var(--ok); }
+
+.final { margin-top: 2.6rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1.2rem; display: grid; gap: .8rem; }
+.gate { font: 500 .9rem/1.4 var(--font-body); }
+.gate.locked { color: var(--block); }
+.gate.open { color: var(--ok); }
+.reset { font: 400 .8rem/1 var(--font-body); background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0; justify-self: start; }
+
+@media (max-width: 34rem) {
+  .task-head { grid-template-columns: auto 1fr; }
+  .toggle { grid-column: 2; justify-self: start; }
+  .task-body { padding-left: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <span class="eyebrow">Fiche de recette · partie humaine du run</span>
+    <h1>Ce qu'il vous reste à faire</h1>
+    <p class="lede">Le run autonome a livré tout le code. Il reste ce qu'un agent ne peut pas faire : mesurer sur votre poste, jouer les scénarios réseau coupé, faire tester des collègues, regarder l'interface dans un vrai navigateur. Cochez au fur et à mesure : la page garde vos coches dans ce navigateur.</p>
+    <div class="runline">
+      <span>main <b>55a7423</b></span>
+      <span>version <b>0.2.0</b> préparée, non publiée</span>
+      <span>CI <b>verte</b> sur Windows, macOS, Ubuntu</span>
+      <span>état au <b>19/10/2026</b></span>
+    </div>
+  </header>
+
+  <div class="sticky" role="region" aria-label="Avancement">
+    <div class="progress-row">
+      <div class="bar" aria-hidden="true"><span class="b" id="bar-b"></span><span class="o" id="bar-o"></span></div>
+      <span class="count" id="count">0 / 0</span>
+    </div>
+    <div class="chips" role="group" aria-label="Filtrer les tâches" id="chips"></div>
+  </div>
+
+  <section class="order" aria-labelledby="order-title">
+    <h2 id="order-title">Ordre conseillé</h2>
+    <p class="small">Les trois premières étapes débloquent la release v0.2.0. Le reste peut attendre.</p>
+    <ol id="order"></ol>
+  </section>
+
+  <div id="groups"></div>
+
+  <section class="final" id="final" aria-labelledby="final-title">
+    <span class="tag block">Dernière étape</span>
+    <h2 id="final-title">Donner votre accord de publication</h2>
+    <p id="gate" class="gate locked">Mesure et SM-9 pas encore cochées.</p>
+    <p>Quand la mesure et le tableau SM-9 sont consignés dans <code>docs/releases/v0.2.0.md</code> et commités, collez ce message dans la session de Claude Code. L'orchestrateur vérifiera la CI de main, posera le tag annoté <code>v0.2.0</code> et publiera la release GitHub avec les notes.</p>
+    <div class="out"><pre id="accord">Mesure et SM-9 consignées dans docs/releases/v0.2.0.md, je donne mon accord : publie la release v0.2.0.</pre></div>
+    <button class="copy" type="button" data-copy="accord">Copier le message</button>
+    <button class="reset" type="button" id="reset">Effacer toutes mes coches et saisies</button>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "wds-recette-v020";
+  var state = { done: {}, sm9: {}, m: {}, open: {}, filter: "all" };
+  try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); for (var k in s) state[k] = s[k]; } } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var GROUPS = [
+    { id: "block", tag: "block", label: "Bloque la v0.2.0", title: "Débloquer la release v0.2.0",
+      intro: "Story 9.5, type mixte. Le tag et la release attendent ces deux résultats, puis votre accord." },
+    { id: "v010", tag: "later", label: "Recette v0.1.0", title: "Finir la recette de la v0.1.0",
+      intro: "Story 6.7, en relecture depuis la publication de la v0.1.0. Elle demande deux collègues." },
+    { id: "real", tag: "later", label: "Poste réel", title: "Vérifier sur un poste réel",
+      intro: "Les tests simulent ces cas ; seul un vrai poste dit si l'expérience tient." },
+    { id: "nav", tag: "later", label: "Navigateur", title: "Regarder l'interface dans un navigateur",
+      intro: "Les tests DOM tournent sous Node. Le rendu, le focus et la lecture d'écran se jugent à l'œil." }
+  ];
+
+  var TASKS = [
+    { id: "mesure", group: "block", order: 1, title: "Mesurer un run complet du pipeline (45 s au plus)", time: "≈ 15 min", story: "9.5",
+      why: "Le budget de 45 s se mesure sur votre poste de référence, pas en CI. En CI, le pipeline complet prend 4,21 s sur Ubuntu et 9,08 s sur macOS ; le test de CI n'alerte qu'au-delà de 90 s et n'échoue qu'au-delà de 180 s.",
+      steps: [
+        "Le poste de référence est l’EliteBook professionnel (16 Go de RAM). Fermez les applications lourdes (Teams, navigateur chargé) pour mesurer dans des conditions d’atelier. Installez la v0.2.0, ou faites <code>git pull</code> puis <code>uv sync</code> dans le dossier <code>app</code>.",
+        "Lancez <code>uv run wavedevsecops</code>. Le navigateur s'ouvre sur une adresse locale.",
+        "Ouvrez un scénario de station qui passe par une PR avec pipeline, par exemple <code>couverture-sous-le-seuil</code> (parcours sans IA).",
+        "Poussez et ouvrez la PR. Chronométrez du push jusqu'au dernier des 7 checks terminé : ruff, pytest, gitleaks, bandit, pip_audit, uv_lock, quality_gate.",
+        "La vue Distant + PR affiche la durée de chaque check : notez-les si un job paraît lent.",
+        "Saisissez la durée ci-dessous : la page dit si le budget tient et prépare la ligne à coller dans les notes."
+      ],
+      where: "<b>À consigner :</b> section « Mesure du run complet du pipeline sur le poste de référence » de <code>docs/releases/v0.2.0.md</code>.",
+      tool: "mesure" },
+    { id: "sm9", group: "block", order: 2, title: "SM-9 : jouer les 12 scénarios de station, réseau coupé, sans indice", time: "≈ 1 h 30", story: "9.5",
+      why: "SM-9 vérifie que chaque barrière bloque bien sur son défaut prévu, dans les deux parcours, sans réseau. Six scénarios existent dans les deux parcours, six dans un seul.",
+      steps: [
+        "Coupez le réseau du poste : Wi-Fi coupé et câble débranché, ou mode avion.",
+        "Lancez l'application et jouez chaque scénario sans ouvrir aucun indice.",
+        "Pour chaque scénario, cochez la case du parcours quand la barrière a bloqué sur le défaut prévu, puis que votre correction l'a fait passer.",
+        "Notez dans « Retours » ce qui vous a fait hésiter ou ce qui vous a paru faux.",
+        "Copiez le tableau généré et remplacez celui des notes de release."
+      ],
+      where: "<b>À consigner :</b> section « SM-9 » de <code>docs/releases/v0.2.0.md</code>. Si personne d'autre ne l'a vérifié, ajoutez la mention « non validé par un tiers ».",
+      tool: "sm9" },
+    { id: "accord", group: "block", order: 3, title: "Commiter les notes et donner votre accord", time: "≈ 5 min", story: "9.5",
+      why: "La publication est une sortie externe : rien ne part sans votre accord explicite dans la session.",
+      steps: [
+        "Commitez <code>docs/releases/v0.2.0.md</code> sur main et poussez.",
+        "Copiez le message d'accord en bas de cette page et collez-le dans la session de Claude Code.",
+        "L'orchestrateur vérifie la CI de main, pose le tag <code>v0.2.0</code> et publie la release GitHub. Les liens d'installation <code>/v0.2.0/</code> du README répondent ensuite."
+      ],
+      where: "<b>Après la publication :</b> <code>/rename</code> puis <code>/clear</code> avant tout autre sujet." },
+
+    { id: "sm1", group: "v010", order: 4, title: "SM-1 : finir les scénarios du socle sans indice", time: "≈ 1 h", story: "6.7",
+      why: "Critère : zéro indice par scénario, et un quiz réussi à 80 % ou plus dès le premier essai.",
+      steps: ["Jouez les scénarios du socle git (A puis B) sans indice.", "Notez votre score de quiz au premier passage."],
+      where: "<b>À consigner :</b> tableau « Recette SM-1 à SM-4 » de <code>docs/releases/v0.1.0.md</code>." },
+    { id: "sm2", group: "v010", order: 5, title: "SM-2 : deux collègues installent seuls, en moins de 10 minutes", time: "≈ 20 min par collègue", story: "6.7",
+      why: "L'installation doit marcher sans droits administrateur, y compris derrière le proxy de l'entreprise.",
+      steps: [
+        "Donnez-leur seulement la commande d'installation du README, sans aide.",
+        "Chronométrez. L'installeur écrit aussi sa durée dans <code>install.json</code>, champ <code>duration_s</code>.",
+        "Ajoutez la ligne « poste réel » au tableau « Temps d'installation »."
+      ],
+      where: "<b>À consigner :</b> <code>docs/releases/v0.1.0.md</code>, tableaux « Temps d'installation » et « Recette »." },
+    { id: "sm3", group: "v010", order: 6, title: "SM-3 : le socle en une heure (branche, PR, conflit, récupération)", time: "1 h par collègue", story: "6.7",
+      why: "Mesure si le parcours guidé tient sa promesse pédagogique pour quelqu'un d'autre que l'auteur.",
+      steps: ["Les mêmes collègues enchaînent branche, PR, conflit et récupération.", "Notez la durée et les points de blocage."],
+      where: "<b>À consigner :</b> <code>docs/releases/v0.1.0.md</code>, tableau « Recette »." },
+    { id: "sm4", group: "v010", order: 7, title: "SM-4 : ils expliquent ce qu'un agent a fait sur le dépôt", time: "≈ 15 min", story: "6.7",
+      why: "Le mode B doit rendre lisible le travail d'un agent. Recueillez aussi leur avis sur la vue du graphe.",
+      steps: ["Après un scénario B, demandez-leur de raconter ce que l'agent a fait.", "Notez leurs retours sur le graphe : ils comptent plus que les vôtres."],
+      where: "<b>À consigner :</b> <code>docs/releases/v0.1.0.md</code>, « Recette » et « Retours sur la vue du graphe »." },
+
+    { id: "w16", group: "real", order: 8, title: "Windows sans droits administrateur, derrière un proxy", time: "≈ 20 min", story: "1.6",
+      why: "Les runners de CI n'ont ni proxy d'entreprise ni compte restreint.",
+      steps: ["Sur un poste d'entreprise, lancez la commande PowerShell du README depuis une session non administrateur.", "Si le proxy bloque, réessayez avec <code>$env:HTTPS_PROXY</code> renseigné.", "Vérifiez que <code>uv run wavedevsecops</code> ouvre l'application."],
+      where: "<b>À noter :</b> limites connues des notes v0.1.0 et v0.2.0." },
+    { id: "u17", group: "real", order: 9, title: "macOS et Linux sur un poste personnel", time: "≈ 15 min", story: "1.7",
+      why: "La CI couvre des images propres ; un poste personnel a déjà son propre git, son shell, son PATH.",
+      steps: ["Lancez <code>curl -fsSL …/install.sh | sh</code> comme dans le README.", "Ouvrez l'application et jouez un scénario."],
+      where: "<b>À noter :</b> limites connues des notes de release." },
+    { id: "o66", group: "real", order: 10, title: "Exécuter le code d'exercice LLM avec un vrai Ollama", time: "≈ 20 min", story: "6.6",
+      why: "Le parcours LLM suppose Ollama sur <code>127.0.0.1:11434</code>. Les tests remplacent le modèle ; ici, c'est vous qui activez la ressource.",
+      steps: ["Démarrez Ollama en local avec un petit modèle.", "Dans un scénario du parcours LLM, lancez le code d'exercice et vérifiez la réponse.", "Arrêtez Ollama : l'exécution doit échouer avec un message clair, et le reste de l'application doit continuer de fonctionner."],
+      where: "<b>À noter :</b> limites connues des notes de release." },
+    { id: "n28", group: "real", order: 11, title: "Windows : ouverture d'un fichier sans éditeur associé", time: "≈ 5 min", story: "2.8",
+      why: "Par sécurité, un fichier sans verbe « modifier » s'ouvre dans le Bloc-notes. À confirmer sur un vrai Windows.",
+      steps: ["Dans la vue Code, ouvrez dans l'éditeur externe un fichier dont l'extension n'a pas d'éditeur associé.", "Vérifiez qu'il s'ouvre dans le Bloc-notes et pas dans un programme qui l'exécuterait."] },
+
+    { id: "b25", group: "nav", order: 12, title: "Carte de confirmation du terminal", time: "≈ 5 min", story: "2.5 · arbitrages UI",
+      why: "Nouveau depuis aujourd'hui : <code>rm -rf *</code> et ses variantes demandent une confirmation.",
+      steps: ["Dans le bac à sable, tapez <code>rm -rf *</code>, puis <code>rm -rf ?*</code> : une carte de confirmation doit apparaître.", "Annulez : rien ne doit être supprimé. Confirmez : la racine se vide, hors <code>.git</code>.", "Vérifiez qu'Échap quitte d'abord le mode Désigner, avant tout autre effet."] },
+    { id: "b210", group: "nav", order: 13, title: "Graphe et étiquettes de refs", time: "≈ 5 min", story: "2.10",
+      why: "Le « i » d'une étiquette de ref est désormais à côté d'elle, hors du bouton du commit.",
+      steps: ["Survolez et cliquez le « i » d'une étiquette (<code>main</code>, <code>origin/main</code>).", "Vérifiez que le popover s'ouvre et que le clic ne sélectionne pas le commit."] },
+    { id: "b58", group: "nav", order: 14, title: "Commit perdu en tirets et section Stash", time: "≈ 5 min", story: "5.8",
+      why: "Deux rendus propres aux scénarios B « stash oublié » et « rebase laissé en conflit ».",
+      steps: ["Jouez <code>stash.B</code> : le stash doit apparaître dans la vue staging et pouvoir être désigné.", "Jouez <code>rebase.B</code> : le commit perdu doit s'afficher en tirets."] },
+    { id: "b59", group: "nav", order: 15, title: "Encart « Ce qui l'aurait bloqué »", time: "≈ 5 min", story: "5.9",
+      why: "Nouveau en fin de scénario B : chaque incident est relié à la barrière qui l'aurait évité.",
+      steps: ["Finissez <code>add-commit.B</code> (le <code>.env</code> committé) : l'encart doit nommer gitleaks, station 1, avec un lien.", "Finissez <code>push-pull.B</code> : il doit nommer la protection de branche, station 2.", "Vérifiez la mise en page de l'encart sous la correction."] },
+    { id: "b94", group: "nav", order: 16, title: "Popover du Vocabulaire", time: "≈ 5 min", story: "9.4",
+      why: "Chaque terme doit mener à sa barrière, sans lien mort.",
+      steps: ["Ouvrez la page Vocabulaire et dépliez quelques termes.", "Vérifiez que chaque lien de scénario ouvre bien le bon scénario."] },
+    { id: "b96", group: "nav", order: 17, title: "Explications du pipeline et terme « Traçabilité »", time: "≈ 10 min", story: "9.6",
+      why: "Nouveau : un « i » par job, et un lien « Traçabilité » qui ouvre la vue Distant + PR de l'espace.",
+      steps: [
+        "Vue Code, onglet Pipeline (ouvrez-la avec « Voir dans le pipeline ») : un « i » à côté de chaque tâche, popover au-dessus du panneau.",
+        "Vue Distant + PR : le « i » d'un check et celui d'une sortie.",
+        "Ouvrez <code>check-en-echec</code>, puis Vocabulaire → Traçabilité : le lien ouvre l'espace sur la vue Distant + PR, titre au focus. Essayez aussi sous 1280 px de large et avec cette vue masquée.",
+        "Ouvrez <code>bac-a-sable-libre</code>, puis Traçabilité : une phrase s'affiche, sans lien."
+      ] },
+    { id: "nvda", group: "nav", order: 18, title: "Lecture par NVDA", time: "≈ 15 min", story: "transverse",
+      why: "Les noms accessibles ont été vérifiés par les tests, la lecture réelle non.",
+      steps: ["Avec NVDA, parcourez le graphe, une carte de confirmation, un popover d'explication et la page Vocabulaire.", "Vérifiez qu'un commit est annoncé avec le verdict de sa ref (« main : ✓ Attendu »)."] }
+  ];
+
+  var SM9 = [
+    ["defaut-de-lint", "ruff (hook pre-commit)", true, true],
+    ["secret-dans-un-commit", "gitleaks (hook pre-commit)", true, true],
+    ["test-casse", "pytest", true, true],
+    ["check-en-echec", "check requis de la PR", true, true],
+    ["pr-sans-revue", "revue obligatoire", true, true],
+    ["push-direct-main", "protection de branche", true, true],
+    ["code-vulnerable", "bandit", true, false],
+    ["dependance-vulnerable", "pip-audit et SBOM", true, false],
+    ["couverture-sous-le-seuil", "quality gate 80 %", true, false],
+    ["outil-trop-puissant", "bandit, pip-audit, quality gate, deux approbations", false, true],
+    ["cle-api-en-dur", "gitleaks et test de config LLM", false, true],
+    ["donnees-vers-le-cloud", "test de config LLM", false, true]
+  ];
+
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+  /* ---- Outil de mesure ---- */
+  function buildMesure() {
+    var t = el("div", "tool");
+    t.appendChild(el("h4", null, "Votre mesure"));
+    var f = el("div", "fields");
+    [["m-s", "Durée (secondes)", "number", "par ex. 38"], ["m-poste", "Poste de référence", "text", "par ex. HP EliteBook, 16 Go"], ["m-os", "Système", "text", "par ex. Windows 11"], ["m-date", "Date", "text", "19/10/2026"]].forEach(function (d) {
+      var lab = el("label", "field"); lab.setAttribute("for", d[0]); lab.textContent = d[1];
+      var inp = document.createElement("input"); inp.id = d[0]; inp.type = d[2]; inp.placeholder = d[3];
+      if (d[2] === "number") { inp.min = "0"; inp.step = "0.1"; inp.inputMode = "decimal"; }
+      inp.value = state.m[d[0]] || "";
+      inp.addEventListener("input", function () { state.m[d[0]] = inp.value; save(); refreshMesure(); });
+      lab.appendChild(inp); f.appendChild(lab);
+    });
+    t.appendChild(f);
+    var v = el("p", "verdict idle"); v.id = "m-verdict"; t.appendChild(v);
+    var out = el("div", "out"); var pre = el("pre"); pre.id = "m-out"; out.appendChild(pre); t.appendChild(out);
+    var b = el("button", "copy", "Copier la ligne du tableau"); b.type = "button"; b.dataset.copy = "m-out"; t.appendChild(b);
+    return t;
+  }
+  function refreshMesure() {
+    var v = document.getElementById("m-verdict"), o = document.getElementById("m-out");
+    if (!v) return;
+    var s = parseFloat(String(state.m["m-s"] || "").replace(",", "."));
+    if (isNaN(s)) { v.className = "verdict idle"; v.textContent = "Saisissez la durée mesurée pour voir le verdict."; }
+    else if (s <= 45) { v.className = "verdict ok"; v.textContent = "✓ Budget tenu : " + fmt(s) + " s pour 45 s au plus."; }
+    else if (s <= 90) { v.className = "verdict warn"; v.textContent = "Budget dépassé de " + fmt(s - 45) + " s. Le critère de 9.5 n'est pas tenu : dites-le à l'orchestrateur avant de donner votre accord."; }
+    else { v.className = "verdict bad"; v.textContent = "Au-delà de 90 s : c'est aussi le seuil d'alerte de la CI. Signalez-le avant toute publication."; }
+    var dur = isNaN(s) ? "_à remplir_" : fmt(s) + " s";
+    o.textContent = "| " + (state.m["m-poste"] || "_à remplir_") + " | " + (state.m["m-os"] || "_à remplir_") + " | " + dur + " (budget : 45 s au plus) | " + (state.m["m-date"] || "_à remplir_") + " |";
+  }
+  function fmt(n) { return (Math.round(n * 10) / 10).toString().replace(".", ","); }
+
+  /* ---- Tableau SM-9 ---- */
+  function buildSm9() {
+    var t = el("div", "tool");
+    t.appendChild(el("h4", null, "Tableau SM-9"));
+    var wrap = el("div", "sm9");
+    var tbl = el("table");
+    tbl.innerHTML = "<thead><tr><th scope=\"col\">Scénario</th><th scope=\"col\">Barrière qui doit bloquer</th><th scope=\"col\" class=\"c\">Sans IA</th><th scope=\"col\" class=\"c\">LLM</th></tr></thead>";
+    var tb = el("tbody");
+    SM9.forEach(function (r, i) {
+      var tr = el("tr"); tr.dataset.i = i;
+      tr.appendChild(el("td", null, "<code>" + r[0] + "</code>"));
+      tr.appendChild(el("td", null, r[1]));
+      [["n", r[2], "sans IA"], ["l", r[3], "LLM"]].forEach(function (c) {
+        var td = el("td", "c");
+        if (!c[1]) { td.appendChild(el("span", "na", "n/a")); }
+        else {
+          var id = "sm9-" + i + "-" + c[0];
+          var cb = document.createElement("input"); cb.type = "checkbox"; cb.id = id;
+          cb.setAttribute("aria-label", r[0] + ", parcours " + c[2] + " : barrière vérifiée");
+          cb.checked = !!state.sm9[id];
+          cb.addEventListener("change", function () { state.sm9[id] = cb.checked; save(); refreshSm9(); });
+          td.appendChild(cb);
+        }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); wrap.appendChild(tbl); t.appendChild(wrap);
+    var f = el("div", "fields");
+    [["sm9-mention", "Mention", "par ex. non validé par un tiers"], ["sm9-retours", "Retours", "ce qui vous a fait hésiter"]].forEach(function (d) {
+      var lab = el("label", "field"); lab.setAttribute("for", d[0]); lab.textContent = d[1];
+      var inp = document.createElement("input"); inp.id = d[0]; inp.type = "text"; inp.placeholder = d[2];
+      inp.value = state.m[d[0]] || "";
+      inp.addEventListener("input", function () { state.m[d[0]] = inp.value; save(); refreshSm9(); });
+      lab.appendChild(inp); f.appendChild(lab);
+    });
+    t.appendChild(f);
+    var v = el("p", "verdict idle"); v.id = "sm9-verdict"; t.appendChild(v);
+    var out = el("div", "out"); var pre = el("pre"); pre.id = "sm9-out"; out.appendChild(pre); t.appendChild(out);
+    var b = el("button", "copy", "Copier le tableau Markdown"); b.type = "button"; b.dataset.copy = "sm9-out"; t.appendChild(b);
+    return t;
+  }
+  function sm9Totals() {
+    var total = 0, done = 0;
+    SM9.forEach(function (r, i) { if (r[2]) { total++; if (state.sm9["sm9-" + i + "-n"]) done++; } if (r[3]) { total++; if (state.sm9["sm9-" + i + "-l"]) done++; } });
+    return { total: total, done: done };
+  }
+  function refreshSm9() {
+    var v = document.getElementById("sm9-verdict"), o = document.getElementById("sm9-out");
+    if (!v) return;
+    var t = sm9Totals();
+    v.className = "verdict " + (t.done === t.total ? "ok" : t.done ? "warn" : "idle");
+    v.textContent = t.done === t.total ? "✓ Les " + t.total + " combinaisons scénario × parcours sont vérifiées." : t.done + " combinaison(s) vérifiée(s) sur " + t.total + ".";
+    document.querySelectorAll(".sm9 tbody tr").forEach(function (tr) {
+      var i = +tr.dataset.i, r = SM9[i];
+      var full = (!r[2] || state.sm9["sm9-" + i + "-n"]) && (!r[3] || state.sm9["sm9-" + i + "-l"]);
+      tr.classList.toggle("full", !!full);
+    });
+    var lines = ["| Scénario | Barrière qui doit bloquer | Parcours sans IA | Parcours LLM |", "|---|---|---|---|"];
+    SM9.forEach(function (r, i) {
+      function cell(on, k) { return on ? (state.sm9["sm9-" + i + "-" + k] ? "[x]" : "[ ]") : "n/a"; }
+      lines.push("| `" + r[0] + "` | " + r[1] + " | " + cell(r[2], "n") + " | " + cell(r[3], "l") + " |");
+    });
+    lines.push("", "n/a : scénario proposé dans un seul parcours.", "", "Mention : " + (state.m["sm9-mention"] || "_à remplir_") + ". Retours : " + (state.m["sm9-retours"] || "_à remplir_") + ".");
+    o.textContent = lines.join("\n");
+    if (t.done === t.total && !state.done.sm9) { state.done.sm9 = true; save(); var c = document.getElementById("chk-sm9"); if (c) { c.checked = true; markTask("sm9"); } refreshProgress(); }
+  }
+
+  /* ---- Rendu des groupes et tâches ---- */
+  function render() {
+    var root = document.getElementById("groups");
+    GROUPS.forEach(function (g) {
+      var sec = el("section", "group"); sec.dataset.group = g.id; sec.setAttribute("aria-labelledby", "g-" + g.id);
+      var head = el("div", "group-head");
+      head.appendChild(el("span", "tag " + g.tag, g.label));
+      var h = el("h2", null, g.title); h.id = "g-" + g.id; head.appendChild(h);
+      head.appendChild(el("p", null, g.intro));
+      sec.appendChild(head);
+      TASKS.filter(function (t) { return t.group === g.id; }).forEach(function (t) { sec.appendChild(taskCard(t)); });
+      root.appendChild(sec);
+    });
+  }
+  function taskCard(t) {
+    var card = el("article", "task" + (t.group === "block" ? " is-block" : "")); card.id = "t-" + t.id;
+    var head = el("div", "task-head");
+    var cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "check"; cb.id = "chk-" + t.id;
+    cb.checked = !!state.done[t.id];
+    var titleWrap = el("div", "task-title");
+    var lab = el("label"); lab.setAttribute("for", cb.id); lab.appendChild(el("h3", null, t.title));
+    titleWrap.appendChild(lab);
+    titleWrap.appendChild(el("div", "meta", "<span>story " + t.story + "</span><span>" + t.time + "</span>"));
+    var bodyId = "body-" + t.id;
+    var tog = el("button", "toggle"); tog.type = "button"; tog.setAttribute("aria-controls", bodyId);
+    head.appendChild(cb); head.appendChild(titleWrap); head.appendChild(tog);
+    card.appendChild(head);
+    var body = el("div", "task-body"); body.id = bodyId;
+    body.appendChild(el("p", "why", t.why));
+    var ol = el("ol"); t.steps.forEach(function (s) { ol.appendChild(el("li", null, s)); }); body.appendChild(ol);
+    if (t.where) body.appendChild(el("p", "where", t.where));
+    if (t.tool === "mesure") body.appendChild(buildMesure());
+    if (t.tool === "sm9") body.appendChild(buildSm9());
+    card.appendChild(body);
+    var open = state.open[t.id]; if (open == null) open = t.group === "block";
+    setOpen(t.id, open, body, tog);
+    tog.addEventListener("click", function () { var o = body.hidden; state.open[t.id] = o; save(); setOpen(t.id, o, body, tog); });
+    cb.addEventListener("change", function () { state.done[t.id] = cb.checked; save(); markTask(t.id); refreshProgress(); });
+    if (cb.checked) card.classList.add("done");
+    return card;
+  }
+  function setOpen(id, o, body, tog) { body.hidden = !o; tog.setAttribute("aria-expanded", o ? "true" : "false"); tog.textContent = o ? "Replier" : "Voir les étapes"; }
+  function markTask(id) { var c = document.getElementById("t-" + id); if (c) c.classList.toggle("done", !!state.done[id]); }
+
+  /* ---- Ordre conseillé ---- */
+  function renderOrder() {
+    var ol = document.getElementById("order");
+    var picks = ["mesure", "sm9", "accord", "sm2", "sm1", "w16", "b59", "b96"];
+    var labels = { mesure: "Mesurer le pipeline sur le poste de référence", sm9: "Jouer les 12 scénarios réseau coupé (SM-9)", accord: "Commiter les notes et donner votre accord", sm2: "Réserver deux collègues pour SM-2 à SM-4", sm1: "Faire SM-1 vous-même", w16: "Installer sur un poste Windows d'entreprise", b59: "Contrôler l'encart de fin des scénarios B", b96: "Contrôler les explications du pipeline et la traçabilité" };
+    picks.forEach(function (p) {
+      var li = el("li"); li.dataset.id = p;
+      var a = el("a", null, labels[p]); a.href = "#t-" + p;
+      li.appendChild(a); ol.appendChild(li);
+    });
+  }
+
+  /* ---- Filtres et progression ---- */
+  function renderChips() {
+    var box = document.getElementById("chips");
+    var opts = [{ id: "all", label: "Tout" }].concat(GROUPS.map(function (g) { return { id: g.id, label: g.label }; }));
+    opts.forEach(function (o) {
+      var b = el("button", "chip"); b.type = "button"; b.dataset.f = o.id;
+      var n = o.id === "all" ? TASKS.length : TASKS.filter(function (t) { return t.group === o.id; }).length;
+      b.innerHTML = o.label + "<span class=\"n\">" + n + "</span>";
+      b.addEventListener("click", function () { state.filter = o.id; save(); applyFilter(); });
+      box.appendChild(b);
+    });
+    applyFilter();
+  }
+  function applyFilter() {
+    document.querySelectorAll(".chip").forEach(function (c) { c.setAttribute("aria-pressed", c.dataset.f === state.filter ? "true" : "false"); });
+    document.querySelectorAll("section.group").forEach(function (s) { s.hidden = !(state.filter === "all" || s.dataset.group === state.filter); });
+  }
+  function refreshProgress() {
+    var blk = TASKS.filter(function (t) { return t.group === "block"; });
+    var nb = blk.filter(function (t) { return state.done[t.id]; }).length;
+    var no = TASKS.filter(function (t) { return t.group !== "block" && state.done[t.id]; }).length;
+    var all = TASKS.length;
+    document.getElementById("bar-b").style.width = (nb / all * 100) + "%";
+    document.getElementById("bar-o").style.width = (no / all * 100) + "%";
+    document.getElementById("count").textContent = (nb + no) + " / " + all + " · v0.2.0 : " + nb + "/" + blk.length;
+    document.querySelectorAll("#order li").forEach(function (li) { li.classList.toggle("done", !!state.done[li.dataset.id]); });
+    var g = document.getElementById("gate");
+    var ready = state.done.mesure && state.done.sm9;
+    g.className = "gate " + (ready ? "open" : "locked");
+    g.textContent = ready ? "✓ Mesure et SM-9 cochées : vous pouvez donner votre accord." : "Mesure et SM-9 pas encore cochées.";
+  }
+
+  /* ---- Copie ---- */
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-copy]") : null;
+    if (!b) return;
+    var src = document.getElementById(b.dataset.copy); if (!src) return;
+    var text = src.textContent, label = b.textContent;
+    function ok() { b.classList.add("done"); b.textContent = "Copié"; setTimeout(function () { b.classList.remove("done"); b.textContent = label; }, 1600); }
+    function fallback() { var r = document.createRange(); r.selectNodeContents(src); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "Texte sélectionné : Ctrl+C"; setTimeout(function () { b.textContent = label; }, 2200); }
+    try { navigator.clipboard.writeText(text).then(ok, fallback); } catch (err) { fallback(); }
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    state = { done: {}, sm9: {}, m: {}, open: {}, filter: "all" }; save();
+    document.querySelectorAll("input").forEach(function (i) { if (i.type === "checkbox") i.checked = false; else i.value = ""; });
+    document.querySelectorAll(".task").forEach(function (c) { c.classList.remove("done"); });
+    applyFilter(); refreshMesure(); refreshSm9(); refreshProgress();
+  });
+
+  render(); renderOrder(); renderChips(); refreshMesure(); refreshSm9(); refreshProgress();
+})();
+</script>
+</body>
+</html>

@@ -107,6 +107,7 @@ chronométrée de la v0.1.0 est consignée dans les [notes de version](docs/rele
 
 - [Idée forgée](docs/forge/forged-idea.md) : décisions, options rejetées, points à trancher.
 - [Rapport de la session](docs/forge/forge-report.html).
+- [Fiche de recette v0.2.0](docs/recette/v0.2.0.html) : ce qui reste à faire à la main (mesure, SM-9, recette v0.1.0, contrôles). Ouvrez le fichier dans un navigateur.
 
 ## Licence
 
