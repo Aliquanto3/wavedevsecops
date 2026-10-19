@@ -517,6 +517,12 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 12:13 · 8.3 · review · rebase sur main (fingerprints régénéré), H (osv_url transmis par create_app, test par create_app), H (8 tests lents de test_pipeline réalignés sur 5 jobs), M (exigence absente du SBOM = unscanned_file : marqueur d'environnement), L (SBOM expiré ou illisible = constat) corrigés ; fichier vidé et {osv_url} des gabarits écartés ; pyproject non audité reporté ; 1352 passed (rapides), 111 ciblés · a34c468
 - 2026-10-19 12:13 · — · décision pour Anaël · 8.3 : seul requirements.txt est audité (AR-23) : corriger ce seul fichier valide l'étape ; job uv lock --check ou condition de contenu dans pr_state, dans une story ultérieure · —
 - 2026-10-19 12:22 · — · décision Anaël · accord sur toutes les recommandations de la liste d'arbitrages (28 points) : stations assumées en aperçu dans la v0.1.0 ; publication (tag, release, description, topics, PR portfolio.json) ; encart « Ce qui l'aurait bloqué » en story dédiée après v0.1.0 ; station 1 reste livrée ; rm -rf * à la racine avec confirmation ; Échap quitte d'abord Désigner ; notice effacée à l'enregistrement ; « i » à côté de l'étiquette ; bandit --ini hors de l'arbre et uv lock --check dans 8.4 ; spine mis à jour (httpx, diagnostic_seen, step_id, scenario_reset, check_output_seen, pr_request_review, conditions de repo_state) ; critère 6.4 reformulé ; story d'explications (vue pipeline, traçabilité) après v0.2 ; autres comportements actuels confirmés · —
+- 2026-10-19 12:38 · main · CI · verte sur les trois OS (6.7 fusionnée) · f940716
+- 2026-10-19 12:38 · 6.7 (mixte) · release · tag annoté v0.1.0 sur f940716, release GitHub publiée avec docs/releases/v0.1.0.md ; topics ai-portfolio + status-test (status-spec retiré), description mise à jour ; entrée portfolio.json déjà présente · f940716
+- 2026-10-19 12:38 · 6.7 · attente humaine · recette SM-1 à SM-4 par Anaël et deux collègues, mesure d'installation sur poste réel, notes de release à compléter · —
+- 2026-10-19 12:38 · 8.3 · CI · verte sur les trois OS · a34c468
+- 2026-10-19 12:38 · 8.3 · fusion · commit de fusion sur main (après le tag v0.1.0), story done · 04657d7
+- 2026-10-19 12:38 · docs · fusion · spine et epics.md alignés sur le code (arbitrages), stories 5.9 et 9.6 ajoutées en backlog · db75c3f
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
 
