@@ -21,7 +21,58 @@ export const SHA_FAILED_TEXT = "Le SHA n'a pas pu être résolu. Réessayez.";
 export const NOT_ACCEPTED_TEXT = "Cette question n'attend pas de commit.";
 export const SENDING_TEXT = "Réponse en cours d'envoi.";
 
+export const LIST_LABEL = "Choisir dans la liste";
+export const FILTER_LABEL = "Filtrer par nom, SHA ou chemin";
+export const CHOSEN_TEXT = "choisi";
+export const NO_MATCH_TEXT = "Aucun élément ne correspond à ce filtre.";
+export const NO_DESIGNABLE_TEXT = "Aucun élément désignable pour l'instant.";
+export const SHA_MIN = 7;
+const ACTOR_NAMES = { agent: "Agent", colleague: "Collègue", learner: "Vous" };
+const KIND_ICONS = { commit: "●", ref: "⑂", file: "▤", branch: "⑂", pr: "⇄", check: "✓", review: "✎" };
+const GROUP_TITLES = { graph: "Graphe", staging: "Index", remote: "Distant" };
+
 const registry = new WeakMap();
+
+/**
+ * Éléments désignables des vues, groupés par vue : `[{key, title, items: [{id, kind, label,
+ * sha, search}]}]`. Le front ne décide de rien : il liste ce que la projection marque
+ * `designable` (AD-2), dans l'ordre du dessin.
+ */
+export function collectDesignables(views) {
+  const groups = [];
+  const seen = new Set();
+  const add = (key, item) => {
+    if (!item || item.designable !== true || !item.element_id || seen.has(`${key}|${item.element_id}`)) return;
+    seen.add(`${key}|${item.element_id}`);
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = { key, title: GROUP_TITLES[key] || key, items: [] };
+      groups.push(group);
+    }
+    const id = String(item.element_id);
+    const kind = id.split(":")[0];
+    const sha = kind === "commit" ? String(item.sha || id.slice(7)) : "";
+    const label =
+      kind === "commit"
+        ? `${item.short_sha || sha.slice(0, 7)} · ${item.subject || ""}`.trim()
+        : item.name_text || item.path || item.title_text || item.a11y_name_text || shortId(id);
+    group.items.push({ id, kind, label, sha, search: `${label} ${id} ${sha}`.toLowerCase() });
+  };
+  const v = views || {};
+  const graph = v.graph || {};
+  for (const node of graph.nodes || []) add("graph", node);
+  for (const node of graph.nodes || []) for (const ref of node.refs || []) add("graph", ref);
+  const staging = v.staging || {};
+  for (const name of ["staged", "unstaged", "untracked"]) for (const item of staging[name] || []) add("staging", item);
+  const remote = v.remote || {};
+  for (const branch of remote.branches || []) add("remote", branch);
+  for (const card of remote.pulls || []) {
+    add("remote", card);
+    for (const check of card.checks || []) add("remote", check);
+    for (const entry of (card.review || {}).entries || []) add("remote", entry);
+  }
+  return groups;
+}
 
 /** Libellé d'une case d'après l'`element_id` : la forme courte d'un commit (7 caractères). */
 export function shortId(elementId) {
@@ -243,7 +294,111 @@ export function createDesignateBlock({ designation, onIntent }) {
   const shaHelp = el("p", "sha-help", { id: helpId });
   shaHelp.textContent = SHA_HELP;
   const shaError = el("p", "sha-error", { id: errId, role: "alert" });
-  shaRow.append(shaLabel, sha, shaHelp, shaError);
+  const shaPreview = el("p", "sha-preview", { role: "status" });
+  const shaPlace = el("button", "btn btn-secondary sha-place", { type: "button", "data-designate-focus": "sha-place" });
+  shaPlace.textContent = "Placer dans la case";
+  shaPlace.hidden = true;
+  shaRow.append(shaLabel, sha, shaHelp, shaPreview, shaPlace, shaError);
+
+  // Liste filtrable (« Choisir dans la liste ▾ ») : tous les désignables des vues, au clavier.
+  const listId = `designate-list-${uid}`;
+  const listToggle = el("button", "btn btn-secondary designate-list-toggle", {
+    type: "button",
+    "aria-expanded": "false",
+    "aria-controls": listId,
+    "data-designate-focus": "list-toggle",
+  });
+  const listBox = el("div", "designate-list-box", { id: listId });
+  listBox.hidden = true;
+  const filterId = `designate-filter-${uid}`;
+  const filterLabel = el("label", "designate-filter-label", { for: filterId });
+  filterLabel.textContent = FILTER_LABEL;
+  const filter = el("input", "designate-filter", {
+    type: "text",
+    id: filterId,
+    autocomplete: "off",
+    spellcheck: "false",
+    "data-designate-focus": "filter",
+  });
+  const list = el("div", "designate-list", { "data-testid": "designate-list" });
+  listBox.append(filterLabel, filter, list);
+  let listOpen = false;
+  function drawList() {
+    listToggle.textContent = `${LIST_LABEL} ${listOpen ? "▴" : "▾"}`;
+    listToggle.setAttribute("aria-expanded", String(listOpen));
+    listBox.hidden = !listOpen;
+    if (!listOpen) return;
+    const needle = String(filter.value || "").trim().toLowerCase();
+    const chosen = designation.pickedIds();
+    const groups = collectDesignables(state ? state.views : null);
+    const active = document.activeElement;
+    const focusId = active && list.contains(active) ? active.getAttribute("data-element-id") : null;
+    list.replaceChildren();
+    let total = 0;
+    let shown = 0;
+    for (const group of groups) {
+      const items = group.items.filter((item) => !needle || item.search.includes(needle));
+      total += group.items.length;
+      if (!items.length) continue;
+      shown += items.length;
+      const section = el("div", "designate-group", { "data-group": group.key });
+      const heading = el("p", "designate-group-title");
+      heading.textContent = group.title;
+      const ul = el("ul", "designate-items");
+      for (const item of items) {
+        const isChosen = chosen.has(item.id);
+        const button = el("button", `designate-item${isChosen ? " is-chosen" : ""}`, {
+          type: "button",
+          "data-element-id": item.id,
+          "aria-pressed": String(isChosen),
+        });
+        const icon = el("span", "designate-item-icon", { "aria-hidden": "true" });
+        icon.textContent = KIND_ICONS[item.kind] || "•";
+        const name = el("span", "designate-item-label");
+        name.textContent = item.label;
+        button.append(icon, name);
+        if (isChosen) {
+          const mark = el("span", "designate-item-chosen");
+          mark.textContent = CHOSEN_TEXT;
+          button.append(mark);
+        }
+        button.addEventListener("click", () => {
+          if (!designation.accepts(item.kind)) return;
+          if (designation.pickedIds().has(item.id)) return;
+          designation.pick(item.id, item.label);
+          live.textContent = `${item.label} : choisi.`;
+        });
+        const li = el("li");
+        li.append(button);
+        ul.append(li);
+      }
+      section.append(heading, ul);
+      list.append(section);
+    }
+    if (!shown) {
+      const empty = el("p", "designate-list-empty");
+      empty.textContent = total ? NO_MATCH_TEXT : NO_DESIGNABLE_TEXT;
+      list.append(empty);
+    }
+    if (focusId) {
+      const again = [...list.querySelectorAll("button")].find((b) => b.getAttribute("data-element-id") === focusId);
+      if (again) again.focus();
+    }
+  }
+  listToggle.addEventListener("click", () => {
+    listOpen = !listOpen;
+    drawList();
+    if (listOpen) filter.focus();
+  });
+  filter.addEventListener("input", drawList);
+  filter.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !listOpen || designation.armed) return;
+    event.preventDefault();
+    event.stopPropagation();
+    listOpen = false;
+    drawList();
+    listToggle.focus();
+  });
   const submit = el("button", "btn btn-primary designate-submit", {
     type: "button",
     "aria-describedby": onceId,
@@ -258,38 +413,65 @@ export function createDesignateBlock({ designation, onIntent }) {
   });
   designation.setButton(button);
 
-  async function resolve() {
-    const prefix = sha.value.trim();
-    if (!prefix) return;
+  let previewed = null; // {prefix, found} : dernier commit résolu pour le texte du champ
+  let lookupSeq = 0;
+  let debounce = null;
+  const actorText = (actor) => (ACTOR_NAMES[actor] ? ` · ${ACTOR_NAMES[actor]}` : "");
+
+  function clearFeedback() {
+    shaError.textContent = "";
+    shaPreview.textContent = "";
+    shaPlace.hidden = true;
+    previewed = null;
+    sha.removeAttribute("aria-invalid");
+    sha.setAttribute("aria-describedby", helpId);
+  }
+
+  /** Résout le texte du champ ; rend le commit (aperçu posé) ou null (erreur posée). */
+  async function lookup(prefix) {
     const askedFor = designation.stepId;
+    const seq = ++lookupSeq;
     const found = await designation.resolveSha(prefix);
-    if (designation.stepId !== askedFor) return; // l'étape a changé pendant la résolution
+    if (designation.stepId !== askedFor || seq !== lookupSeq || sha.value.trim() !== prefix) return null;
     if (found.ok && found.element_id && !designation.accepts(String(found.element_id).split(":")[0])) {
       found.ok = false;
       found.reason_text = NOT_ACCEPTED_TEXT;
     }
+    clearFeedback();
     if (found.ok && found.element_id) {
-      shaError.textContent = "";
-      sha.removeAttribute("aria-invalid");
-      sha.removeAttribute("aria-describedby");
-      sha.setAttribute("aria-describedby", helpId);
-      designation.pick(found.element_id, `${found.short_sha} · ${found.subject}`);
-      sha.value = "";
-    } else {
-      sha.setAttribute("aria-invalid", "true");
-      sha.setAttribute("aria-describedby", `${helpId} ${errId}`);
-      shaError.textContent = found.reason_text || SHA_FAILED_TEXT;
+      previewed = { prefix, found };
+      shaPreview.textContent = `${found.short_sha} · ${found.subject}${actorText(found.actor)}`;
+      shaPlace.hidden = false;
+      return found;
     }
+    sha.setAttribute("aria-invalid", "true");
+    sha.setAttribute("aria-describedby", `${helpId} ${errId}`);
+    shaError.textContent = found.reason_text || SHA_FAILED_TEXT;
+    return null;
   }
+
+  async function resolve() {
+    const prefix = sha.value.trim();
+    if (!prefix) return;
+    const found = previewed && previewed.prefix === prefix ? previewed.found : await lookup(prefix);
+    if (!found) return;
+    designation.pick(found.element_id, `${found.short_sha} · ${found.subject}`);
+    clearFeedback();
+    sha.value = "";
+  }
+  shaPlace.addEventListener("click", resolve);
   sha.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
     resolve();
   });
   sha.addEventListener("input", () => {
-    shaError.textContent = "";
-    sha.removeAttribute("aria-invalid");
-    sha.setAttribute("aria-describedby", helpId);
+    clearFeedback();
+    lookupSeq++;
+    clearTimeout(debounce);
+    const prefix = sha.value.trim();
+    if (prefix.length < SHA_MIN) return; // en dessous de 7 caractères, pas de requête
+    debounce = setTimeout(() => lookup(prefix), 250);
   });
   // Garde d'envoi : posée au clic, avant tout redessin, pour qu'un double clic n'envoie pas une
   // seconde réponse (refusée en 409). Elle tombe si l'envoi échoue ; acceptée, elle dure jusqu'au
@@ -369,6 +551,7 @@ export function createDesignateBlock({ designation, onIntent }) {
     const active = document.activeElement;
     const focusKey = active && root.contains(active) ? active.getAttribute("data-designate-focus") : null;
     drawSlots();
+    drawList();
     if (focusKey) {
       const again = root.querySelector(`[data-designate-focus="${focusKey}"]`);
       (again || button).focus();
@@ -380,7 +563,7 @@ export function createDesignateBlock({ designation, onIntent }) {
     bindAction(submit, reason);
   }
 
-  root.append(question, button, slotsBox, shaRow, submit, once, live);
+  root.append(question, button, listToggle, listBox, slotsBox, shaRow, submit, once, live);
   designation.subscribe(refresh);
 
   return {
