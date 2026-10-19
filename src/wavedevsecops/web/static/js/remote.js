@@ -33,6 +33,12 @@ export const HIDE_OUTPUT_LABEL = "Masquer la sortie";
 export const RERUN_LABEL = "Relancer le check";
 export const VIEW_PIPELINE_LABEL = "Voir dans le pipeline";
 export const NO_OUTPUT_TEXT = "L'outil n'a rien affiché.";
+export const SHOW_SBOM_LABEL = "Voir le SBOM";
+export const HIDE_SBOM_LABEL = "Masquer le SBOM";
+export const READONLY_TEXT = "Lecture seule";
+export const SBOM_COLUMNS = ["Composant", "Version", "Licence", "Vulnérabilités"];
+export const SBOM_CLEAN_TEXT = "aucune";
+export const SBOM_TITLE = (job) => `SBOM de ${job}`;
 const FINISHED = new Set(["success", "failure", "error"]);
 export const REVIEW_MARKS = { approved: "✓", changes_requested: "✗", commented: "•" };
 
@@ -128,6 +134,45 @@ export function buildCheckOutput(check) {
   return block;
 }
 
+/** `sbom-view` (UX-DR22) : le SBOM du check, en lecture seule ; ligne vulnérable ✗ + identifiant. */
+export function buildSbom(check) {
+  const wrap = el("div", "sbom-view", { "data-sbom": check.element_id });
+  wrap.id = `sbom-${check.element_id}`;
+  const head = el("div", "sbom-head");
+  head.append(text("span", "sbom-title", SBOM_TITLE(check.job_id)), text("span", "pipeline-readonly", READONLY_TEXT));
+  wrap.append(head);
+  const table = el("table", "sbom-table", { "aria-label": SBOM_TITLE(check.job_id) });
+  const header = el("tr");
+  for (const label of SBOM_COLUMNS) header.append(text("th", "", label));
+  const thead = el("thead");
+  thead.append(header);
+  table.append(thead);
+  const body = el("tbody");
+  for (const row of check.sbom) {
+    const line = el("tr", `sbom-row${row.vulnerable ? " is-vulnerable" : ""}`);
+    const name = el("td", "sbom-name");
+    const pick = selectable("button", "sbom-pick", row.element_id, row.a11y_name_text);
+    pick.append(dot(), text("code", "sbom-component", row.name));
+    name.append(pick);
+    if (row.declared_text) name.append(text("span", "sbom-declared", row.declared_text));
+    const vulns = el("td", "sbom-vulns");
+    if (row.vulnerable) {
+      for (const vuln of row.vulns) {
+        const item = el("span", "sbom-vuln");
+        item.append(text("span", "sbom-mark", "✗"), text("code", "sbom-vuln-id", vuln.text || vuln.vuln_id));
+        vulns.append(item);
+      }
+    } else {
+      vulns.append(text("span", "sbom-clean", SBOM_CLEAN_TEXT));
+    }
+    line.append(name, text("td", "sbom-version", row.version), text("td", "sbom-license", row.license_text), vulns);
+    body.append(line);
+  }
+  table.append(body);
+  wrap.append(table);
+  return wrap;
+}
+
 function buildDetails(check) {
   const list = el("ul", "check-details");
   check.details.forEach((detail, index) => {
@@ -159,10 +204,13 @@ function buildCheckExtra(check, item, opts) {
   const open = done && Boolean(check.output_text) && opts.expanded.has(check.element_id);
   const hasOutput = done && Boolean(check.output_text);
   const hasRerun = done && check.can_rerun;
-  if (!hasOutput && !hasRerun && !check.in_pipeline) return;
+  const hasSbom = done && (check.sbom || []).length > 0;
+  const sbomOpen = hasSbom && opts.expanded.has(sbomKey(check));
+  if (!hasOutput && !hasRerun && !hasSbom && !check.in_pipeline) return;
   const actions = el("div", "check-actions");
   item.append(actions);
   if (hasOutput) actions.append(outputToggle(check, opts, open));
+  if (hasSbom) actions.append(sbomToggle(check, opts, sbomOpen));
   if (check.in_pipeline) actions.append(pipelineButton(check, opts));
   if (hasRerun) {
     const rerun = el("button", "btn btn-secondary btn-small", {
@@ -177,6 +225,27 @@ function buildCheckExtra(check, item, opts) {
     bindAction(rerun, opts.busy ? BUSY_TEXT : null);
   }
   if (open) item.append(buildCheckOutput(check));
+  if (sbomOpen) item.append(buildSbom(check));
+}
+
+/** Clé de l'ensemble `expanded` pour le SBOM d'un check (distincte de celle de sa sortie). */
+function sbomKey(check) {
+  return `sbom:${check.element_id}`;
+}
+
+function sbomToggle(check, opts, open) {
+  const toggle = el("button", "btn btn-secondary btn-small", {
+    type: "button",
+    "data-action": "toggle-sbom",
+    "data-check": check.element_id,
+    "data-number": opts.number,
+    "data-job": check.job_id,
+    "data-key": `sbom-toggle:${check.element_id}`,
+    "aria-expanded": String(open),
+    "aria-controls": `sbom-${check.element_id}`,
+  });
+  toggle.textContent = open ? HIDE_SBOM_LABEL : SHOW_SBOM_LABEL;
+  return toggle;
 }
 
 /** « Voir dans le pipeline » : ouvre `pipeline-tabs` (vue Code) sur la tâche de ce check. */
@@ -439,6 +508,26 @@ export function renderRemote(body, ctx, renderEmpty) {
     draw(store.state, true);
   }
 
+  // « Voir le SBOM » : lire le SBOM d'un check pip-audit vaut aussi lire sa sortie (preuve
+  // `evidence_seen` de la même barrière, soumise une fois par check).
+  function toggleSbom(target) {
+    const id = target.getAttribute("data-check");
+    const key = `sbom:${id}`;
+    if (expanded.has(key)) {
+      expanded.delete(key);
+    } else {
+      expanded.add(key);
+      if (!seen.has(id)) {
+        seen.add(id);
+        postIntent(store, "check_output_seen", {
+          number: Number(target.getAttribute("data-number")),
+          job_id: target.getAttribute("data-job"),
+        });
+      }
+    }
+    draw(store.state, true);
+  }
+
   root.addEventListener("click", (event) => {
     const target = event.target.closest && event.target.closest("button");
     if (!target) {
@@ -454,6 +543,8 @@ export function renderRemote(body, ctx, renderEmpty) {
     const action = target.getAttribute("data-action");
     if (action === "toggle-output") {
       toggleOutput(target);
+    } else if (action === "toggle-sbom") {
+      toggleSbom(target);
     } else if (action === "view-pipeline") {
       pipelineFocus.open(target.getAttribute("data-number"), target.getAttribute("data-job"));
     } else if (action === "check-rerun") {

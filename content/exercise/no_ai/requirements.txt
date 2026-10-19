@@ -1,0 +1,3 @@
+# Dépendances de l'application, épinglées exactement : c'est le fichier que lit pip-audit
+# (tâche « pip_audit » du pipeline). Il reflète `dependencies` de pyproject.toml ; aucune
+# dépendance pour l'instant.

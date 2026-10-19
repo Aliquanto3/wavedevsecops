@@ -1,9 +1,9 @@
 # Pipeline du projet en GitLab CI. Le même pipeline s'écrit dans « .github/workflows/ci.yml »
-# (GitHub Actions) et dans « Jenkinsfile » (Jenkins) : quatre tâches, l'une après l'autre
+# (GitHub Actions) et dans « Jenkinsfile » (Jenkins) : cinq tâches, l'une après l'autre
 # (une étape par tâche, car les tâches d'une même étape tournent en parallèle).
 # Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 # surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
-stages: [ruff, pytest, gitleaks, bandit]
+stages: [ruff, pytest, gitleaks, bandit, pip_audit]
 
 default:
   image: python:3.14
@@ -49,4 +49,16 @@ bandit:
   script:
     # Le code de l'application (src/), sans les exemptions « # nosec ».
     - uv run bandit -r src -q --ignore-nosec
+# wds:end
+
+# wds:job pip_audit
+pip_audit:
+  # Dépendances (pip-audit)
+  stage: pip_audit
+  before_script:
+    - pip install uv
+    - uv sync --frozen
+  script:
+    # Dépendances épinglées de requirements.txt, sans résolution ; {osv_url} : adresse du point OSV (dans WaveDevSecOps : le point local, base figée).
+    - uv run pip-audit --vulnerability-service osv --osv-url '{osv_url}' --no-deps --disable-pip --progress-spinner off -r requirements.txt
 # wds:end

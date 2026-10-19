@@ -27,6 +27,8 @@ from wavedevsecops.contracts.remote import (
     RemoteView,
     ReviewEntry,
     ReviewLog,
+    SbomRow,
+    SbomVulnRow,
 )
 from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.projections.spans import Linker
@@ -131,6 +133,42 @@ def _details(check: Check, linker: Linker | None) -> tuple[list[CheckDetail], st
     return details, tool_error
 
 
+REQUIREMENTS_FILE = "requirements.txt"
+"""Même valeur que `ci.findings.REQUIREMENTS_FILE` (la projection n'importe pas `ci`)."""
+NO_LICENSE_TEXT = "non indiquée"
+
+
+def _sbom_rows(pr: PullRequest, check: Check) -> list[SbomRow]:
+    """Lignes de `sbom-view` : composant, version, licence, vulnérabilités (✗ côté front)."""
+    rows = []
+    for item in check.sbom:
+        vulns = [SbomVulnRow(vuln_id=v.vuln_id, text=v.vuln_id) for v in item.vulns]
+        licenses = ", ".join(item.licenses) or NO_LICENSE_TEXT
+        name = f"{item.name} {item.version}".strip()
+        ids = ", ".join(v.vuln_id for v in vulns)
+        verdict = f"vulnérable : {ids}" if vulns else "sans vulnérabilité"
+        label = f"Composant {name}, licence {licenses}, {verdict}"
+        links = [
+            check.element(pr.number),
+            element_id("path", "head", REQUIREMENTS_FILE),
+            element_id("path", "head", "pyproject.toml"),
+        ]
+        rows.append(
+            SbomRow(
+                element_id=item.element(),
+                name=item.name,
+                version=item.version,
+                license_text=licenses,
+                vulnerable=bool(vulns),
+                vulns=vulns,
+                declared_text=f"{REQUIREMENTS_FILE}:{item.line}" if item.line else "",
+                a11y_name_text=label,
+                links=links,
+            )
+        )
+    return rows
+
+
 def _check_row(
     pr: PullRequest,
     check: Check,
@@ -163,6 +201,7 @@ def _check_row(
         output_text=check.output,
         output_spans=[CheckSpan(**span) for span in spans],
         details=details,
+        sbom=_sbom_rows(pr, check),
         tool_error_text=tool_error,
         can_rerun=check.state == "error" and pr.state == "open" and not stale,
         in_pipeline=check.job_id in pipeline_jobs,

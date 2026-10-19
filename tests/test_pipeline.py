@@ -50,7 +50,7 @@ FEATURE = "src/inventory/rapport.py"
 # ------------------------------------------------------------------ contrat du pipeline
 def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
     pipeline = ci.load_pipeline(Settings())
-    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit"]
+    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit", "pip_audit"]
     registry = load_registry(settings=Settings())
     chain = yaml.safe_load((CONTENT / "chain.yaml").read_text("utf-8"))
     barriers = {
@@ -93,8 +93,12 @@ def test_le_pipeline_refuse_un_jeton_inconnu_et_report_hors_machine(tmp_path: Pa
 def test_les_jetons_sont_remplaces_par_ci() -> None:
     tokens = {"repo": "/ci/1-abc", "base_sha": SHA, "osv_url": "http://127.0.0.1:1/osv/v1/query"}
     argv = ["--compare-branch={base_sha}", "{repo}", "--osv-url", "{osv_url}"]
-    assert ci.expand(argv, tokens) == [f"--compare-branch={SHA}", "/ci/1-abc", "--osv-url",
-                                       tokens["osv_url"]]
+    assert ci.expand(argv, tokens) == [
+        f"--compare-branch={SHA}",
+        "/ci/1-abc",
+        "--osv-url",
+        tokens["osv_url"],
+    ]
     with pytest.raises(KeyError):
         ci.expand(["{osv_url}"], {"osv_url": ""})
 
@@ -246,7 +250,9 @@ class Box:
         loaded = load_scenario(path, settings)
         prepare_workspace(loaded, "no_ai", settings=settings, git_path=git_path, replace=True)
         self.ws = f"no_ai.{loaded.scenario.key}"
-        self.manager = WorkspaceManager(settings, git_path=git_path, watch=False)
+        self.manager = WorkspaceManager(
+            settings, git_path=git_path, watch=False, osv_url=settings.osv_url(1)
+        )
         self.events: list[Envelope] = []
         self.manager.events(self.ws).attach(None, self.events.append)
         self.engine: WorkspaceEngine = self.manager.get(self.ws)
@@ -272,7 +278,7 @@ class Box:
     def wait_settled(self) -> None:
         self.wait(
             lambda: (
-                len(self.states()) == 4
+                len(self.states()) == len(ci.load_pipeline(self.settings).job_ids)
                 and all(s not in ("queued", "running") for s in self.states().values())
                 and not self.runner.busy
             ),
@@ -287,8 +293,15 @@ class Box:
             (self.layout.repo / FEATURE).write_text(text, "utf-8")
             git.internal("add", "-A", cwd=self.layout.repo)
             git.internal(
-                "-c", "user.name=Apprenant", "-c", "user.email=apprenant@example.invalid",
-                "commit", "-q", "-m", "Modifie le rapport", cwd=self.layout.repo,
+                "-c",
+                "user.name=Apprenant",
+                "-c",
+                "user.email=apprenant@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "Modifie le rapport",
+                cwd=self.layout.repo,
             )
             git.internal("push", "-q", "origin", "rapport", cwd=self.layout.repo)
             github_sim.refresh(git, ctx.layout)
@@ -305,6 +318,15 @@ class Box:
 Behaviour = dict[str, tuple[str, int, str, float]]
 """outil -> (sortie humaine, code, sortie machine, pause en secondes avant de sortir)."""
 
+DEFAULT_BEHAVIOUR: Behaviour = {
+    # pip-audit sans dépendance : rapport et SBOM vides, mais lisibles (sinon le check rougit).
+    "pip-audit": (
+        "No known vulnerabilities found\n",
+        0,
+        '{"dependencies": [], "components": []}',
+        0,
+    ),
+}
 MACHINE_FLAGS = ("--output-format", "--junitxml", "--report-format", "-f")
 
 RUFF_TEXT = "src/inventory/rapport.py:1:8: F401 [*] `os` imported but unused\nFound 1 error.\n"
@@ -348,7 +370,9 @@ def _fake_tools(monkeypatch: pytest.MonkeyPatch, behaviour: Behaviour, calls: li
     def fake(tool_id, args, *, cwd, venv, timeout, settings=None):  # noqa: ANN001, ANN202
         args = list(args)
         machine = any(flag in args for flag in MACHINE_FLAGS)
-        human, code, machine_text, pause = behaviour.get(tool_id, ("", 0, "", 0))
+        human, code, machine_text, pause = behaviour.get(
+            tool_id, DEFAULT_BEHAVIOUR.get(tool_id, ("", 0, "", 0))
+        )
         calls.append((tool_id, machine, Path(cwd)))
         text = machine_text if machine else human
         script = "import sys, time; "
@@ -392,9 +416,7 @@ def box(tmp_path: Path, git_path: Path, fake_env: None) -> Iterator[Box]:
 
 
 @pytest.mark.slow
-def test_chaque_job_donne_un_check_ecrit_par_la_file(
-    box, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_chaque_job_donne_un_check_ecrit_par_la_file(box, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list = []
     _fake_tools(
         monkeypatch,
@@ -410,7 +432,7 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
     opened.wait_settled()
     pr = opened.pr()
     checks = {c.job_id: c for c in pr.checks}
-    assert [c.job_id for c in pr.checks] == ["ruff", "pytest", "gitleaks", "bandit"]
+    assert [c.job_id for c in pr.checks] == ["ruff", "pytest", "gitleaks", "bandit", "pip_audit"]
     # bandit : sortie humaine verbatim, constat (fichier, ligne, règle) de `-f json`.
     bandit = checks["bandit"]
     assert bandit.state == "failure" and bandit.output == BANDIT_TEXT
@@ -442,6 +464,8 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         ("gitleaks", False),
         ("bandit", False),
         ("bandit", True),
+        ("pip-audit", False),
+        ("pip-audit", True),
     ]
     assert not tree.exists()
     # Chaque changement d'état est une opération de la file : check_updated, puis pr_updated.
@@ -455,6 +479,8 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         ("gitleaks", "error"),
         ("bandit", "running"),
         ("bandit", "failure"),
+        ("pip_audit", "running"),
+        ("pip_audit", "success"),
     ]
     assert updates[1]["element_id"] == f"check:1:ruff:{pr.head_sha}"
     ops = {e.op_id for e in opened.events if e.kind == Kind.CHECK_UPDATED}
@@ -466,14 +492,15 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
         "pytest": "success",
         "gitleaks": "error",
         "bandit": "failure",
+        "pip_audit": "success",
     }
     # Vue Distant + PR : sortie verbatim liée, ligne de détail fichier:ligne, erreur de l'outil.
     opened.engine.submit(Operation("noop", lambda ctx: 0, writes=False)).result(WAIT)
     rows = {
         c["job_id"]: c
-        for c in json.loads(json.dumps(opened.engine.last_projection.views, default=str))[
-            "remote"
-        ]["pulls"][0]["checks"]
+        for c in json.loads(json.dumps(opened.engine.last_projection.views, default=str))["remote"][
+            "pulls"
+        ][0]["checks"]
     }
     path_id = f"path:worktree:{FEATURE}"
     assert rows["ruff"]["output_text"] == RUFF_TEXT
@@ -559,8 +586,9 @@ def test_recommencer_annule_le_run_en_cours(box, monkeypatch: pytest.MonkeyPatch
     opened.wait(lambda: len(spawned) >= 1, "ruff lent lancé")
     epoch = opened.engine.epoch
     path = opened.settings.scenarios_path() / "pipeline-essai.A.yaml"
-    _engine, future = opened.manager.create(load_scenario(path, opened.settings), "no_ai",
-                                            replace=True)
+    _engine, future = opened.manager.create(
+        load_scenario(path, opened.settings), "no_ai", replace=True
+    )
     future.result(WAIT)
     assert opened.engine.epoch == epoch + 1
     assert wait_dead(spawned[0].pid) and not alive(spawned[0].pid)
@@ -609,7 +637,11 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
     opened.wait_settled()
     assert [t for t, _m, _c in calls] == ["gitleaks"]
     assert opened.states() == {
-        "ruff": "success", "pytest": "success", "gitleaks": "success", "bandit": "success"
+        "ruff": "success",
+        "pytest": "success",
+        "gitleaks": "success",
+        "bandit": "success",
+        "pip_audit": "success",
     }
     assert opened.pr().mergeable
 
@@ -727,8 +759,11 @@ def test_vrais_outils_dans_le_pipeline(tmp_path: Path, git_path: Path) -> None:
         '    assert version("httpx") == "0.28.1"\n'
     )
     scenario["setup"][4:5] = [
-        {"op": "write_file", "path": "pyproject.toml",
-         "content": (llm / "pyproject.toml").read_text("utf-8")},
+        {
+            "op": "write_file",
+            "path": "pyproject.toml",
+            "content": (llm / "pyproject.toml").read_text("utf-8"),
+        },
         {"op": "write_file", "path": "uv.lock", "content": (llm / "uv.lock").read_text("utf-8")},
         {"op": "write_file", "path": "tests/test_dependance.py", "content": httpx_test},
     ]
@@ -746,8 +781,9 @@ def test_vrais_outils_dans_le_pipeline(tmp_path: Path, git_path: Path) -> None:
         (run,) = opened.runner.history
         seconds = (run.duration_ms or 0) / 1000
         if seconds > ALERT_S:
-            warnings.warn(f"run du pipeline en {seconds:.1f} s (alerte à {ALERT_S:g} s)",
-                          stacklevel=1)
+            warnings.warn(
+                f"run du pipeline en {seconds:.1f} s (alerte à {ALERT_S:g} s)", stacklevel=1
+            )
         assert seconds <= LIMIT_S
     finally:
         opened.close()

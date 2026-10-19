@@ -91,8 +91,12 @@ def test_barrieres_livrees_ont_un_scenario_les_autres_se_degradent() -> None:
     assert secrets["scenario"]["id"] == "secret-dans-un-commit"
     assert secrets["scenario"]["play_text"].startswith("La voir jouer : scénario ")
     # Barrière pas encore jouable (Epic 8) : le terme et la barrière restent, le scénario manque.
+    # (`dast` n'a pas de barrière ; `sast` attend que 8.1 renseigne son `scenario_id`.)
     assert by_id["sast"]["barrier"]["id"] == "static-analysis" and by_id["sast"]["scenario"] is None
-    assert by_id["sca"]["scenario"] is None
+    # Livrée par la story 8.3 : SCA et SBOM renvoient au scénario « dépendance vulnérable ».
+    assert by_id["sca"]["barrier"]["id"] == "dependencies"
+    assert by_id["sca"]["scenario"]["id"] == "dependance-vulnerable"
+    assert by_id["sbom"]["scenario"]["id"] == "dependance-vulnerable"
     assert by_id["dast"]["barrier"] is None and by_id["dast"]["scenario"] is None
     assert by_id["traceability"]["barrier"] is None and by_id["traceability"]["trace_text"]
     assert body["ui"]["soon_text"] == "Scénario à venir"

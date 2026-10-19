@@ -42,8 +42,9 @@
 #
 # Lecteurs `parse` livrés : ruff_json (`ruff check --output-format json`), junit (rapport
 # `--junitxml` de pytest : fichier du test en échec), gitleaks_json (`--report-format json`).
-# 8.1 a livré bandit_json ; 8.3 ajoute pip_audit_json et cyclonedx_json (SBOM), 8.4 coverage_json et
-# diff_cover_json : un lecteur par format, dans `ci/findings.py`, et sa valeur dans `ci.Parse`.
+# 8.1 a livré bandit_json, 8.3 pip_audit_json et cyclonedx_json (le SBOM : des composants, pas des
+# constats), 8.4 ajoute coverage_json et diff_cover_json : un lecteur par format, dans
+# `ci/findings.py`, et sa valeur dans `ci.Parse`.
 schema_version: 1
 jobs:
   - job_id: ruff
@@ -96,5 +97,28 @@ jobs:
     machine:
       - argv: [-r, src, -q, --ignore-nosec, -f, json]
         parse: bandit_json
+        when: always
+    exit_codes: {success: [0], failure: [1]}
+
+  - job_id: pip_audit
+    label_text: Dépendances (pip-audit)
+    tool: pip-audit
+    required: true
+    barrier: dependencies
+    # Options exactes (AD-11, AR-23) : le vrai pip-audit lit le fichier d'exigences épinglées
+    # `requirements.txt` (`-r`), sans résolution (`--no-deps`, `--disable-pip` : tout est épinglé
+    # exactement), contre le point OSV local (`--vulnerability-service osv --osv-url`), jamais
+    # contre PyPI. Trois exécutions sur le même arbre : sortie humaine affichée, `-f json` pour
+    # les constats (dépendance, vulnérabilité, ligne du fichier), `-f cyclonedx-json` pour le
+    # SBOM lu par `sbom-view`. Il sort 1 quand il trouve une vulnérabilité, ou si le fichier
+    # d'exigences est absent ou invalide : la PR reste bloquée. La base est citée dans le constat
+    # (« base embarquée, figée au <date> »). L'exécution du SBOM tourne aussi sur un succès ; un
+    # fichier vidé de ses dépendances est refusé par l'étape du scénario (`sbom_has`).
+    human: [--vulnerability-service, osv, --osv-url, "{osv_url}", --no-deps, --disable-pip, --progress-spinner, "off", -r, requirements.txt]
+    machine:
+      - argv: [--vulnerability-service, osv, --osv-url, "{osv_url}", --no-deps, --disable-pip, --progress-spinner, "off", -r, requirements.txt, -f, json]
+        parse: pip_audit_json
+      - argv: [--vulnerability-service, osv, --osv-url, "{osv_url}", --no-deps, --disable-pip, --progress-spinner, "off", -r, requirements.txt, -f, cyclonedx-json]
+        parse: cyclonedx_json
         when: always
     exit_codes: {success: [0], failure: [1]}

@@ -65,6 +65,34 @@ class CheckDetail(_Model):
     """`element_id` du fichier dans le bac à sable ; vide s'il n'y existe pas."""
 
 
+class SbomVulnRow(_Model):
+    """Vulnérabilité d'un composant dans `sbom-view` : l'identifiant, affiché avec ✗."""
+
+    vuln_id: str
+    text: str = ""
+    """« PYSEC-2026-1471 (CVE-2025-27516) » ; l'identifiant seul si aucun alias n'est connu."""
+
+
+class SbomRow(_Model):
+    """Ligne de `sbom-view` (UX-DR22), en lecture seule : un composant du SBOM du check."""
+
+    element_id: str
+    """`sbom:<paquet>@<version>` : liable et désignable comme preuve."""
+    name: str
+    version: str
+    license_text: str
+    """Licence du SBOM, ou « non indiquée » : pip-audit n'en lit pas sans résolution."""
+    vulnerable: bool = False
+    vulns: list[SbomVulnRow] = []
+    declared_text: str = ""
+    """« requirements.txt:3 » ; vide si la ligne n'est pas connue."""
+    a11y_name_text: str
+    links: list[str] = []
+    """Le check, le fichier d'exigences et `pyproject.toml` (dépendance déclarée)."""
+    designable: bool = True
+    """Désignable à l'étape courante (story 5.2, `engine.designation.mark_views`)."""
+
+
 class CheckRow(_Model):
     """`pr-check` : un check de la PR."""
 
@@ -95,6 +123,8 @@ class CheckRow(_Model):
     """La tâche est dans `content/pipeline.yaml` : « Voir dans le pipeline » est proposé (7.6)."""
     output_element_id: str = ""
     """`output:check:<n>:<job_id>:<sha>` : le bloc `tool-output` déplié, désignable."""
+    sbom: list[SbomRow] = []
+    """SBOM du check (« Voir le SBOM », 8.3) ; vide pour un check sans SBOM."""
 
 
 class ReviewEntry(_Model):

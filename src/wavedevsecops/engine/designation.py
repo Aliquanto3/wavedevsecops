@@ -81,6 +81,8 @@ def mark_views(views: dict[str, Any], accept: frozenset[str] | None) -> dict[str
         _flag(card, accept)
         for check in card.get("checks") or []:
             _flag(check, accept)
+            for row in check.get("sbom") or []:
+                _flag(row, accept)
         for entry in (card.get("review") or {}).get("entries") or []:
             _flag(entry, accept)
     return marked
@@ -117,6 +119,8 @@ def describe(element: str, state: RepoState | None) -> str:
         return f"le tag {segments[0]}"
     if kind == "path":
         return f"le fichier {segments[1]}"
+    if kind == "sbom":
+        return f"le composant {segments[0]}"
     return element
 
 

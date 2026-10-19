@@ -47,14 +47,14 @@ registerPane({
   id: "remote",
   title: "Distant + PR",
   subtitle: "Refs de origin et PR du GitHub simulé",
-  elementTypes: ["ref", "pr", "check", "review"],
-  // Vue `remote` de state_projected : branches de origin, cartes de PR, checks et revues.
+  elementTypes: ["ref", "pr", "check", "review", "sbom"],
+  // Vue `remote` de state_projected : branches de origin, cartes de PR, checks, SBOM et revues.
   projection: {
     remote: (remote) => [
       ...remote.branches.map((b) => b.element_id),
       ...remote.pulls.flatMap((pr) => [
         pr.element_id,
-        ...pr.checks.map((c) => c.element_id),
+        ...pr.checks.flatMap((c) => [c.element_id, ...(c.sbom || []).map((s) => s.element_id)]),
         ...pr.review.entries.map((r) => r.element_id),
       ]),
     ],

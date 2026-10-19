@@ -36,12 +36,16 @@ class Args(StepArgs):
     check_states: dict[str, CheckState] = Field(default_factory=dict)
     """État attendu de chaque check, par `job_id`, sur les SHA courants de la PR (un résultat
     périmé ne compte pas : le push qui le remplace remet le check en attente)."""
+    sbom_has: dict[str, list[str]] = Field(default_factory=dict)
+    """Composants que le SBOM de chaque check (par `job_id`, SHA courants) doit encore contenir
+    (nom de paquet) : un vert obtenu en vidant ou en supprimant le fichier de dépendances ne
+    valide pas l'étape (leçon 6.2 : le geste enseigné, pas un contournement)."""
     mergeable: bool | None = None
     """`True` : « Merger » est actif ; `False` : la PR est bloquée (`merge-blocked`)."""
 
-    @field_validator("check_states")
+    @field_validator("check_states", "sbom_has")
     @classmethod
-    def _jobs(cls, value: dict[str, CheckState]) -> dict[str, CheckState]:
+    def _jobs(cls, value: dict) -> dict:
         for job in value:
             if not re.fullmatch(JOB_ID_PATTERN, job):
                 raise ValueError(f"job_id invalide : « {job} »")
@@ -67,9 +71,23 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
             and (step.max_approvals is None or pr.approvals <= step.max_approvals)
             and (step.mergeable is None or pr.mergeable is step.mergeable)
             and _checks_match(pr, step.check_states)
+            and _sbom_match(pr, step.sbom_has)
         ):
             return Verdict(status="passed")
     return Verdict(status="pending")
+
+
+def _sbom_match(pr: PullRequest, wanted: dict[str, list[str]]) -> bool:
+    """Chaque composant demandé figure au SBOM du check, calculé pour les SHA courants."""
+    checks = {c.job_id: c for c in pr.checks}
+    for job_id, names in wanted.items():
+        check = checks.get(job_id)
+        if check is None or (check.head_sha, check.base_sha) != (pr.head_sha, pr.base_sha):
+            return False
+        present = {re.sub(r"[-_.]+", "-", item.name).lower() for item in check.sbom}
+        if any(re.sub(r"[-_.]+", "-", name).lower() not in present for name in names):
+            return False
+    return True
 
 
 def _checks_match(pr: PullRequest, wanted: dict[str, CheckState]) -> bool:

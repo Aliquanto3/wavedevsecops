@@ -43,6 +43,29 @@ class Finding(_Model):
     line: int | None = Field(default=None, ge=1)
 
 
+class SbomVuln(_Model):
+    """Vulnérabilité d'un composant du SBOM : identifiant OSV (`PYSEC-…`, `GHSA-…`)."""
+
+    vuln_id: str = Field(min_length=1)
+    aliases: list[str] = Field(default_factory=list)
+    fix_versions: list[str] = Field(default_factory=list)
+
+
+class SbomComponent(_Model):
+    """Composant du SBOM CycloneDX d'un check pip-audit (AD-11) : nom, version, licence si le
+    document en porte une, vulnérabilités que pip-audit y a rattachées."""
+
+    name: str = Field(min_length=1)
+    version: str = ""
+    licenses: list[str] = Field(default_factory=list)
+    vulns: list[SbomVuln] = Field(default_factory=list)
+    line: int | None = Field(default=None, ge=1)
+    """Ligne du fichier d'exigences épinglé qui déclare le composant, si elle est connue."""
+
+    def element(self) -> str:
+        return element_id("sbom", f"{self.name}@{self.version}")
+
+
 class Check(_Model):
     """Check d'une PR, lié à la paire `(head_sha, base_sha)` pour laquelle il a été calculé."""
 
@@ -54,6 +77,8 @@ class Check(_Model):
     output: str = ""
     """Sortie humaine de l'outil, verbatim (hors empreinte)."""
     findings: list[Finding] = Field(default_factory=list)
+    sbom: list[SbomComponent] = Field(default_factory=list)
+    """SBOM lu dans l'exécution CycloneDX du job pip-audit (hors empreinte, AD-11)."""
     duration_ms: int | None = Field(default=None, ge=0)
     """Durée du job (hors empreinte)."""
     updated_at: str | None = None

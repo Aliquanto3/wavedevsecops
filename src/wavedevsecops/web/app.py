@@ -226,7 +226,7 @@ def create_app(
     if pr_intents.refresh_after_command not in terminal.AFTER_COMMAND_HOOKS:
         terminal.AFTER_COMMAND_HOOKS.append(pr_intents.refresh_after_command)
     register_exercise_intent()
-    workspaces = workspaces or WorkspaceManager(settings)
+    workspaces = workspaces or WorkspaceManager(settings, osv_url=settings.osv_url(port))
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)
     install_code_routes(app, workspaces)

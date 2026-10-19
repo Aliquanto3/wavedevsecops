@@ -76,6 +76,14 @@ entries:
       recherche de [[secrets-scanning|secrets]]. Un check obligatoire en échec bloque la fusion.
       Si vous poussez un nouveau commit, le résultat précédent n'est plus valable.
 
+  remote.sbom:
+    title_text: "Un composant du SBOM"
+    body_text: >-
+      Le [[sbom|SBOM]] liste chaque composant du logiciel, avec sa version et sa licence.
+      L'analyse de composition ([[sca|SCA]]) compare ces versions aux failles connues : une ligne
+      marquée ✗ porte l'identifiant de la vulnérabilité. Cette vue se lit seulement ; pour
+      corriger, on change la version de la dépendance dans le dépôt.
+
   remote.review:
     title_text: "Une revue"
     body_text: >-
