@@ -409,6 +409,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:58 · 5.4 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction) · —
 - 2026-10-19 05:07 · 2.10 · review · rebase (workspace.js : deux imports gardés), M2 (tool-output allume le fichier cité et terminal-lit), L6, L7, L8 (4 explications corrigées), écouteur click fuyant corrigés ; M3, L4, L5, L9, L10 écartés ; « i » des étiquettes de refs du graphe reporté ; 1337 passed, CI branche verte · de70a74
 - 2026-10-19 05:07 · — · décision pour Anaël · 2.10 : placement du « i » des étiquettes de refs dans le graphe (pas de bouton dans le bouton du commit) · —
+- 2026-10-19 05:35 · 7.4 ★, 5.5 · fusion · CI branche verte pour les deux (0038179, 99651a8) ; suite complète de 7.4 en cours · —
+- 2026-10-19 05:35 · 6.3 · dev · fini, 340 + 1021 passed, CI verte ; scénarios conflit, stash, rebase, recuperation (.A, deux parcours), 7 tests d'erreurs réalistes, 8 empreintes ; report : repo_state ne lit pas le contenu (marqueurs de conflit commités valident l'étape) · a0bcc18
+- 2026-10-19 05:35 · 6.3 · second-avis · lancé · —
+- 2026-10-19 05:35 · — · outillage · création de worktree refusée (dossier vide laissé par la suppression ratée de 4.4, puis config git lue pendant une écriture concurrente) : dossier vide et worktree inutilisé supprimés, relance réussie · —
+- 2026-10-19 05:35 · 5.6 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction ; chemin critique de l'Epic 5) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
