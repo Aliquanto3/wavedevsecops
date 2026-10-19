@@ -1,0 +1,115 @@
+# Scénario B « push / pull » (Story 5.7) : un agent a écrasé sur origin le travail d'un collègue.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: push-pull
+mode: B
+title_text: push / pull
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Le collègue pousse un commit, que votre dépôt récupère.
+  - op: colleague_commit
+    branch: main
+    message: Ajoute le guide de contribution
+    files:
+      - path: docs/guide.md
+        content: |
+          # Guide de contribution
+
+          1. Créez une branche par changement.
+          2. Relisez-vous avant de pousser.
+    as: commit-collegue
+  - op: fetch
+    branch: main
+  # Puis l'agent, dont le push était refusé, force : il écrase le commit du collègue sur origin.
+  - op: agent_push_force
+    branch: main
+    parent: "@depart"
+    message: Ajoute les tests de bonjour
+    files:
+      - path: tests/test_bonjour.py
+        content: |
+          from src.bonjour import bonjour
+
+
+          def test_bonjour() -> None:
+              assert bonjour("Ada") == "Bonjour, Ada !"
+  # Votre dépôt a fetché depuis : `origin/main` est celle de l'agent, le commit du collègue n'est
+  # plus cité que par le reflog.
+  - op: fetch
+    branch: main
+    as: commit-agent
+steps:
+  - step_id: designer
+    type: designate
+    title_text: Repérer ce qui a disparu
+    instruction_text: >-
+      Un agent a poussé de force sur `origin/main`. Le graphe montre un commit en tirets,
+      « perdu · visible par reflog » : il n'est plus sur `origin/main`. Désignez le commit
+      du collègue qui a été écrasé, puis validez : vous n'avez qu'un essai, et la correction
+      s'affiche ensuite.
+    explanation_text: >-
+      Le commit « Ajoute le guide de contribution », celui du collègue, n'est plus sur
+      `origin/main` : le push forcé de l'agent l'a remplacé. Il n'est pas détruit : votre dépôt
+      le connaît encore par le reflog de `origin/main`. On pouvait aussi désigner le commit forcé
+      de l'agent, qui est la cause ; le commit écrasé reste l'élément principal, parce que c'est
+      lui qu'il faut retrouver.
+    explain_ref: graph.commit
+    question_text: Quel travail l'agent a-t-il écrasé ?
+    accept: [commit]
+    slots:
+      - slot_id: ecrase
+        label_text: Le commit en cause
+        answers: ["@commit-collegue", "@commit-agent"]
+        primary: "@commit-collegue"
+    hints:
+      lead_text: >-
+        Cherchez dans le graphe un commit qu'aucune branche ne porte plus : il a été retiré
+        d'`origin/main` par un autre.
+      partial_text: Le commit à désigner est celui du ___, en tirets
+      solution_text: >-
+        Désignez le commit « Ajoute le guide de contribution » (en tirets, perdu), ou le commit
+        forcé de l'agent « Ajoute les tests de bonjour ».
+
+  - step_id: restaurer
+    type: origin_contains
+    title_text: Restaurer le travail du collègue sur origin
+    instruction_text: >-
+      Faites en sorte que `origin/main` contienne de nouveau le commit du collègue, sans perdre
+      le commit de l'agent, qui est bon : le fichier `docs/guide.md` et les tests doivent
+      être sur `origin`.
+    explanation_text: >-
+      Le commit écrasé reste dans le reflog (`git reflog origin/main`). On le retrouve, on le
+      rapporte sur la branche (`git merge`, ou `git rebase` d'une branche partie de ce commit),
+      puis on pousse sans forcer : `origin/main` garde alors le travail de l'agent et celui du collègue. Un nouveau
+      `push --force` qui rétablirait l'ancien sommet effacerait à son tour le travail de l'agent.
+    explain_ref: graph.remote_ref
+    branch: main
+    present: ["@commit-collegue", "@commit-agent"]
+    hints:
+      lead_text: >-
+        Le reflog garde la trace de ce que `origin/main` pointait avant. Retrouvez le commit du
+        collègue, intégrez-le à votre `main`, puis envoyez le résultat.
+      partial_text: git reflog ___ puis git merge <sha>
+      solution_text: >-
+        git merge origin/main, puis git merge (SHA du commit du collègue, lu par git
+        reflog origin/main), puis git push
