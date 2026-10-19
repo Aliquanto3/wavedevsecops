@@ -141,7 +141,10 @@ steps:
       votre commande, qui valide l'étape. Les raccourcis ne fonctionnent pas : le seuil est
       fixé par la plateforme, les réglages de couverture de votre dépôt (`omit`,
       `# pragma: no cover`) sont ignorés, et supprimer le module ne ferait pas l'affaire : la
-      quality gate doit toujours mesurer des lignes du nouveau code.
+      quality gate doit toujours mesurer des lignes du nouveau code. Elle a deux limites : un
+      test sans `assert` qui se contente d'exécuter le code franchit aussi le seuil, et le code
+      que la CI lance (vos tests) pourrait réécrire sa propre mesure. C'est pourquoi une PR
+      passe aussi par une relecture humaine, qui lit ce que les tests vérifient vraiment.
     head: feature
     base: main
     pr_state: open

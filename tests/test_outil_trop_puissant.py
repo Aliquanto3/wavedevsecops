@@ -20,7 +20,7 @@ from test_quality_gate import _commit, _run, osv_url, real_tools  # noqa: F401
 from wavedevsecops import ci, github_sim
 from wavedevsecops.ci import findings as parsers
 from wavedevsecops.config import Settings
-from wavedevsecops.contracts.github import Check, GithubState, PullRequest
+from wavedevsecops.contracts.github import Check, Finding, GithubState, PullRequest
 from wavedevsecops.engine import prepare_workspace
 from wavedevsecops.engine.designation import correct
 from wavedevsecops.gitio import Git
@@ -160,7 +160,7 @@ def test_le_depart_porte_l_outil_dangereux_et_la_dependance_vulnerable(prepared)
 
 
 def test_main_exige_sept_checks_et_deux_approbations_les_revues_arrivent_au_vert(
-    prepared,
+    prepared, git_path: Path
 ) -> None:
     layout, git = prepared
     (protection,) = github_sim.load(layout).protections
@@ -168,6 +168,7 @@ def test_main_exige_sept_checks_et_deux_approbations_les_revues_arrivent_au_vert
     assert set(protection.required_checks) == set(JOBS)
     git.run("push", "-u", "origin", "feature", cwd=layout.repo)
     pr = github_sim.open_pr(git, layout, "feature", "main")
+    _push_tool(layout, git, git_path, RESTRICTED, "Restreint l'outil")
     github_sim.ensure_checks(git, layout, pr.number, [(job, True) for job in JOBS])
     for job in JOBS[:-1]:
         github_sim.set_check_state(git, layout, pr.number, job, "success", output="ok")
@@ -178,7 +179,110 @@ def test_main_exige_sept_checks_et_deux_approbations_les_revues_arrivent_au_vert
     github_sim.set_check_state(git, layout, pr.number, JOBS[-1], "success", output="ok")
     pr = github_sim.load(layout).pulls[0]
     assert pr.count_approvals() == 2 and pr.mergeable is True
-    assert sorted({r.author for r in pr.reviews}) == ["Agent B", "Sacha Martin"]
+    # Deux relecteurs humains distincts, jamais l'agent B (qui approuverait sans lire).
+    assert sorted({r.author for r in pr.reviews}) == ["Noé Lefèvre", "Sacha Martin"]
+
+
+BYPASSES = {
+    "builtins": "import builtins\n\n\ndef run_query(stock, expression):\n"
+    "    return str(builtins.eval(expression, {'stock': stock}))\n",
+    "getattr": "import builtins\n\n\ndef run_query(stock, expression):\n"
+    "    return str(getattr(builtins, 'ev' + 'al')(expression, {'stock': stock}))\n",
+    "__builtins__": "def run_query(stock, expression):\n"
+    "    return str(__builtins__['eval'](expression, {'stock': stock}))\n",
+}
+"""Contournements que bandit ne voit pas (aucun constat B307) : prouvé par le test lent."""
+
+
+def _push_tool(layout: Layout, git: Git, git_path: Path, content: str | None, message: str) -> None:
+    module = layout.repo / "src/inventory/query_tool.py"
+    if content is None:
+        module.unlink()
+    else:
+        module.write_text(content, "utf-8")
+    _commit(layout.repo, git_path, message)
+    assert git.run("push", "-q", "origin", "feature", cwd=layout.repo).returncode == 0
+    github_sim.refresh(git, layout)
+
+
+def _all_green(layout: Layout, git: Git, number: int) -> None:
+    github_sim.ensure_checks(git, layout, number, [(job, True) for job in JOBS])
+    for job in JOBS:
+        github_sim.set_check_state(git, layout, number, job, "success", output="ok")
+
+
+def test_le_second_relecteur_lit_l_outil_et_refuse_un_contournement_de_bandit(
+    prepared, git_path: Path
+) -> None:
+    """Checks verts mais l'outil exécute encore du code : Noé demande des changements, la PR
+    reste à une approbation ; outil restreint au commit suivant : il approuve."""
+    layout, git = prepared
+    git.run("push", "-u", "origin", "feature", cwd=layout.repo)
+    pr = github_sim.open_pr(git, layout, "feature", "main")
+    _push_tool(layout, git, git_path, BYPASSES["getattr"], "Contourne bandit")
+    _all_green(layout, git, pr.number)
+    pr = github_sim.load(layout).pulls[0]
+    noe = [r for r in pr.reviews if r.author == "Noé Lefèvre"]
+    assert [r.state for r in noe] == ["changes_requested"]
+    assert "bandit ne voit pas tout" in noe[0].body_text
+    assert (pr.count_approvals(), pr.mergeable) == (1, False)
+    _push_tool(layout, git, git_path, RESTRICTED, "Restreint l'outil")
+    _all_green(layout, git, pr.number)
+    pr = github_sim.load(layout).pulls[0]
+    assert [r.state for r in pr.reviews if r.author == "Noé Lefèvre"] == [
+        "changes_requested",
+        "approved",
+    ]
+    assert (pr.count_approvals(), pr.mergeable) == (2, True)
+
+
+def test_les_etapes_relisent_l_outil_au_commit_de_tete(prepared, git_path: Path) -> None:
+    """Leçon 6.2 : bandit vert ne suffit pas. Chaque contournement que bandit ne voit pas, et
+    l'outil supprimé, laissent « restreindre » et « tester » en attente ; l'outil restreint les
+    valide."""
+    layout, git = prepared
+    git.run("push", "-u", "origin", "feature", cwd=layout.repo)
+    github_sim.open_pr(git, layout, "feature", "main")
+    coverage = [Finding(rule_id="diff_coverage", severity="info")]
+
+    def status(step_id: str, *, with_git: bool = True) -> str:
+        state = github_sim.load(layout)
+        current = state.pulls[0]
+        checks = [
+            Check(
+                job_id=job,
+                head_sha=current.head_sha,
+                base_sha=current.base_sha,
+                state="success",
+                findings=coverage,
+            )
+            for job in JOBS
+        ]
+        pulls = [current.model_copy(update={"checks": checks})]
+        github_sim._save(layout, state.model_copy(update={"pulls": pulls}))
+        ctx = StepContext(
+            step=_step(step_id), layout=layout, git=(lambda: git) if with_git else None
+        )
+        return pr_state.check(None, ctx).status
+
+    for name, content in [*BYPASSES.items(), ("supprimé", None)]:
+        _push_tool(layout, git, git_path, content, f"Contournement {name}")
+        assert status("restreindre_l_outil") == "pending", name
+        assert status("tester_l_outil") == "pending", name
+    _push_tool(layout, git, git_path, RESTRICTED, "Restreint l'outil")
+    assert status("restreindre_l_outil") == "passed"
+    assert status("tester_l_outil") == "passed"
+    # Hors du moteur (pas de git) : rien n'est validé.
+    assert status("restreindre_l_outil", with_git=False) == "pending"
+
+
+def test_la_condition_porte_sur_l_outil_et_des_mots_entiers() -> None:
+    (cond,) = _step("restreindre_l_outil").head_files
+    assert cond == _step("tester_l_outil").head_files[0]
+    assert cond.path == "src/inventory/query_tool.py"
+    assert {"eval", "exec", "getattr", "builtins", "__builtins__", "__import__"} <= set(
+        cond.forbidden_names
+    )
 
 
 # ------------------------------------------------------------------ étapes de PR
@@ -198,7 +302,8 @@ def _step(step_id: str) -> pr_state.Args:
 
 
 def _status(layout: Layout, step_id: str) -> str:
-    return pr_state.check(None, StepContext(step=_step(step_id), layout=layout)).status
+    step = _step(step_id).model_copy(update={"head_files": []})  # les fichiers : tests à part
+    return pr_state.check(None, StepContext(step=step, layout=layout)).status
 
 
 def _check(job: str, state: str, **extra: object) -> Check:
@@ -206,8 +311,6 @@ def _check(job: str, state: str, **extra: object) -> Check:
 
 
 def test_l_etape_de_test_refuse_le_module_supprime(tmp_path: Path) -> None:
-    from wavedevsecops.contracts.github import Finding
-
     measured = [Finding(rule_id="diff_coverage", severity="info")]
     empty = [Finding(rule_id=parsers.NO_DIFF_RULE, severity="info")]
 
@@ -329,6 +432,15 @@ def test_les_contournements_ne_valident_aucune_etape(
         original.replace("eval(expression", "eval(  # nosec\n    expression"), "utf-8"
     )
     assert run("bandit").state == "failure"
+    # L'exemption de ruff (noqa) n'en est pas une pour bandit.
+    noqa = original.replace('{"stock": stock}))', '{"stock": stock}))  # ' + "noqa")
+    assert noqa != original
+    module.write_text(noqa, "utf-8")
+    assert run("bandit").state == "failure"
+    # Les angles morts de bandit : ces contournements passent, d'où `head_files` et Noé.
+    for name, content in BYPASSES.items():
+        module.write_text(content, "utf-8")
+        assert run("bandit").state == "success", name
     # Un fichier `.bandit` ou `[tool.bandit]` du dépôt est ignoré (réglages hors de l'arbre).
     module.write_text(original, "utf-8")
     (repo / "src" / ".bandit").write_text("[bandit]\nskips = B307\n", "utf-8")
@@ -352,3 +464,10 @@ def test_les_contournements_ne_valident_aucune_etape(
     )
     audit = run("pip_audit")
     assert audit.state == "success" and "h11" not in {c.name for c in audit.sbom}
+    # Dépendance déplacée vers pyproject.toml (sans verrou à jour) : `uv_lock` échoue.
+    pyproject = repo / "pyproject.toml"
+    text = pyproject.read_text("utf-8")
+    assert "dependencies = [" in text
+    moved = text.replace("dependencies = [", 'dependencies = [\n    "h11==0.14.0",', 1)
+    pyproject.write_text(moved, "utf-8")
+    assert run("uv_lock").state == "failure"

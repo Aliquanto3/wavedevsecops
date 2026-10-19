@@ -41,6 +41,7 @@ Parse = Literal[
     "cyclonedx_json",
     "coverage_json",
     "diff_cover_json",
+    "uv_lock_check",
 ]
 """Lecteurs livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent. `cyclonedx_json` lit
 le SBOM (composants), pas des constats."""

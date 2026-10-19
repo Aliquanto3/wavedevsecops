@@ -17,7 +17,7 @@ from wavedevsecops.contracts import AppError, parse_element_id
 from wavedevsecops.gitio import LEARNER_EMAIL, LEARNER_NAME, Git
 from wavedevsecops.wsfs import Layout
 
-Persona = Literal["learner", "colleague", "agent"]
+Persona = Literal["learner", "colleague", "agent", "reviewer"]
 
 
 @dataclass(frozen=True)
@@ -30,8 +30,10 @@ PERSONAS: dict[str, Identity] = {
     "learner": Identity(LEARNER_NAME, LEARNER_EMAIL),
     "colleague": Identity("Sacha Martin", "sacha.martin@exemple.test"),
     "agent": Identity("Agent B", "agent-b@exemple.test"),
+    "reviewer": Identity("Noé Lefèvre", "noe.lefevre@exemple.test"),
 }
-"""Identités fixes des auteurs du setup (l'apprenant, le collègue simulé, l'agent B)."""
+"""Identités fixes des auteurs du setup (l'apprenant, le collègue simulé, l'agent B) et du
+second relecteur humain (`reviewer`, story 8.5), qui ne fait que des revues."""
 
 SETUP_EPOCH = datetime(2026, 1, 5, 9, 0, tzinfo=UTC)
 """Date du premier commit d'un setup ; les suivants avancent de `COMMIT_STEP`."""

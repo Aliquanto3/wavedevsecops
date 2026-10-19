@@ -111,7 +111,14 @@ def test_bandit_est_lance_avec_un_fichier_ini_hors_de_l_arbre() -> None:
 def test_le_job_uv_lock_verifie_la_coherence_de_pyproject_et_du_verrou() -> None:
     assert UV_LOCK is not None
     assert (UV_LOCK.tool, UV_LOCK.human, UV_LOCK.required) == ("uv", ["lock", "--check"], True)
-    assert UV_LOCK.barrier == "dependencies" and not UV_LOCK.machine
+    assert UV_LOCK.barrier == "dependencies"
+    # Sur un échec seulement : le constat en français (uv n'a pas de sortie machine).
+    (machine,) = UV_LOCK.machine
+    assert (machine.argv, machine.parse, machine.when) == (
+        ["lock", "--check"],
+        "uv_lock_check",
+        "failure",
+    )
     assert UV_LOCK.exit_codes.meaning(1) == "failure" and UV_LOCK.exit_codes.meaning(2) == "error"
     assert PIPELINE.job_ids[-2:] == ["uv_lock", "quality_gate"]
     assert PIPELINE.job_ids == [
@@ -186,9 +193,10 @@ def test_le_lecteur_diff_cover_au_seuil_ou_au_dessus_est_vert(tmp_path: Path) ->
     # 79 % reste sous le seuil : pas d'arrondi vers le haut (même règle que --fail-under).
     just_below = json.loads(_diff(100, list(range(79)), list(range(79, 100))))
     just_below["total_percent_covered"] = 79
-    assert "79 % · seuil 80 % · ✗" in parsers.parse_diff_cover_json(
-        json.dumps(just_below), tmp_path
-    )[0].message_text
+    assert (
+        "79 % · seuil 80 % · ✗"
+        in parsers.parse_diff_cover_json(json.dumps(just_below), tmp_path)[0].message_text
+    )
 
 
 def test_le_lecteur_diff_cover_sans_ligne_mesuree_n_est_pas_un_constat_de_couverture(
@@ -208,6 +216,16 @@ def test_le_lecteur_diff_cover_normalise_les_chemins_et_refuse_l_illisible(tmp_p
     for bad in ("", "pas du json", "[]", "{}", '{"src_stats": {}, "total_num_lines": "x"}'):
         with pytest.raises(ValueError):
             parsers.parse_diff_cover_json(bad, tmp_path)
+
+
+def test_le_lecteur_uv_lock_donne_un_constat_en_francais_sur_le_verrou(tmp_path: Path) -> None:
+    (finding,) = parsers.parse_uv_lock_check("", tmp_path)
+    assert (finding.rule_id, finding.severity, finding.path) == (
+        "lock_mismatch",
+        "error",
+        "uv.lock",
+    )
+    assert "Le verrou uv.lock ne correspond plus à pyproject.toml" in finding.message_text
 
 
 def test_le_lecteur_coverage_donne_la_couverture_totale_et_refuse_une_mesure_vide(
@@ -526,13 +544,19 @@ def test_uv_lock_check_refuse_un_pyproject_sans_verrou_a_jour(
     pyproject = repo / "pyproject.toml"
     text = pyproject.read_text("utf-8")
     pyproject.write_text(
-        text.replace('requires-python = ">=3.14,<3.15"', 'requires-python = ">=3.14,<3.15"\n#')
-        .replace("pytest==9.1.1", "pytest==9.1.0"),
+        text.replace(
+            'requires-python = ">=3.14,<3.15"', 'requires-python = ">=3.14,<3.15"\n#'
+        ).replace("pytest==9.1.1", "pytest==9.1.0"),
         "utf-8",
     )
     stale = _run(UV_LOCK, repo, base, tmp_path)
     assert stale.state == "failure", stale.output
     assert stale.output.strip()  # la sortie de uv reste affichée, verbatim
+    (finding,) = stale.findings
+    assert (finding.rule_id, finding.path) == (parsers.LOCK_MISMATCH_RULE, "uv.lock")
+    assert finding.message_text.startswith(
+        "Le verrou uv.lock ne correspond plus à pyproject.toml : mettez-les en accord"
+    )
 
 
 # ------------------------------------------------------------------ performance du pipeline

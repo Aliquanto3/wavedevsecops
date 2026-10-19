@@ -414,9 +414,7 @@ def parse_diff_cover_json(text: str, tree: Path) -> list[Finding]:
             Finding(
                 rule_id=UNCOVERED_RULE,
                 severity="error" if not passed else "info",
-                message_text=(
-                    f"{count} {noun} du nouveau code sans test : {_ranges(missing)}"
-                ),
+                message_text=(f"{count} {noun} du nouveau code sans test : {_ranges(missing)}"),
                 path=path,
                 line=_line(min(missing)),
             )
@@ -445,6 +443,27 @@ def parse_coverage_json(text: str, tree: Path) -> list[Finding]:
     ]
 
 
+LOCK_MISMATCH_RULE = "lock_mismatch"
+LOCK_FILE = "uv.lock"
+
+
+def parse_uv_lock_check(text: str, tree: Path) -> list[Finding]:  # noqa: ARG001
+    """`uv lock --check` en échec : un constat en français. uv n'a pas de sortie machine ; sa
+    sortie brute (« No solution found… network was disabled » hors ligne) reste affichée sous
+    le constat, verbatim. Ne tourne que sur un échec (`when: failure`)."""
+    return [
+        Finding(
+            rule_id=LOCK_MISMATCH_RULE,
+            severity="error",
+            message_text=(
+                "Le verrou uv.lock ne correspond plus à pyproject.toml : mettez-les en accord "
+                "(la sortie de uv, ci-dessous, nomme la dépendance en cause)."
+            ),
+            path=LOCK_FILE,
+        )
+    ]
+
+
 PARSERS: dict[str, Callable[[str, Path], list[Any]]] = {
     "ruff_json": parse_ruff_json,
     "junit": parse_junit,
@@ -454,6 +473,7 @@ PARSERS: dict[str, Callable[[str, Path], list[Any]]] = {
     "cyclonedx_json": parse_cyclonedx_json,
     "coverage_json": parse_coverage_json,
     "diff_cover_json": parse_diff_cover_json,
+    "uv_lock_check": parse_uv_lock_check,
 }
 """Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée.
 Un lecteur rend des `Finding`, sauf `cyclonedx_json` : des `SbomComponent` (le SBOM)."""

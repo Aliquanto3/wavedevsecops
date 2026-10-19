@@ -3,8 +3,9 @@
 # faire évaluer n'importe quelle expression Python (`eval`), sans test, et un `requirements.txt`
 # qui épingle h11 0.14.0 (vulnérable ; le verrou `uv.lock` porte la 0.16.0, corrigée). Le
 # pipeline simulé tourne sur la PR : bandit, pip-audit et la quality gate échouent ; l'apprenant
-# restreint l'outil, met la dépendance à jour (SBOM consulté), teste le module, puis le collègue
-# et l'agent B approuvent (deux approbations requises) et « Merger » devient actif.
+# restreint l'outil, met la dépendance à jour (SBOM consulté), teste le module, puis deux
+# collègues humains approuvent (deux approbations requises) et « Merger » devient actif. Le
+# second relecteur lit l'outil : s'il évalue encore du code, il demande des changements.
 # `uv.lock` et `pyproject.toml` ne bougent pas : le check `uv_lock` reste vert (aucune
 # dépendance déclarée n'est modifiée), seul le fichier épinglé que lit pip-audit change.
 schema_version: 1
@@ -31,7 +32,8 @@ setup:
     required_approvals: 2
     required_checks: [ruff, pytest, gitleaks, bandit, pip_audit, uv_lock, quality_gate]
   # Les deux approbations arrivent d'elles-mêmes quand tous les checks sont verts sur le dernier
-  # commit : le collègue commente puis approuve, l'agent B approuve aussi.
+  # commit : Sacha commente puis approuve ; Noé, second relecteur humain, lit l'outil et
+  # n'approuve que s'il n'évalue plus de code (sinon il demande des changements).
   - op: colleague_reaction
     trigger: checks_green
     head: feature
@@ -44,10 +46,21 @@ setup:
   - op: colleague_reaction
     trigger: checks_green
     head: feature
-    author: agent
+    author: reviewer
+    when_files: &outil_restreint
+      - path: src/inventory/query_tool.py
+        forbidden_names: [eval, exec, getattr, __import__, builtins, __builtins__, importlib]
     reviews:
       - state: approved
-        body_text: "Je valide aussi : le modèle ne peut plus exécuter de code arbitraire."
+        body_text: >-
+          J'ai lu query_tool.py : l'outil ne répond plus qu'à des requêtes prévues, le modèle ne
+          peut plus exécuter de code. Je valide aussi.
+    otherwise:
+      - state: changes_requested
+        body_text: >-
+          Les checks sont verts, mais query_tool.py est absent, ou il peut encore exécuter du
+          code choisi par le modèle (eval, exec, getattr, builtins…). bandit ne voit pas
+          tout : restreignez l'outil à des requêtes prévues.
   - op: switch
     branch: feature
     create: true
@@ -171,19 +184,23 @@ steps:
       Modifiez `src/inventory/query_tool.py` pour que le modèle ne fasse plus évaluer de code :
       l'outil ne doit répondre qu'à une liste fermée de requêtes prévues (par exemple « les
       articles sous le seuil » et « la quantité d'un article »). Gardez l'outil, restreint.
-      Committez sur `feature`, puis poussez. Le pipeline repart sur le nouveau commit.
+      N'utilisez ni `eval`, ni `exec`, ni accès dynamique (`getattr`, `builtins`,
+      `__import__`) : l'étape relit le fichier, pas seulement bandit. Committez sur `feature`,
+      puis poussez. Le pipeline repart sur le nouveau commit.
     explanation_text: >-
       Restreindre, c'est donner au modèle le moins de pouvoir possible : des actions nommées et
       des paramètres vérifiés, au lieu d'un langage entier. Le correctif n'a pas besoin d'être
       validé à la main : bandit repasse tout seul au vert quand `eval` a disparu. Les raccourcis
       ne fonctionnent pas : `# nosec` est refusé, un fichier `.bandit` de votre dépôt est ignoré,
-      et supprimer l'outil ne passera pas l'étape de test qui suit, car la quality gate doit
-      toujours mesurer des lignes du nouveau code.
+      et supprimer l'outil laisse l'étape en attente. bandit reconnaît `eval` écrit en clair,
+      pas `getattr(builtins, "ev" + "al")` : un outil d'analyse a des angles morts, c'est
+      pourquoi la plateforme relit aussi le fichier, et un relecteur humain après elle.
     head: feature
     base: main
     pr_state: open
     check_states:
       bandit: success
+    head_files: *outil_restreint
     hints:
       lead_text: >-
         Remplacez l'expression libre par un choix parmi des requêtes que vous écrivez vous-même :
@@ -267,8 +284,10 @@ steps:
       justement celui qui prouve que l'outil est bien restreint : le modèle ne peut pas lui
       faire faire autre chose que ce qui est prévu. Les raccourcis ne fonctionnent pas : le
       seuil est fixé par la plateforme, `omit` et `# pragma: no cover` sont ignorés, et
-      supprimer le module ne ferait pas l'affaire : il faut toujours des lignes du nouveau code
-      mesurées.
+      supprimer le module ne ferait pas l'affaire : l'étape exige que `query_tool.py` existe
+      encore. Le seuil a ses limites : un test sans `assert` qui exécute le code le franchit
+      aussi, et le code lancé par la CI pourrait réécrire sa propre mesure. La relecture
+      humaine reste la dernière barrière.
     head: feature
     base: main
     pr_state: open
@@ -278,6 +297,7 @@ steps:
       quality_gate: success
     finding_has:
       quality_gate: [diff_coverage]
+    head_files: *outil_restreint
     hints:
       lead_text: >-
         Un test appelle l'outil avec un cas précis et vérifie le résultat avec `assert`. Pensez
@@ -294,12 +314,15 @@ steps:
     type: pr_state
     title_text: Lire les approbations et le feu vert de la PR
     instruction_text: >-
-      Attendez que les sept checks soient verts. Le collègue et l'agent B relisent alors la PR :
-      le journal de revue affiche « Approbations : 2 sur 2 » et « Merger » devient actif.
+      Attendez que les sept checks soient verts. Sacha et Noé, deux collègues, relisent alors la
+      PR : le journal de revue affiche « Approbations : 2 sur 2 » et « Merger » devient actif.
+      Si Noé demande des changements, lisez sa revue, corrigez l'outil et poussez.
     explanation_text: >-
       Les checks vérifient le code, pas le regard d'autres personnes. `main` demande ici deux
       approbations, plus que le minimum d'une : pour un outil donné à un modèle, deux regards
-      valent mieux qu'un. Vous ne pouvez pas les écrire vous-même.
+      valent mieux qu'un. Noé lit l'outil lui-même au lieu de se fier aux checks verts : une
+      relecture humaine voit ce qu'un outil d'analyse ne voit pas. Vous ne pouvez pas écrire
+      ces approbations vous-même.
     explain_ref: graph.remote_ref
     head: feature
     base: main
