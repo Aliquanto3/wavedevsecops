@@ -1,0 +1,175 @@
+# Scénario A « PR / merge » (Story 6.2) : pousser une branche, ouvrir une PR, lire la revue du
+# collègue simulé, merger, puis récupérer le résultat.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: pr-merge
+mode: A
+title_text: PR / merge
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` demande une approbation avant tout merge ; le collègue relit la PR dès son ouverture.
+  - op: set_protection
+    branch: main
+    required_approvals: 1
+  - op: colleague_reaction
+    trigger: pr_opened
+    head: feature
+    author: colleague
+    reviews:
+      - state: commented
+        body_text: Merci pour cette PR ! Le changement est petit et clair, c'est facile à relire.
+      - state: approved
+        body_text: Je valide. Vous pouvez merger.
+steps:
+  - step_id: commiter_sur_feature
+    type: repo_state
+    title_text: Préparer un changement sur une branche
+    instruction_text: >-
+      `main` est protégée : on y arrive par une pull request. Créez la branche `feature`,
+      ajoutez-y un fichier (par exemple avec `echo "Salut" > salut.txt`) et commitez-le.
+    explanation_text: >-
+      Un changement part d'une branche à part. La PR comparera cette branche à `main` : il faut
+      donc au moins un commit dessus.
+    explain_ref: graph.commit
+    expect:
+      head:
+        branch: feature
+      commits:
+        - "on": feature
+          ahead_of: main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            clean: false
+        reason_text: >-
+          Des changements attendent encore : indexez-les avec `git add`, puis enregistrez-les
+          avec `git commit`.
+      - when:
+          head:
+            branch: feature
+        reason_text: >-
+          La branche `feature` existe, mais elle n'a pas encore de commit propre : il manque le
+          commit du changement.
+    hints:
+      lead_text: >-
+        Trois temps : créer la branche et s'y placer, écrire le fichier, puis l'indexer et
+        le commiter.
+      partial_text: git switch ___ feature
+      solution_text: >-
+        git switch -c feature, puis echo "Salut" > salut.txt, git add salut.txt et git commit -m
+        "Ajoute le salut"
+
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Poussez `feature` vers l'origine : une PR ne se crée que pour une branche que l'origine
+      connaît.
+    explanation_text: >-
+      `git push -u origin feature` crée la branche côté origine et relie votre branche locale à
+      elle (`-u`, conseillé) : depuis `feature`, les `git push` et `git pull` suivants n'auront
+      plus besoin de préciser où.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR »
+      de la vue « Distant + PR ». Le collègue relira votre changement aussitôt.
+    explanation_text: >-
+      Une pull request demande de fusionner une branche dans une autre, après relecture. Le
+      collègue a laissé un commentaire puis une approbation : `main` exige cette approbation
+      avant tout merge.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: merger_pr
+    type: pr_state
+    title_text: Merger la pull request approuvée
+    instruction_text: >-
+      Lisez la revue du collègue, puis mergez la PR avec le bouton « Merger » de la
+      vue « Distant + PR ».
+    explanation_text: >-
+      Le merge intègre `feature` dans `main` sur l'origine, avec un commit de fusion. Il n'était
+      possible qu'avec l'approbation demandée par la protection de `main`.
+    explain_ref: graph.remote_ref
+    head: feature
+    base: main
+    pr_state: merged
+    min_approvals: 1
+    hints:
+      lead_text: >-
+        La PR est approuvée et rien ne bloque : le bouton « Merger » de la vue « Distant + PR »
+        est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"
+
+  - step_id: recuperer_main
+    type: repo_state
+    title_text: Récupérer le merge dans votre dépôt
+    instruction_text: >-
+      Le merge a eu lieu sur l'origine, pas chez vous. Revenez sur `main` et récupérez le commit
+      de fusion.
+    explanation_text: >-
+      Votre `main` locale n'a pas bougé quand la PR a été mergée : c'est `git pull` qui rapporte
+      le commit de fusion. Votre dépôt et l'origine sont de nouveau d'accord.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        branch: main
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+          subject_contains: Merge pull request
+    foreseen:
+      - when:
+          head:
+            branch: main
+        reason_text: >-
+          Vous êtes sur `main`, mais le commit de fusion n'est pas encore arrivé : il reste à le
+          récupérer.
+    hints:
+      lead_text: >-
+        Deux commandes : changer de branche pour revenir sur `main`, puis récupérer.
+      partial_text: git switch ___
+      solution_text: git switch main, puis git pull

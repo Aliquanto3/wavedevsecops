@@ -1,0 +1,159 @@
+# Scénario A « push / pull » (Story 6.2) : récupérer le commit d'un collègue, puis partager le sien.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: push-pull
+mode: A
+title_text: push / pull
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Pendant ce temps, le collègue a poussé un commit que votre dépôt ne connaît pas encore.
+  - op: colleague_commit
+    branch: main
+    message: Ajoute le guide de contribution
+    files:
+      - path: docs/guide.md
+        content: |
+          # Guide de contribution
+
+          1. Créez une branche par changement.
+          2. Relisez-vous avant de pousser.
+    as: commit-collegue
+steps:
+  - step_id: voir_sans_integrer
+    type: quiz
+    title_text: Regarder ce qui a bougé sans rien toucher
+    instruction_text: >-
+      Votre collègue a poussé un commit sur l'origine. Vous voulez le voir arriver sans
+      modifier votre branche `main`. Quelle commande choisissez-vous ?
+    explanation_text: >-
+      `git fetch` télécharge les nouveaux commits et avance `origin/main`, sans toucher à votre
+      branche ni à vos fichiers. Vous regardez d'abord, vous intégrez ensuite.
+    explain_ref: graph.remote_ref
+    choices:
+      - choice_id: fetch
+        command_text: git fetch
+        correct: true
+      - choice_id: pull
+        command_text: git pull
+        effect_text: >-
+          `pull` a téléchargé le commit puis l'a intégré aussitôt à votre branche : vos fichiers
+          ont changé sans que vous ayez pu regarder avant.
+      - choice_id: push
+        command_text: git push
+        effect_text: >-
+          `push` envoie vos commits vers l'origine ; il ne rapporte rien. Le commit du collègue
+          n'est toujours pas arrivé chez vous.
+    hints:
+      lead_text: >-
+        Une seule de ces commandes ne fait que télécharger : ni fusion, ni envoi.
+      partial_text: git ___
+      solution_text: git fetch
+
+  - step_id: recuperer
+    type: repo_state
+    title_text: Récupérer le commit du collègue
+    instruction_text: >-
+      Intégrez à votre branche `main` le commit du collègue : le fichier `docs/guide.md` doit
+      apparaître dans votre dossier.
+    explanation_text: >-
+      `git pull` fait un `fetch`, puis intègre les commits reçus à la branche courante. Ici
+      votre branche n'avait rien de nouveau : git avance simplement `main` jusqu'au commit du
+      collègue (une avance rapide).
+    explain_ref: graph.remote_ref
+    expect:
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+          subject_contains: guide
+      tree:
+        present: [docs/guide.md]
+    foreseen:
+      - when:
+          commits:
+            - "on": origin/main
+              ahead_of: "@depart"
+              min: 1
+        reason_text: >-
+          Le commit du collègue est dans `origin/main`, mais pas encore dans votre branche :
+          il reste à l'intégrer.
+    hints:
+      lead_text: >-
+        Récupérer et intégrer en un seul geste : la commande existe, et elle porte le nom de
+        l'action.
+      partial_text: git ___
+      solution_text: git pull
+
+  - step_id: commiter_a_partager
+    type: repo_state
+    title_text: Faire un commit à partager
+    instruction_text: >-
+      Créez un fichier (par exemple avec `echo "À faire" > todo.txt`), indexez-le et
+      commitez-le.
+    explanation_text: >-
+      Votre commit est local : l'origine ne le connaît pas. Le graphe le montre un cran
+      devant `origin/main`.
+    explain_ref: graph.commit
+    expect:
+      commits:
+        - ahead_of: origin/main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            clean: false
+        reason_text: >-
+          Des changements attendent encore : indexez-les avec `git add`, puis enregistrez-les
+          avec `git commit`.
+    hints:
+      lead_text: >-
+        Créer le fichier, l'indexer, puis commiter : le même cycle que dans « add / commit ».
+      partial_text: echo "À faire" > ___
+      solution_text: >-
+        echo "À faire" > todo.txt, puis git add todo.txt, puis git commit -m "Ajoute la liste
+        à faire"
+
+  - step_id: pousser
+    type: repo_state
+    title_text: Pousser son commit
+    instruction_text: Envoyez votre commit vers l'origine pour que le collègue puisse le récupérer.
+    explanation_text: >-
+      `git push` envoie vos commits vers l'origine et avance `origin/main`. Comme vous aviez
+      d'abord récupéré le commit du collègue, l'origine n'a qu'à avancer jusqu'au vôtre : git
+      accepte l'envoi.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/main
+    foreseen:
+      - when:
+          commits:
+            - ahead_of: origin/main
+              min: 1
+        reason_text: "Le commit n'existe encore que chez vous, l'origine ne l'a pas reçu."
+    hints:
+      lead_text: >-
+        La commande inverse de `pull` envoie vos commits.
+      partial_text: git ___
+      solution_text: git push

@@ -1,0 +1,179 @@
+# Scénario A « branche » (Story 6.2) : créer une branche, y travailler, la fusionner, la supprimer.
+# Trois quiz, dont une erreur réaliste (`git reset --hard HEAD~1`, Flow 1).
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: branche
+mode: A
+title_text: Branche
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+steps:
+  - step_id: creer_feature
+    type: repo_state
+    title_text: Créer la branche feature
+    instruction_text: >-
+      Créez une branche `feature` et placez-vous dessus, pour travailler sans toucher à `main`.
+    explanation_text: >-
+      Une branche est un simple pointeur vers un commit. `HEAD` indique la branche sur laquelle
+      vous êtes : les prochains commits avanceront celle-là, et `main` ne bougera pas.
+    explain_ref: graph.branch
+    expect:
+      head:
+        branch: feature
+      branches:
+        - name: feature
+          at: "@depart"
+    foreseen:
+      - when:
+          branches:
+            - name: feature
+        reason_text: >-
+          La branche `feature` existe, mais `HEAD` n'est pas dessus : placez-vous sur elle.
+    hints:
+      lead_text: >-
+        Une seule commande peut créer la branche et s'y placer, en ajoutant une option à
+        `git switch`.
+      partial_text: git switch ___ feature
+      solution_text: git switch -c feature
+
+  - step_id: commiter_sur_feature
+    type: repo_state
+    title_text: Faire un commit sur la branche
+    instruction_text: >-
+      Créez un fichier (par exemple avec `echo "Salut" > salut.txt`), indexez-le et commitez-le
+      depuis `feature`.
+    explanation_text: >-
+      Le commit avance `feature` ; `main` reste où elle était. `feature` a maintenant un commit
+      d'avance sur `main`.
+    explain_ref: graph.commit
+    expect:
+      head:
+        branch: feature
+      commits:
+        - "on": feature
+          ahead_of: main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            clean: false
+        reason_text: >-
+          Des changements attendent encore : indexez-les avec `git add`, puis enregistrez-les
+          avec `git commit`.
+    hints:
+      lead_text: >-
+        Le cycle habituel : écrire le fichier, l'indexer, puis commiter.
+      partial_text: echo "Salut" > ___
+      solution_text: >-
+        echo "Salut" > salut.txt, puis git add salut.txt, puis git commit -m "Ajoute le salut"
+
+  - step_id: revenir_sur_main
+    type: quiz
+    title_text: Revenir sur main sans perdre son travail
+    instruction_text: >-
+      Vous voulez retourner sur `main`, en gardant le commit fait sur `feature`. Quelle
+      commande choisissez-vous ?
+    explanation_text: >-
+      `git switch main` change de branche : les fichiers du dossier suivent `main`, et le
+      commit de `feature` reste intact, accessible quand vous reviendrez.
+    explain_ref: graph.head
+    choices:
+      - choice_id: switch_main
+        command_text: git switch main
+        correct: true
+      - choice_id: reset_dur
+        command_text: git reset --hard HEAD~1
+        effect_text: >-
+          `reset --hard HEAD~1` n'a pas changé de branche : il a fait reculer `feature` d'un
+          commit et effacé le fichier du dossier. Le commit n'est plus sur aucune branche ; il
+          faudrait le retrouver dans le reflog.
+      - choice_id: switch_bis
+        command_text: git switch -c main-bis
+        effect_text: >-
+          Cette commande a créé une branche `main-bis` à partir de `feature` : vous n'êtes
+          toujours pas sur `main`.
+    hints:
+      lead_text: >-
+        Changer de branche, c'est `switch` suivi du nom de la branche : sans option, et sans
+        rien effacer.
+      partial_text: git switch ___
+      solution_text: git switch main
+
+  - step_id: fusionner
+    type: quiz
+    title_text: Intégrer feature dans main
+    instruction_text: >-
+      Vous êtes sur `main`. Quelle commande y apporte le commit de `feature` ?
+    explanation_text: >-
+      `git merge feature` fusionne `feature` dans la branche courante. `main` n'avait pas
+      avancé : git déplace simplement `main` sur le commit de `feature` (une avance rapide).
+    explain_ref: graph.branch
+    choices:
+      - choice_id: merge_feature
+        command_text: git merge feature
+        correct: true
+      - choice_id: merge_main
+        command_text: git merge main
+        effect_text: >-
+          Fusionner `main` dans `main` ne fait rien : git répond « Already up to date ». Le
+          sens compte : on fusionne la branche à intégrer dans la branche courante.
+      - choice_id: switch_feature
+        command_text: git switch feature
+        effect_text: >-
+          Cette commande vous a ramené sur `feature` : `main` n'a rien reçu.
+    hints:
+      lead_text: >-
+        On se place sur la branche qui reçoit, puis on nomme celle qu'on veut intégrer.
+      partial_text: git merge ___
+      solution_text: git merge feature
+
+  - step_id: supprimer_feature
+    type: quiz
+    title_text: Supprimer la branche devenue inutile
+    instruction_text: >-
+      Le travail de `feature` est dans `main`. Quelle commande supprime la branche `feature`
+      sans toucher aux commits ?
+    explanation_text: >-
+      `git branch -d feature` supprime le pointeur, et git refuse si la branche n'est pas
+      fusionnée. Les commits restent dans `main`, car ils en font désormais partie.
+    explain_ref: graph.branch
+    choices:
+      - choice_id: branch_d
+        command_text: git branch -d feature
+        correct: true
+      - choice_id: branch_m
+        command_text: git branch -m feature ancienne
+        effect_text: >-
+          `-m` renomme la branche en `ancienne` : elle existe toujours, sous un autre nom.
+      - choice_id: switch_feature
+        command_text: git switch feature
+        effect_text: >-
+          Cette commande vous a placé sur `feature`, rien n'est supprimé.
+    hints:
+      lead_text: >-
+        Les branches se gèrent avec `git branch` ; une option d'une lettre supprime, et refuse
+        si la branche n'est pas fusionnée.
+      partial_text: git branch ___ feature
+      solution_text: git branch -d feature

@@ -1,0 +1,153 @@
+# Scénario A « add / commit » (Story 6.2) : du fichier neuf au commit, sans réseau.
+# Même setup pour les deux parcours : ce scénario enseigne git, pas le code d'exercice.
+schema_version: 1
+scenario_id: add-commit
+mode: A
+title_text: add / commit
+tracks: [llm, no_ai]
+tools: [git]
+setup:
+  - op: write_file
+    path: README.md
+    content: |
+      # Mon projet
+
+      Un petit projet pour s'entraîner avec git.
+  - op: commit
+    message: Ajoute le README
+  - op: write_file
+    path: src/bonjour.py
+    content: |
+      def bonjour(nom: str) -> str:
+          return f"Bonjour, {nom} !"
+  - op: commit
+    message: Ajoute la fonction bonjour
+    as: depart
+  - op: push
+    branch: main
+    as: origin-main
+  # Un fichier neuf attend dans le dossier : git ne le suit pas encore.
+  - op: write_file
+    path: notes.txt
+    content: |
+      Idées pour la prochaine version :
+      - dire bonjour en plusieurs langues
+steps:
+  - step_id: indexer
+    type: repo_state
+    title_text: Mettre un fichier dans l'index
+    instruction_text: >-
+      Le fichier `notes.txt` est nouveau : git ne le suit pas encore. Placez-le dans l'index,
+      la zone où l'on prépare le prochain commit.
+    explanation_text: >-
+      L'index est une zone de préparation : `git add` y copie l'état du fichier tel qu'il est
+      maintenant. Seul ce qui est dans l'index entre dans le prochain commit ; une modification
+      faite après le `git add` n'y est pas.
+    expect:
+      index:
+        staged: [notes.txt]
+    hints:
+      lead_text: >-
+        Un commit n'enregistre que ce qui est dans l'index. Une commande de la famille `add`
+        y place un fichier.
+      partial_text: git add ___
+      solution_text: git add notes.txt
+
+  - step_id: commiter
+    type: repo_state
+    title_text: Enregistrer le commit
+    instruction_text: >-
+      Enregistrez le contenu de l'index dans un commit, avec un message qui dit ce que vous
+      avez fait (par exemple « Ajoute les notes »).
+    explanation_text: >-
+      Un commit est un instantané de l'index, daté, attribué à son auteur et relié au commit
+      précédent. Il
+      reste local : personne d'autre ne le voit tant que vous ne le poussez pas.
+    explain_ref: graph.commit
+    expect:
+      commits:
+        - ahead_of: "@depart"
+          min: 1
+      index:
+        clean: true
+        tracked: [notes.txt]
+    foreseen:
+      - when:
+          index:
+            staged: [notes.txt]
+        reason_text: >-
+          `notes.txt` est bien dans l'index, mais rien n'est enregistré : il manque le
+          commit lui-même.
+    hints:
+      lead_text: >-
+        La commande de l'enregistrement s'appelle `commit`. Elle demande un message, que
+        l'option `-m` donne sur la même ligne.
+      partial_text: git commit -m "___"
+      solution_text: git commit -m "Ajoute les notes"
+
+  - step_id: corriger_le_message
+    type: quiz
+    title_text: Corriger le message du dernier commit
+    instruction_text: >-
+      En relisant l'historique, vous trouvez votre message trop vague. Quelle commande le
+      corrige sans ajouter de nouveau commit ?
+    explanation_text: >-
+      `git commit --amend` remplace le dernier commit par un nouveau, avec le message corrigé.
+      Cela réécrit l'historique : à réserver à un commit que personne d'autre n'a encore
+      récupéré.
+    explain_ref: graph.commit
+    choices:
+      - choice_id: amend
+        command_text: git commit --amend -m "Ajoute les notes de la réunion"
+        correct: true
+      - choice_id: reset_dur
+        command_text: git reset --hard HEAD~1
+        effect_text: >-
+          `reset --hard` a effacé le commit et le fichier du dossier : le travail a disparu
+          au lieu d'être corrigé.
+      - choice_id: revert
+        command_text: git revert --no-edit HEAD
+        effect_text: >-
+          `revert` a ajouté un commit qui défait le précédent : le message fautif reste dans
+          l'historique et le fichier a disparu.
+    hints:
+      lead_text: >-
+        Il s'agit de remplacer le dernier commit, pas d'en ajouter un ni de l'effacer.
+      partial_text: git commit --___ -m "Nouveau message"
+      solution_text: git commit --amend -m "Ajoute les notes de la réunion"
+
+  - step_id: second_commit
+    type: repo_state
+    title_text: Modifier un fichier suivi et le commiter
+    instruction_text: >-
+      Ajoutez une ligne à `README.md` (par exemple avec `echo "Une ligne en plus" >>
+      README.md`), placez la modification dans l'index, puis commitez-la.
+    explanation_text: >-
+      Pour un fichier déjà suivi, le cycle est le même : modifier, `git add`, `git commit`. Le
+      graphe compte maintenant deux commits de plus que l'origine.
+    explain_ref: graph.commit
+    expect:
+      commits:
+        - ahead_of: "@depart"
+          min: 2
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            unstaged: [README.md]
+        reason_text: >-
+          `README.md` est modifié, mais pas encore dans l'index : `git add` doit passer avant
+          le commit.
+      - when:
+          index:
+            staged: [README.md]
+        reason_text: >-
+          `README.md` est dans l'index, mais pas encore enregistré : il reste le commit.
+    hints:
+      lead_text: >-
+        Trois gestes dans l'ordre : modifier le fichier, l'indexer, puis commiter.
+      partial_text: echo "Une ligne en plus" >> ___
+      solution_text: >-
+        echo "Une ligne en plus" >> README.md, puis git add README.md, puis git commit -m
+        "Complète le README"
