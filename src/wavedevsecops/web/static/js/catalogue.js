@@ -180,6 +180,76 @@ function card(scenario, onOpen) {
   return article;
 }
 
+/** Ligne d'état d'un mode de station : un seul paragraphe, l'outil manquant nommé s'il y a lieu. */
+function stationMode(scenario, mode, onOpen) {
+  const column = el("div", "scenario-mode is-compact", {
+    "data-mode": mode.mode,
+    "data-state": mode.state,
+  });
+  const state = el("p", "scenario-mode-state");
+  if (!mode.available) {
+    column.classList.add("is-unavailable");
+    const info = mode.unavailable;
+    state.append(`${info.text} · ${info.needs_text} · `);
+    const link = el("a", "scenario-mode-link", { href: info.diagnostic_path });
+    link.textContent = info.diagnostic_text;
+    state.append(link);
+    column.append(state);
+    return column;
+  }
+  state.textContent = mode.detail_text
+    ? `${mode.state_text} · ${mode.detail_text}`
+    : mode.state_text;
+  const alert = el("p", "scenario-card-alert", { role: "alert" });
+  const button = el("button", "btn btn-secondary", { type: "button", "data-mode": mode.mode });
+  button.textContent = "Ouvrir";
+  button.setAttribute("aria-label", `Ouvrir ${scenario.title}`);
+  button.addEventListener("click", async () => {
+    alert.textContent = "";
+    try {
+      await onOpen(scenario, mode);
+    } catch (err) {
+      alert.textContent = err.message;
+    }
+  });
+  column.append(state, button, alert);
+  return column;
+}
+
+/** Carte d'un scénario de station (Story 9.3) : titre, une phrase, une seule ligne d'état. */
+function stationCard(scenario, onOpen) {
+  const article = el("article", "scenario-card station-card", {
+    "data-scenario": scenario.scenario_id,
+  });
+  const title = el("h4", "scenario-card-title");
+  title.textContent = scenario.title;
+  article.append(title);
+  if (scenario.description) {
+    const description = el("p", "station-card-description");
+    description.textContent = scenario.description;
+    article.append(description);
+  }
+  const modes = el("div", "scenario-modes");
+  for (const mode of scenario.modes) modes.append(stationMode(scenario, mode, onOpen));
+  article.append(modes);
+  return article;
+}
+
+function stationGroups(section, onOpen) {
+  const wrap = el("div", "station-groups");
+  for (const group of section.groups) {
+    const id = `catalogue-station-${group.station}`;
+    const block = el("section", "station-group", { "aria-labelledby": id });
+    const heading = el("h3", "station-title", { id });
+    heading.textContent = group.text;
+    const cards = el("div", "scenario-cards");
+    for (const scenario of group.scenarios) cards.append(stationCard(scenario, onOpen));
+    block.append(heading, cards);
+    wrap.append(block);
+  }
+  return wrap;
+}
+
 /**
  * Dessine le catalogue dans `container`. Sans parcours choisi (`catalogue.track` nul), seul le
  * `path-picker` apparaît ; `onPick(track)` reçoit le choix. `onOpen(scenario, mode)` ouvre l'espace.
@@ -201,6 +271,11 @@ export function renderCatalogue(container, catalogue, onOpen, onPick = () => {})
     heading.textContent = section.title;
     const subtitle = el("p", "subtitle");
     subtitle.textContent = section.subtitle;
+    if (section.groups) {
+      block.append(heading, subtitle, stationGroups(section, onOpen));
+      container.append(block);
+      continue;
+    }
     const cards = el("div", "scenario-cards");
     if (section.scenarios.length === 0) {
       const empty = el("p", "empty");

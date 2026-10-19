@@ -58,7 +58,7 @@ def test_catalogue_liste_le_socle_git_avec_titres_et_modes(
     status, body = call(instance, "GET", "/api/catalogue?track=no_ai", cookie)
     assert status == 200
     assert body["default_track"] == "no_ai" and body["track"] == "no_ai"
-    (section,) = body["sections"]
+    section = body["sections"][0]
     assert section["title"] == "Socle git"
     by_id = {s["scenario_id"]: s for s in section["scenarios"]}
     assert "bac-a-sable-libre" in by_id

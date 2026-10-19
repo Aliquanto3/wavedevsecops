@@ -24,6 +24,13 @@ SOCLE_ORDER: tuple[str, ...] = (
 absent du catalogue ; un scénario absent de cette liste vient après, par ordre alphabétique."""
 
 
+STATIONS_SECTION = "stations"
+"""Section des scénarios de station (Story 9.3) ; elle vient après le socle git."""
+
+STATION_ORDER: tuple[str, ...] = ("defaut-de-lint", "test-casse")
+"""Ordre conseillé des scénarios de station, à l'intérieur d'une station, par `scenario_id`."""
+
+
 def section_of(section: str | None) -> str:
     """Section effective : sans section, le socle git."""
     return section or SOCLE_SECTION
@@ -33,4 +40,6 @@ def catalogue_rank(scenario_id: str) -> tuple[int, str]:
     """Clé de tri du catalogue : rang dans `SOCLE_ORDER`, puis identifiant."""
     if scenario_id in SOCLE_ORDER:
         return SOCLE_ORDER.index(scenario_id), scenario_id
+    if scenario_id in STATION_ORDER:
+        return len(SOCLE_ORDER) + 1 + STATION_ORDER.index(scenario_id), scenario_id
     return len(SOCLE_ORDER), scenario_id
