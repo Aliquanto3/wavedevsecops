@@ -414,6 +414,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 05:35 · 6.3 · second-avis · lancé · —
 - 2026-10-19 05:35 · — · outillage · création de worktree refusée (dossier vide laissé par la suppression ratée de 4.4, puis config git lue pendant une écriture concurrente) : dossier vide et worktree inutilisé supprimés, relance réussie · —
 - 2026-10-19 05:35 · 5.6 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction ; chemin critique de l'Epic 5) · —
+- 2026-10-19 05:38 · 6.3 · second-avis · 2 high prouvés (conflit commité avec marqueurs valide l'étape ; rebase --abort puis merge valide le rebase), 2 medium (récupération par un nouveau commit de même sujet, stash drop puis réécriture manuelle), 4 low ; reviewer Opus lancé avec ajout de conditions à repo_state (contenu, historique linéaire, sha atteignable) et vérification des scénarios 6.2 · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
