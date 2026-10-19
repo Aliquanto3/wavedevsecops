@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, get_args
 
-from wavedevsecops import github_sim, projections
+from wavedevsecops import ci, github_sim, projections
 from wavedevsecops.config import Settings
 from wavedevsecops.contracts import AppError
 from wavedevsecops.engine import hints
@@ -107,8 +107,16 @@ def repo_projector(settings: Settings, git_path: Path | None = None) -> Projecto
             resolved["git"] = git_path or resolve_git(settings)
         git = Git.for_workspace(resolved["git"], ctx.layout.root, settings)
         digest = fingerprint(ctx.layout, git)
+        try:
+            jobs = frozenset(ci.load_pipeline(settings).job_ids)
+        except ci.PipelineError:
+            jobs = frozenset()
         projected = projections.project(
-            git, ctx.layout, ctx.last_views, after_restore=bool(ctx.data.get(RESTORED_KEY))
+            git,
+            ctx.layout,
+            ctx.last_views,
+            after_restore=bool(ctx.data.get(RESTORED_KEY)),
+            pipeline_jobs=jobs,
         )
         return Projection(projected.views.model_dump(mode="json"), digest, projected.linker)
 

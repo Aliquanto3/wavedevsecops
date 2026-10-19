@@ -8,6 +8,12 @@
 #
 # Contrat d'un job (les stories 8.1, 8.3, 8.4 et 8.6 ajoutent ou complètent des jobs ici) :
 #
+# Tout job ajouté ici s'écrit aussi, à la même place dans l'ordre, dans les 6 fichiers CI des
+# gabarits (content/exercise/{no_ai,llm}/ : .github/workflows/ci.yml, Jenkinsfile,
+# .gitlab-ci.yml), encadré par « wds:job <job_id> » et « wds:end » en commentaires seuls sur
+# leur ligne, avec son label_text et la commande « tool + human » (story 7.6,
+# tests/test_pipeline_files.py), puis `uv run python scripts/update_fingerprints.py`.
+#
 #   job_id      identifiant du check (snake_case, motif JOB_ID_PATTERN) ; unique.
 #   label_text  libellé affiché du check.
 #   tool        identifiant de l'outil dans tools.toml (AD-16) : résolu par le registre, jamais
