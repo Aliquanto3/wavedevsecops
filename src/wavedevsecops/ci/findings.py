@@ -265,10 +265,28 @@ def parse_pip_audit_json(text: str, tree: Path) -> list[Finding]:
     return found
 
 
-def parse_cyclonedx_json(text: str, tree: Path) -> list[SbomComponent]:
+_REQUIREMENT_NAME = re.compile(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
+
+
+def _required_names(tree: Path) -> dict[str, int]:
+    """Nom et ligne de chaque exigence du fichier (épinglée ou non, avec ou sans marqueur)."""
+    try:
+        text = (tree / REQUIREMENTS_FILE).read_text(encoding="utf-8")
+    except OSError, UnicodeDecodeError:
+        return {}
+    found: dict[str, int] = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        match = _REQUIREMENT_NAME.match(line.split("#", 1)[0])
+        if match:
+            found.setdefault(_pkg(match[1]), number)
+    return found
+
+
+def parse_cyclonedx_json(text: str, tree: Path) -> list[SbomComponent | Finding]:
     """`pip-audit -f cyclonedx-json` : un composant par dépendance (nom, version, licences si
-    le document en porte, vulnérabilités rattachées par `affects`). Aucun constat : le SBOM
-    se lit, il ne juge rien."""
+    le document en porte, vulnérabilités rattachées par `affects`). Le SBOM ne juge rien, sauf
+    une exigence du fichier absente du SBOM (marqueur d'environnement faux sur le runner,
+    que pip-audit saute sans le dire) : constat `unscanned_file`, un vert ne prouverait rien."""
     data = _json_dict(text, "pip-audit (SBOM)")
     components = data.get("components", [])
     vulns = data.get("vulnerabilities", [])
@@ -307,6 +325,22 @@ def parse_cyclonedx_json(text: str, tree: Path) -> list[SbomComponent]:
                 line=lines.get(_pkg(name)),
             )
         )
+    listed = {_pkg(c.name) for c in found}
+    for name, line in _required_names(tree).items():
+        if name not in listed:
+            found.append(
+                Finding(
+                    rule_id=UNSCANNED_RULE,
+                    severity="error",
+                    message_text=_short(
+                        f"pip-audit n'a pas audité l'exigence {name} (ligne {line}), absente du "
+                        "SBOM : un marqueur d'environnement l'écarte peut-être sur ce runner. Une "
+                        "dépendance non auditée ne prouve pas qu'elle est sûre."
+                    ),
+                    path=REQUIREMENTS_FILE,
+                    line=line,
+                )
+            )
     return found
 
 

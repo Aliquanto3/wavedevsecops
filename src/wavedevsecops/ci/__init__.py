@@ -416,7 +416,19 @@ def run_job(
             )
             if stopped:
                 return JobResult(job.job_id, "error", interrupted=True)
-            if found is None and state == "failure" and run.parse != "cyclonedx_json":
+            if found is None and run.parse == "cyclonedx_json":
+                # SBOM expiré ou illisible : sans lui, un vert ne prouverait rien.
+                findings.append(
+                    Finding(
+                        rule_id=UNSCANNED_RULE,
+                        severity="error",
+                        message_text=(
+                            f"Le SBOM de {job.tool} n'a pas pu être produit ou lu : "
+                            "les dépendances ne sont pas prouvées sûres."
+                        ),
+                    )
+                )
+            elif found is None and state == "failure":
                 findings.append(
                     Finding(
                         rule_id=NO_DETAIL_RULE,

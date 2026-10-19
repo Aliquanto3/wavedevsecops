@@ -44,3 +44,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 8.3 » ; F
 1. Pousser `feature`, ouvrir la PR : `pip_audit` passe à « Échec · Obligatoire », le détail nomme jinja2 3.1.2, `PYSEC-2026-1471` (et ses alias) et cite « Base embarquée, figée au 2026-10-18 » ; « Merger » est inactif.
 2. « Voir le SBOM » : la ligne jinja2 3.1.2 est sur fond rouge clair avec ✗ et ses identifiants, liée à `requirements.txt`, `pyproject.toml` et au check ; la désigner puis valider.
 3. Passer jinja2 à `3.1.6` dans les deux fichiers, committer, pousser : le check repasse au vert et le SBOM garde jinja2 3.1.6 sans ✗.
+
+## Revue
+
+Revue Opus du 2026-10-19, après rebase sur `origin/main` (5.8 ; `content/fingerprints.json` régénéré, stable sur deux passes).
+
+- High · second avis 1 · corrigé : `create_app` construisait `WorkspaceManager(settings)` sans `osv_url` ; dans l'application réelle, `{osv_url}` manquait et pip_audit (requis) sortait en erreur, PR bloquée. `osv_url=settings.osv_url(port)` ; test par `create_app`.
+- High · revue · corrigé : les tests lents de `test_pipeline.py` (8 tests) cassés par le nouveau job : harnais sans `osv_url`, attente de 4 checks codée en dur, listes de jobs à 4. Harnais complété, pip-audit simulé par défaut (rapport et SBOM vides lisibles).
+- Medium · second avis 2 · corrigé : fingerprints régénérés après rebase.
+- Medium · second avis 3 · corrigé en partie : une exigence de `requirements.txt` absente du SBOM (marqueur d'environnement faux sur le runner, que pip-audit saute sans le dire) donne un constat `unscanned_file` dans `parse_cyclonedx_json`, donc un check rouge (tests unitaire et lent avec le vrai pip-audit). « Fichier vidé = vert » rejeté : le gabarit no_ai n'a aucune dépendance et doit rester vert ; l'étape `sbom_has` refuse déjà ce contournement (test lent existant).
+- Medium · second avis 4 · reporté (décision pour Anaël) : seul `requirements.txt` est audité, conformément à AR-23 (`-r requirements.txt`, `--no-deps`). Corriger seulement `requirements.txt` valide l'étape même si `pyproject.toml` garde 3.1.2 (`uv sync --frozen` ne le voit pas). L'étape est un `pr_state`, sans condition de contenu ; ajouter `tree.contains` au `pr_state` changerait un contrat partagé. Piste : un job `uv lock --check` ou une condition de contenu dans une story ultérieure.
+- Low · second avis 5 · corrigé : SBOM expiré ou illisible : constat `unscanned_file` au lieu d'un vert silencieux (test). Les doublures de `test_stations_pr.py` produisent désormais un SBOM lisible.
+- Low · second avis 6 · rejeté : les gabarits CI commentent déjà `{osv_url}` (« adresse du point OSV ; dans WaveDevSecOps : le point local ») ; ajouter l'URL publique d'OSV mettrait une URL externe dans le contenu sans gain.
+- Complexité : 0 constat (lecteurs linéaires sur le rapport et le fichier d'exigences ; aucune structure qui grossit par événement).

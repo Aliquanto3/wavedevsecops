@@ -510,3 +510,61 @@ def test_la_correction_ne_touche_pas_uv_lock_et_la_version_corrigee_y_est_deja(
     assert sorted(changed.stdout.split()) == ["pyproject.toml", "requirements.txt"]
     lock = tomllib.loads((layout.repo / "uv.lock").read_text("utf-8"))
     assert {p["name"]: p["version"] for p in lock["package"]}["jinja2"] == "3.1.6"
+
+
+# ------------------------------------------------------------------ revue
+def test_create_app_donne_le_point_osv_local_au_pipeline(tmp_path: Path) -> None:
+    """L'application réelle (pas le harnais de test) passe `{osv_url}` aux runners : sans lui,
+    pip_audit sortirait en erreur et toute PR resterait bloquée."""
+    from wavedevsecops.web.app import create_app
+
+    settings = Settings(data_dir=tmp_path)
+    app = create_app(port=4242, token="t", settings=settings)
+    try:
+        assert app.state.workspaces._osv_url == settings.osv_url(4242)
+    finally:
+        app.state.workspaces.close()
+
+
+def test_une_exigence_absente_du_sbom_est_un_constat_unscanned(tmp_path: Path) -> None:
+    """Un marqueur d'environnement faux sur le runner : pip-audit saute la ligne sans le dire."""
+    tree = _tree(tmp_path, '# x\nMarkupSafe==3.0.3  # ok\njinja2==3.1.2; sys_platform == "x"\n')
+    sbom = json.dumps({"components": [{"name": "markupsafe", "version": "3.0.3"}]})
+    markup, missing = parsers.parse_cyclonedx_json(sbom, tree)
+    assert isinstance(markup, SbomComponent)
+    assert (missing.rule_id, missing.path, missing.line) == (
+        parsers.UNSCANNED_RULE,
+        "requirements.txt",
+        3,
+    )
+    assert "jinja2" in missing.message_text
+
+
+def test_un_sbom_illisible_ne_donne_pas_un_vert(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sortie humaine verte, SBOM vide : le check n'est pas vert (rien ne prouve l'audit)."""
+
+    def collect(handle):  # noqa: ANN001, ANN202
+        return procs.ProcResult(returncode=0)
+
+    class _Handle:
+        interrupted = False
+
+    monkeypatch.setattr(ci, "_spawn", lambda *a, **k: (_Handle(), ""))
+    monkeypatch.setattr(toolrun, "collect", collect)
+    result = _run(_tree(tmp_path), "http://127.0.0.1:1/osv/v1/query", tmp_path)
+    assert result.state == "failure" and result.sbom == []
+    assert [f.rule_id for f in result.findings] == [parsers.UNSCANNED_RULE]
+
+
+@pytest.mark.slow
+def test_le_vrai_pip_audit_avec_marqueur_faux_ne_donne_pas_un_vert(
+    tmp_path: Path, osv_url: str, real_pip_audit: None
+) -> None:
+    (tmp_path / "requirements.txt").write_text(
+        'jinja2==3.1.2; sys_platform == "aucune-plateforme"\n', "utf-8"
+    )
+    result = _run(tmp_path, osv_url, tmp_path)
+    assert result.state == "failure"
+    assert parsers.UNSCANNED_RULE in {f.rule_id for f in result.findings}
