@@ -164,3 +164,26 @@
 .explain-links li {
   margin-top: var(--space-1);
 }
+
+/* --- glossary-term : terme du vocabulaire cité dans une explication (Story 9.4) ------------- */
+.glossary-term {
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--stroke-min) dotted var(--color-primary);
+  cursor: pointer;
+}
+
+.glossary-barrier {
+  margin-top: var(--space-2);
+}
+
+.glossary-barrier p {
+  margin: 0 0 var(--space-1);
+}
+
+.glossary-barrier-play.is-soon {
+  color: var(--color-ink-soft);
+}

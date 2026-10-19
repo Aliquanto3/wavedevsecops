@@ -3,6 +3,7 @@ import { setOffline } from "./actions.js";
 import { loadCatalogue, openMode, renderCatalogue, workspacePath } from "./catalogue.js";
 import { renderBadge, refreshBadge, renderDiagnosticPage } from "./diagnostic.js";
 import { initDisplayMenu } from "./display.js";
+import { loadGlossary, renderVocabulary } from "./glossary.js";
 import { STOPPED_MESSAGE, watchHealth } from "./health.js";
 import { currentSurface, renderNav } from "./nav.js";
 import { renderReportEntry } from "./report.js";
@@ -133,6 +134,9 @@ async function start() {
   if (workspace) {
     if (badgeLink) refreshBadge(badgeLink);
     await showWorkspace(container, decodeURIComponent(workspace[1]));
+  } else if (current && current.key === "vocabulaire") {
+    if (badgeLink) refreshBadge(badgeLink);
+    renderVocabulary(container, await loadGlossary());
   } else if (current && current.key === "diagnostic") {
     await renderDiagnosticPage(container, {
       onReport: (report) => badgeLink && renderBadge(badgeLink, report),

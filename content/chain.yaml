@@ -65,6 +65,16 @@ stations:
         links:
           - {kind: check, label: "Couverture du diff"}
           - {kind: term, label: "Couverture"}
+      - id: human-review
+        label: "Revue par un tiers"
+        links:
+          - {kind: check, label: "Revue approuvée"}
+          - {kind: term, label: "Quatre yeux"}
+      - id: branch-protection
+        label: "Branche principale protégée"
+        links:
+          - {kind: check, label: "Checks requis avant la fusion"}
+          - {kind: term, label: "Protection de branche"}
   - number: 3
     name: "Sécurité et qualité"
     description: "L'analyse du code et des dépendances."
