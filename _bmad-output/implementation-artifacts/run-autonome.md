@@ -365,6 +365,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 03:04 · 2.9 · review · rebase sans conflit, M1 (écriture pendant la suspension retenue et proposée), M2 (mesure stricte des 2 s ; cause : mtime à la seconde en polling), L4-L7 corrigés ; L3 reporté, L8 écarté ; 1151 passed, CI branche verte · 58a1fa7
 - 2026-10-19 03:04 · — · décision pour Anaël · 2.9 : message « fichier supprimé sur le disque » ? effacement de la notice après enregistrement ou commande ? · —
 - 2026-10-19 03:04 · 2.9 · fusion · empilée sur 6.5 sans conflit, branche poussée, suite complète du sommet et CI en cours · —
+- 2026-10-19 03:05 · 6.5 · fusion · CI branche verte sur 6 jobs, commit de fusion sur main, story done · c089c65
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

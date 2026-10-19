@@ -93,7 +93,7 @@ development_status:
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: review
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
-  6-5-exporter-mon-rapport-de-progression: review
+  6-5-exporter-mon-rapport-de-progression: done
   6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: done
   6-7-publier-la-release-v0-1-0-et-la-faire-tester-par-deux-collèg: backlog
   epic-6-retrospective: optional
