@@ -36,6 +36,7 @@ from wavedevsecops.engine import (
     resolve_git,
 )
 from wavedevsecops.engine.runfile import load_run
+from wavedevsecops.events import Stream
 from wavedevsecops.scenarios import load_scenario
 from wavedevsecops.scenarios.steps.push_refused import REFUSED_KEY
 from wavedevsecops.terminal import files, tools
@@ -62,6 +63,10 @@ AFTER_COMMAND_HOOKS: list[AfterCommand] = []
 
 class TerminalLine(BaseModel):
     line: str = Field(max_length=2000)
+    confirmed: bool = False
+    """Vrai quand l'apprenant a confirmé une commande qui efface tout le bac à sable."""
+    cancelled: bool = False
+    """Vrai quand l'apprenant a annulé cette confirmation : rien ne s'exécute."""
 
 
 def _refused_operation(text: str) -> Operation:
@@ -69,6 +74,17 @@ def _refused_operation(text: str) -> Operation:
         hints.settle(ctx)  # une commande tapée, même refusée, est un essai (story 4.6)
         ctx.output(text, "refused")
         return EXIT_REFUSED
+
+    return Operation(INTENT, body, writes=False, validate=False)
+
+
+def _notice_operation(text: str, stream: Stream) -> Operation:
+    """Message sans exécution : la confirmation demandée, ou l'annulation."""
+
+    def body(ctx: OpContext) -> int:
+        hints.settle(ctx)  # la commande tapée est un essai, même en attente de confirmation
+        ctx.output(text, stream)
+        return 0
 
     return Operation(INTENT, body, writes=False, validate=False)
 
@@ -342,6 +358,10 @@ def build_terminal_line(engine: WorkspaceEngine, body: TerminalLine) -> Operatio
             writes=command.write,
         )
     if isinstance(command, FileCommand):
+        if files.clears_root(command) and body.cancelled:
+            return _notice_operation(allow.message("file_confirm_cancelled"), "app")
+        if files.clears_root(command) and not body.confirmed:
+            return _notice_operation(allow.message("file_confirm_root"), "confirm")
         return Operation(
             INTENT, lambda ctx: _run_file(ctx, command, allow), writes=not command.read
         )

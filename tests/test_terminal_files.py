@@ -10,7 +10,8 @@ from test_terminal import Space, settings, space  # noqa: F401  (fixtures)
 
 from wavedevsecops import wsfs
 from wavedevsecops.config import Settings
-from wavedevsecops.terminal import files
+from wavedevsecops.events import Kind
+from wavedevsecops.terminal import TerminalLine, build_terminal_line, files
 from wavedevsecops.terminal.allowlist import get_allowlist
 from wavedevsecops.terminal.parse import FileCommand, Refused, parse_line
 
@@ -423,3 +424,73 @@ def test_refus_de_chemin_et_code_de_sortie_par_le_terminal(space: Space) -> None
     failed = space.run("cat absent.txt")
     assert failed.code == 1 and failed.streams == ["app", "exit"]
     assert "Code de sortie : 1" in failed.text("exit")
+
+
+# --- confirmation d'un `rm` qui vide le bac à sable (arbitrage 2.5) --------------------------
+
+
+@pytest.mark.parametrize(
+    ("line", "clears"),
+    [
+        ("rm -rf *", True),
+        ("rm -rf .", True),
+        ("rm -rf ./*", True),
+        ("rm -r ./", True),
+        ("rm -R *", True),
+        ("rm -rf build", False),
+        ("rm -rf src/*", False),
+        ("rm *", False),  # sans -r, les dossiers restent
+        ("rm -f note.txt", False),
+        ("ls", False),
+    ],
+)
+def test_clears_root_reconnait_les_commandes_qui_vident_la_racine(line: str, clears: bool) -> None:
+    command = parse_line(line, ALLOW)
+    assert isinstance(command, FileCommand)
+    assert files.clears_root(command) is clears
+
+
+def test_rm_r_point_vide_la_racine_comme_etoile_sans_toucher_git(root: Path) -> None:
+    sh(root, "mkdir -p d")
+    sh(root, "touch d/a.txt b.txt .env")
+    assert sh(root, "rm -rf .").code == 0
+    assert sorted(p.name for p in root.iterdir()) == [".git"]
+    assert (root / ".git" / "config").read_text(encoding="utf-8") == "SECRET-GIT"
+
+
+def _outputs(sp: Space, line: str, **flags: bool) -> tuple[int, list[tuple[str, str]]]:
+    op = build_terminal_line(sp.engine, TerminalLine(line=line, **flags))
+    code = sp.engine.submit(op).result(60.0).code
+    shown = [
+        (e.payload["stream"], e.payload["text"])
+        for e in sp.events
+        if e.kind == Kind.TERMINAL_OUTPUT and e.op_id == op.op_id
+    ]
+    return code, shown
+
+
+@pytest.mark.slow
+def test_rm_rf_etoile_demande_une_confirmation_avant_d_effacer(space: Space) -> None:  # noqa: F811
+    assert space.run("echo x > keep.txt").code == 0
+    for line in ("rm -rf *", "rm -rf .", "rm -rf ./*"):
+        code, shown = _outputs(space, line)
+        assert code == 0 and [s for s, _ in shown] == ["confirm"], line
+        assert "efface tout le bac à sable" in shown[0][1]
+        assert "Recommencer le scénario le reconstruit" in shown[0][1]
+        assert (space.layout.repo / "keep.txt").exists(), line  # rien n'a été effacé
+    # Annulation : message, rien d'effacé.
+    code, shown = _outputs(space, "rm -rf *", cancelled=True)
+    assert [s for s, _ in shown] == ["app"] and "annulée" in shown[0][1]
+    assert (space.layout.repo / "keep.txt").exists()
+    # Confirmation : la commande s'exécute.
+    code, shown = _outputs(space, "rm -rf *", confirmed=True)
+    assert code == 0
+    assert not (space.layout.repo / "keep.txt").exists()
+    assert (space.layout.repo / ".git").is_dir()
+
+
+@pytest.mark.slow
+def test_rm_ordinaire_ne_demande_pas_de_confirmation(space: Space) -> None:  # noqa: F811
+    assert space.run("echo x > a.txt").code == 0
+    assert space.run("rm -rf a.txt").code == 0
+    assert not (space.layout.repo / "a.txt").exists()

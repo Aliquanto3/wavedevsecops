@@ -144,6 +144,44 @@ console.log(JSON.stringify({
     assert out["value"] == ""
 
 
+def test_confirmation_en_ligne_d_une_commande_qui_efface_le_bac_a_sable(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+type("rm -rf *");
+key("Enter");
+await flush();
+out("confirm", "Cette commande efface tout le bac à sable. Recommencer le scénario le reconstruit.");
+const card = $(".terminal-confirm");
+const shown = { text: card.querySelector(".terminal-confirm-text").textContent, role: card.getAttribute("role"),
+  buttons: [...card.querySelectorAll("button")].map((b) => [b.textContent, b.getAttribute("data-action")]) };
+$('[data-action="terminal-confirm"]').click();
+await flush();
+const afterConfirm = { buttons: $$(".terminal-confirm button").length };
+type("rm -rf .");
+key("Enter");
+await flush();
+out("confirm", "Texte du serveur.");
+$$('[data-action="terminal-cancel"]')[0].click();
+await flush();
+console.log(JSON.stringify({ shown, afterConfirm, bodies: calls.map((c) => c.body) }));
+""",
+    )
+    assert out["shown"]["text"].startswith("Cette commande efface tout le bac à sable")
+    assert out["shown"]["role"] == "group"
+    assert out["shown"]["buttons"] == [
+        ["Annuler", "terminal-cancel"],
+        ["Tout effacer", "terminal-confirm"],
+    ]
+    assert out["afterConfirm"] == {"buttons": 0}  # une seule réponse par demande
+    assert out["bodies"] == [
+        {"line": "rm -rf *"},
+        {"line": "rm -rf *", "confirmed": True},
+        {"line": "rm -rf ."},
+        {"line": "rm -rf .", "cancelled": True},
+    ]
+
+
 def test_ctrl_l_efface_l_affichage_pas_l_historique(tmp_path: Path) -> None:
     out = _js(
         tmp_path,

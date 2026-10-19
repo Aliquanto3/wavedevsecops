@@ -56,9 +56,10 @@ SEQUENCE_KINDS = frozenset(
 EngineStateName = Literal["idle", "command", "quiz_altered", "restoring", "setup", "exporting"]
 """États d'un espace (AD-1)."""
 
-Stream = Literal["stdout", "stderr", "app", "refused", "exit", "input"]
+Stream = Literal["stdout", "stderr", "app", "refused", "exit", "input", "confirm"]
 """Flux d'une sortie de terminal ; `exit` porte le code de sortie non nul (texte du serveur) ;
-`input` répète la commande lancée par le serveur à la place de l'apprenant (choix de quiz)."""
+`input` répète la commande lancée par le serveur à la place de l'apprenant (choix de quiz) ;
+`confirm` demande une confirmation en ligne avant une commande qui efface tout le bac à sable."""
 
 
 class _Payload(BaseModel):

@@ -364,6 +364,44 @@ console.log(JSON.stringify({ hovered, opened, closed, fetched: calls.filter((c) 
     assert out["fetched"] == 1
 
 
+def test_le_i_d_une_etiquette_de_ref_est_a_cote_d_elle_hors_du_bouton_du_commit(
+    tmp_path: Path, snaps: dict
+) -> None:
+    """Arbitrage 2.10 : pas de bouton dans un bouton ; le « i » suit l'étiquette, au clavier aussi."""
+    out = _js(
+        tmp_path,
+        snaps,
+        """
+const pills = $$(".graph-row [data-ref]");
+const first = pills[0];
+const trigger = first.nextElementSibling;
+const rowButton = first.closest(".graph-row").querySelector("button.graph-node");
+const info = {
+  pills: pills.length,
+  insideButton: pills.filter((p) => p.closest("button")).length,
+  nested: $$("button button").length,
+  isTrigger: trigger.classList.contains("explain-trigger"),
+  forId: trigger.getAttribute("data-explain-for") === first.getAttribute("data-ref"),
+  outsideRowButton: !rowButton.contains(trigger),
+  tag: trigger.tagName,
+  tabindex: trigger.getAttribute("tabindex"),
+  label: trigger.getAttribute("aria-label"),
+  triggers: pills.filter((p) => p.nextElementSibling?.classList.contains("explain-trigger")).length,
+};
+trigger.click();
+await flush();
+info.opened = $$(".explain-popover").length;
+info.key = $(".explain-popover").getAttribute("data-explain-ref");
+console.log(JSON.stringify(info));
+""",
+    )
+    assert out["pills"] >= 1 and out["insideButton"] == 0 and out["nested"] == 0
+    assert out["isTrigger"] and out["forId"] and out["outsideRowButton"]
+    assert out["tag"] == "BUTTON" and out["label"].startswith("Expliquer ")
+    assert out["triggers"] == out["pills"]
+    assert out["opened"] == 1 and out["key"].startswith("graph.")
+
+
 def test_le_popover_liste_les_elements_lies_et_un_choix_les_selectionne(
     tmp_path: Path, snaps: dict
 ) -> None:

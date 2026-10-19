@@ -70,11 +70,15 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
   function decorate() {
     if (current && !current.trigger.isConnected) close(false);
     for (const node of nodesOf()) {
-      if (decorated.has(node) || !node.hasAttribute("data-element-id") || !explainable(node)) continue;
-      const key = keyOf(node);
+      // Étiquette de ref du graphe : posée à côté du bouton du commit (jamais dedans), son « i »
+      // la suit en ligne.
+      const pill = !node.hasAttribute("data-element-id") && node.hasAttribute("data-ref");
+      if (decorated.has(node)) continue;
+      if (pill ? node.closest("button") : !node.hasAttribute("data-element-id") || !explainable(node)) continue;
+      const id = pill ? node.getAttribute("data-ref") : node.getAttribute("data-element-id");
+      const key = pill ? linking.explainOf(id) || "" : keyOf(node);
       if (!key) continue;
       decorated.add(node);
-      const id = node.getAttribute("data-element-id");
       const button = el("button", "explain-trigger", {
         type: "button",
         tabindex: "-1",
@@ -90,7 +94,10 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
         if (current && current.trigger === button) close(true);
         else open(button);
       });
-      if (node.classList.contains("tool-output")) {
+      if (pill) {
+        button.classList.add("explain-inline");
+        node.after(button);
+      } else if (node.classList.contains("tool-output")) {
         node.classList.add("explain-host");
         node.prepend(button);
       } else {

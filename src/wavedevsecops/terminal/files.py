@@ -38,6 +38,23 @@ class FileResult:
         self.code = max(self.code, EXIT_REFUSED if refused else EXIT_FAILED)
 
 
+def _parts(arg: str) -> list[str]:
+    return [part for part in arg.split("/") if part not in ("", ".")]
+
+
+def _is_root(arg: str) -> bool:
+    """Vrai pour `.`, `./`, `./.` : la racine du bac à sable elle-même."""
+    return arg != "" and not _parts(arg) and not arg.startswith("/")
+
+
+def clears_root(command: FileCommand) -> bool:
+    """Vrai pour un `rm` récursif qui vide la racine du bac à sable (`*`, `.`, `./*`) : la
+    commande demande alors une confirmation avant de s'exécuter."""
+    if command.name != "rm" or not command.options & {"-r", "-R"}:
+        return False
+    return any(_is_root(arg) or _parts(arg) == ["*"] for arg in command.args)
+
+
 def _check(path: str) -> str:
     """Refuse d'emblée un chemin non portable ou hors de l'espace, lectures comprises."""
     wsfs.check_relative(path, portable=True)
@@ -192,7 +209,11 @@ def execute(root: Path, command: FileCommand, allow: Allowlist) -> FileResult:
     elif name == "rm":
         recursive = bool(command.options & {"-r", "-R"})
         force = "-f" in command.options
-        paths = _expand(root, result, allow, command, list(command.args))
+        # `rm -r .` vide la racine comme `rm -r *` ; `.git` n'est jamais pris (wsfs).
+        paths = _expand(root, result, allow, command, [a for a in command.args if not _is_root(a)])
+        if any(_is_root(a) for a in command.args):
+            for pattern in ("*", ".*"):
+                paths.extend(wsfs.expand_glob(root, pattern))
 
         def remove(path: str) -> None:
             try:

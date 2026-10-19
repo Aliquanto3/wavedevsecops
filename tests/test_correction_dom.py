@@ -250,12 +250,13 @@ corr.slots[0].accepted_element_ids = [REF];
 answer(store, corr);
 const node = () => $$(".graph-node").find((n) => n.getAttribute("data-element-id").includes("aaa"));
 const marked = node().getAttribute("aria-label");
-const pill = node().querySelector(".graph-branch").textContent;
+const pill = node().parentElement.querySelector(".graph-branch").textContent; // à côté du bouton du commit
 $('[data-action="continue"]').click();
 console.log(JSON.stringify({ marked, pill, after: node().getAttribute("aria-label") }));
 """,
     )
-    assert out["marked"] == "Commit aaaaaaa — main : ✓ Attendu"
+    # L'étiquette n'est plus dans le bouton du commit : sa marque est dans son propre texte.
+    assert out["marked"] == "Commit aaaaaaa"
     assert out["pill"].endswith("✓ Attendu")
     assert out["after"] == "Commit aaaaaaa"
 

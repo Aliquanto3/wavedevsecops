@@ -116,8 +116,36 @@ function toolOutputNode(entry, selection) {
   return block;
 }
 
-function entryNode(entry, selection) {
+export const CONFIRM_LABEL = "Tout effacer";
+export const CANCEL_LABEL = "Annuler";
+
+/** Confirmation en ligne d'une commande qui efface tout le bac à sable : le texte vient du serveur. */
+function confirmNode(entry, choose) {
+  const group = el("div", "terminal-line terminal-confirm", {
+    role: "group",
+    "data-zone": "terminal-confirm",
+  });
+  const text = el("p", "terminal-confirm-text");
+  text.textContent = entry.text;
+  const actions = el("div", "terminal-confirm-actions");
+  const cancel = el("button", "btn btn-secondary", { type: "button", "data-action": "terminal-cancel" });
+  cancel.textContent = CANCEL_LABEL;
+  const confirm = el("button", "btn btn-primary", { type: "button", "data-action": "terminal-confirm" });
+  confirm.textContent = CONFIRM_LABEL;
+  const settle = (confirmed) => {
+    actions.remove(); // une seule réponse par demande
+    choose(confirmed);
+  };
+  cancel.addEventListener("click", () => settle(false));
+  confirm.addEventListener("click", () => settle(true));
+  actions.append(cancel, confirm);
+  group.append(text, actions);
+  return group;
+}
+
+function entryNode(entry, selection, choose) {
   if (entry.tool) return toolOutputNode(entry, selection);
+  if (entry.kind === "confirm") return confirmNode(entry, choose);
   if (entry.kind === "input") {
     const line = el("div", "terminal-line terminal-command");
     const prompt = el("span", "terminal-prompt");
@@ -222,9 +250,24 @@ export function createTerminal(body, { store, timers = globalThis }) {
     store.terminalAppend({ kind: "refused", text });
   }
 
+  let lastLine = ""; // la ligne en attente d'une confirmation en ligne
+
+  async function choose(confirmed, line) {
+    if (!line || isBusy(store.state)) return;
+    const payload = confirmed ? { line, confirmed: true } : { line, cancelled: true };
+    try {
+      const response = await post("terminal_line", payload);
+      if (!response.ok) await refusal(response);
+    } catch (err) {
+      store.terminalAppend({ kind: "refused", text: OFFLINE_TEXT });
+    }
+    input.focus?.();
+  }
+
   async function submit(line) {
     const text = line.trim();
     if (!text) return;
+    lastLine = text;
     if (history[history.length - 1] !== text) history.push(text);
     if (history.length > HISTORY_MAX) history.shift();
     historyIndex = null;
@@ -332,7 +375,8 @@ export function createTerminal(body, { store, timers = globalThis }) {
     let added = false;
     for (let index = Math.max(rendered, cleared); index < terminal.entries.length; index += 1) {
       const entry = terminal.entries[index];
-      const node = entryNode(entry, selection);
+      const asked = lastLine;
+      const node = entryNode(entry, selection, (confirmed) => choose(confirmed, asked));
       const lines = countLines(entry.text);
       log.append(node);
       nodes.push({ node, lines });
