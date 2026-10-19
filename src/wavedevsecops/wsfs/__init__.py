@@ -197,6 +197,14 @@ def write_text(root: Path, path: str, text: str) -> Path:
     return target
 
 
+def write_executable(root: Path, path: str, text: str) -> Path:
+    """Comme `write_text`, avec le bit d'exécution (un hook git doit être exécutable ; sans
+    effet sous Windows, où git lance le script par son `#!`)."""
+    target = write_text(root, path, text)
+    target.chmod(0o755)
+    return target
+
+
 def read_bytes(root: Path, path: str) -> bytes | None:
     """Contenu de `root/path`, ou `None` s'il n'existe pas ou n'est pas un fichier."""
     target = confine(root, path, portable=False)

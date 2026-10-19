@@ -8,7 +8,8 @@ Empreinte : sha256 d'une sérialisation triée de l'état de l'espace :
 - chemin et contenu (sha256) de chaque fichier suivi ou non ignoré de l'arbre de travail
   (un lien symbolique vaut sa cible écrite : il n'est jamais suivi) ;
 - liste ordonnée du stash ;
-- chemin et contenu de chaque fichier de `hooks/` ;
+- chemin et contenu de chaque fichier de `hooks/`, sans le chemin de l'interpréteur
+  (`hooks.canonical_script`) ;
 - `github.json` sérialisé de façon canonique, sans `checks[].output`, durées ni horodatages
   (`github_sim.canonical_digest`, son seul propriétaire).
 
@@ -26,6 +27,7 @@ from pathlib import Path
 from wavedevsecops import github_sim, gitio, wsfs
 from wavedevsecops.config import Settings, get_settings
 from wavedevsecops.gitio import Git
+from wavedevsecops.hooks import canonical_script
 from wavedevsecops.wsfs import Layout
 
 FINGERPRINTS_SCHEMA_VERSION = 1
@@ -49,7 +51,9 @@ def canonical_records(layout: Layout, git: Git) -> list[str]:
     for position, sha in enumerate(gitio.stash_list(git, layout.repo)):
         records.append(f"repo stash {position} {sha}")
     for rel in wsfs.iter_files(layout.hooks):
-        records.append(f"hooks {rel} {_digest(wsfs.read_entry(layout.hooks, rel))}")
+        # Sans le chemin de Python du poste : la référence d'AD-18 vaut sur les trois systèmes.
+        data = wsfs.read_entry(layout.hooks, rel)
+        records.append(f"hooks {rel} {_digest(None if data is None else canonical_script(data))}")
     records.append(f"github {github_sim.canonical_digest(layout) or 'absent'}")
     return sorted(records)
 

@@ -67,6 +67,7 @@ messages:
   missing_message: "git attend un message de commit. Ajoutez `-m \"…\"`."
   timeout: "La commande a dépassé {seconds} s : elle a été arrêtée."
   interrupted: "Commande interrompue."
+  protected_branch: "Refusé par la protection de `{branch}` : tout passe par une PR."
 
 # Options qu'aucune ligne n'obtient en dehors de la liste d'une sous-commande
 # (le refus les nomme « interdites » plutôt qu'« absentes de la liste »).

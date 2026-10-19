@@ -456,6 +456,18 @@ def set_protection(git: Git, layout: Layout, protection: BranchProtection) -> Re
     return _commit(git, layout, state.model_copy(update={"protections": protections}), force=True)
 
 
+def direct_push_blocked(layout: Layout, branch: str) -> bool:
+    """Vrai si `branch` est protégée avec `block_direct_push` (lu par le hook `pre-receive`).
+
+    Un `github.json` absent, illisible ou invalide ne bloque rien : le hook ne doit pas
+    empêcher l'apprenant de travailler sur un état qu'il ne sait pas lire."""
+    try:
+        state = load(layout)
+    except GithubSimError:
+        return False
+    return any(p.branch == branch and p.block_direct_push for p in state.protections)
+
+
 def add_reaction(
     layout: Layout,
     trigger: ReactionTrigger,
@@ -755,6 +767,7 @@ __all__ = [
     "merge_message",
     "merge_pr",
     "canonical_digest",
+    "direct_push_blocked",
     "evaluate",
     "has_conflict",
     "init",
