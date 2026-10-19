@@ -37,6 +37,7 @@ from wavedevsecops.engine import (
 )
 from wavedevsecops.engine.runfile import load_run
 from wavedevsecops.scenarios import load_scenario
+from wavedevsecops.scenarios.steps.push_refused import REFUSED_KEY
 from wavedevsecops.terminal import files, tools
 from wavedevsecops.terminal.allowlist import Allowlist, get_allowlist
 from wavedevsecops.terminal.parse import (
@@ -264,6 +265,10 @@ def _reaches_hook(
     return ancestor.ok
 
 
+PROTECTION_BARRIER = "protection"
+"""Barrière de `content/chain.yaml` que prouve le refus d'un push direct (story 7.5)."""
+
+
 def _explain_protection(
     ctx: OpContext, tool: gitio.Git, command: GitCommand, allow: Allowlist
 ) -> None:
@@ -277,6 +282,8 @@ def _explain_protection(
             tool, ctx, command, source, branch
         ):
             ctx.output(allow.message("protected_branch", branch=branch), "app")
+            ctx.data[REFUSED_KEY] = branch  # valide l'étape « push direct refusé » (7.5)
+            ctx.submit_evidence(PROTECTION_BARRIER)  # la preuve de la protection s'affiche
             return
 
 

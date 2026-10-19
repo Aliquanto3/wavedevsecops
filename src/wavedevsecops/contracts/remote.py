@@ -124,6 +124,12 @@ class ReviewLog(_Model):
     """« Approbations : 1 sur 2 »."""
     required_text: str = ""
     """« 2 approbations requises » ou « Aucune approbation requise »."""
+    can_request: bool = False
+    """Une réaction du collègue attend qu'on lui demande la revue (« Demander une revue », 7.5)."""
+    request_enabled: bool = False
+    """Les checks obligatoires sont verts : la demande est possible."""
+    request_disabled_text: str = ""
+    """Pourquoi « Demander une revue » est inactif."""
 
 
 class MergeReason(_Model):

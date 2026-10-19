@@ -370,17 +370,31 @@ def _recompute(git: Git, layout: Layout, state: GithubState) -> RefreshResult:
 # --- Réactions du collègue simulé ---------------------------------------------------------------
 
 
-def _checks_green(pr: PullRequest) -> bool:
+def checks_green(pr: PullRequest) -> bool:
     """Vrai si la PR a au moins un check obligatoire et que tous sont `success` (SHA courants :
     un changement de SHA les a remis à `queued`)."""
     required = [c for c in pr.checks if c.required]
     return bool(required) and all(c.state == "success" for c in required)
 
 
-def _react(state: GithubState, opened: int | None) -> tuple[GithubState, list[int]]:
+def pending_request(state: GithubState, pr: PullRequest) -> bool:
+    """Vrai si une réaction `review_requested` attend la demande de revue de cette PR ouverte
+    (pas encore jouée pour son `head_sha`)."""
+    return pr.state == "open" and any(
+        r.trigger == "review_requested"
+        and r.head in (None, pr.head)
+        and not any(f.number == pr.number and f.head_sha == pr.head_sha for f in r.fired)
+        for r in state.reactions
+    )
+
+
+def _react(
+    state: GithubState, opened: int | None, requested: int | None = None
+) -> tuple[GithubState, list[int]]:
     """Joue les réactions dues : revues ajoutées dans l'ordre, une seule fois par déclencheur.
 
-    `opened` : numéro de la PR qui vient d'être ouverte (déclencheur `pr_opened`). Rend l'état
+    `opened` : numéro de la PR qui vient d'être ouverte (déclencheur `pr_opened`) ; `requested` :
+    numéro de la PR dont l'apprenant demande la revue (`review_requested`). Rend l'état
     et les numéros de PR modifiées ; ne recalcule pas les approbations (l'appelant le fait)."""
     pulls = {p.number: p for p in state.pulls}
     reactions = []
@@ -391,7 +405,11 @@ def _react(state: GithubState, opened: int | None) -> tuple[GithubState, list[in
             if pr.state != "open" or reaction.head not in (None, pr.head):
                 continue
             on_open = reaction.trigger == "pr_opened"
-            if not (number == opened if on_open else _checks_green(pr)):
+            if reaction.trigger == "review_requested":
+                due = number == requested and checks_green(pr)
+            else:
+                due = number == opened if on_open else checks_green(pr)
+            if not due:
                 continue
             if any(f.number == number and (on_open or f.head_sha == pr.head_sha) for f in fired):
                 continue
@@ -424,11 +442,12 @@ def _commit(
     *,
     force: bool = False,
     opened: int | None = None,
+    requested: int | None = None,
 ) -> RefreshResult:
-    """Recalcule, joue les réactions dues (ouverture, checks verts), puis écrit, en une seule
-    écriture atomique."""
+    """Recalcule, joue les réactions dues (ouverture, checks verts, revue demandée), puis écrit,
+    en une seule écriture atomique."""
     result = _recompute(git, layout, state)
-    reacted, touched = _react(result.state, opened)
+    reacted, touched = _react(result.state, opened, requested)
     if touched:
         again = _recompute(git, layout, reacted)
         updated = sorted(set(result.updated) | set(touched) | set(again.updated))
@@ -458,6 +477,28 @@ def set_protection(git: Git, layout: Layout, protection: BranchProtection) -> Re
     others = [p for p in state.protections if p.branch != protection.branch]
     protections = sorted([*others, protection], key=lambda p: p.branch)
     return _commit(git, layout, state.model_copy(update={"protections": protections}), force=True)
+
+
+def request_review(git: Git, layout: Layout, number: int) -> RefreshResult:
+    """« Demander une revue » : la réaction `review_requested` de la PR joue si ses checks
+    obligatoires sont verts. Refus (`GithubSimError`) sinon : la relecture attend la CI."""
+    state = load(layout)
+    pr = state.pull(number)
+    if pr is None or pr.state != "open":
+        raise GithubSimError(
+            f"La PR n°{number} n'est pas ouverte.", "Ouvrez une PR depuis une branche poussée."
+        )
+    if not pending_request(state, pr):
+        raise GithubSimError(
+            f"Aucune revue n'est à demander pour la PR n°{number}.",
+            "Le collègue a déjà relu cette version, ou personne n'attend votre demande.",
+        )
+    if not checks_green(pr):
+        raise GithubSimError(
+            f"Les checks obligatoires de la PR n°{number} ne sont pas tous verts.",
+            "Le collègue relit une PR dont la CI passe : attendez les checks, puis redemandez.",
+        )
+    return _commit(git, layout, state, requested=number)
 
 
 def direct_push_blocked(layout: Layout, branch: str) -> bool:

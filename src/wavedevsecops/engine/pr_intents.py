@@ -162,11 +162,36 @@ def build_pr_merge(engine: WorkspaceEngine, body: PrMerge) -> Operation:
     return Operation("pr_merge", run)
 
 
+REVIEW_BARRIER = "review"
+"""Barrière de `content/chain.yaml` que prouve la revue obligatoire (story 7.5)."""
+
+
+def build_pr_request_review(engine: WorkspaceEngine, body: PrMerge) -> Operation:
+    """« Demander une revue » (story 7.5) : le collègue simulé relit quand les checks sont
+    verts. Sa revue entre dans le journal de la PR, preuve `evidence_seen` de la revue."""
+    del engine
+
+    def run(ctx: OpContext) -> int:
+        tool = _git(ctx.git_path, ctx.layout, ctx.settings)
+        try:
+            result = github_sim.request_review(tool, ctx.layout, body.number)
+        except GithubSimError as error:
+            _announce_all(ctx)
+            return _refuse(ctx, error)
+        ctx.output(f"Revue demandée pour la PR n°{body.number}.", "app")
+        announce(ctx, sorted({body.number, *result.updated}))
+        ctx.submit_evidence(REVIEW_BARRIER)
+        return 0
+
+    return Operation("pr_request_review", run)
+
+
 def register_intents() -> None:
-    """Enregistre `pr_open` et `pr_merge` (idempotent)."""
+    """Enregistre `pr_open`, `pr_merge` et `pr_request_review` (idempotent)."""
     for name, model, build in (
         ("pr_open", PrOpen, build_pr_open),
         ("pr_merge", PrMerge, build_pr_merge),
+        ("pr_request_review", PrMerge, build_pr_request_review),
     ):
         if name not in INTENTS:
             register_intent(Intent(name, model, build))

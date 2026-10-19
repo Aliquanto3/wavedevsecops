@@ -65,6 +65,16 @@ stations:
         links:
           - {kind: check, label: "Couverture du diff"}
           - {kind: term, label: "Couverture"}
+      - id: review
+        label: "Revue obligatoire"
+        links:
+          - {kind: check, label: "Approbations requises"}
+          - {kind: term, label: "Revue de code"}
+      - id: protection
+        label: "Protection de main"
+        links:
+          - {kind: hook, label: "pre-receive : push direct refusé"}
+          - {kind: term, label: "Protection de branche"}
   - number: 3
     name: "Sécurité et qualité"
     description: "L'analyse du code et des dépendances."

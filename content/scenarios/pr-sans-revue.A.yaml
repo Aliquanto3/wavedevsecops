@@ -1,0 +1,161 @@
+# Station 2 (Story 7.5) : des checks verts ne suffisent pas, la revue est obligatoire.
+# La branche `test-quantite` ajoute un test qui passe. `main` exige les trois checks et une
+# approbation : le collègue simulé relit quand l'apprenant lui demande la revue, checks verts.
+schema_version: 1
+scenario_id: pr-sans-revue
+mode: A
+title_text: Voir la revue obligatoire bloquer la PR
+section: stations
+station: 2
+tracks: [llm, no_ai]
+tools: [git, pytest]
+template: empty
+pipeline: true
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  - op: install_hooks
+  - op: set_protection
+    branch: main
+    required_approvals: 1
+    required_checks: [ruff, pytest, gitleaks]
+  - op: colleague_reaction
+    trigger: review_requested
+    head: test-quantite
+    author: colleague
+    reviews:
+      - state: commented
+        body_text: Merci d'avoir ajouté ce test, il est clair et couvre bien le retrait.
+      - state: approved
+        body_text: Je valide. Vous pouvez merger.
+  - op: switch
+    branch: test-quantite
+    create: true
+  - op: write_file
+    path: tests/test_quantite.py
+    content: |
+      from inventory import Stock
+
+
+      def test_retirer_la_quantite_demandee() -> None:
+          stock = Stock()
+          stock.add("vis", 10)
+          stock.remove("vis", 4)
+          assert stock.quantity("vis") == 6
+  - op: commit
+    message: Ajoute le test du retrait
+steps:
+  - step_id: pousser_la_branche
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      La branche `test-quantite` porte un commit qui ajoute un test. Poussez-la vers l'origine,
+      puis ouvrez la PR à l'étape suivante.
+    explanation_text: >-
+      Le pipeline et la revue se jouent sur la pull request : il lui faut d'abord la branche sur
+      l'origine.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/test-quantite
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `test-quantite`.
+      partial_text: git push -u ___ test-quantite
+      solution_text: git push -u origin test-quantite
+
+  - step_id: ouvrir_la_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `test-quantite` vers `main` avec le bouton « Ouvrir une PR »
+      de la vue « Distant + PR ». Le pipeline démarre aussitôt.
+    explanation_text: >-
+      La protection de `main` demande deux choses avant tout merge : des checks verts et une
+      approbation. Le pipeline s'occupe des premiers ; la seconde vient d'un relecteur.
+    explain_ref: graph.remote_ref
+    head: test-quantite
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/test-quantite"
+
+  - step_id: constater_la_revue_manquante
+    type: pr_state
+    title_text: Constater que les checks verts ne suffisent pas
+    instruction_text: >-
+      Attendez que les trois checks soient verts. « Merger » reste pourtant inactif : lisez la
+      raison affichée sous le bouton et le compteur d'approbations du journal de revue.
+    explanation_text: >-
+      Les checks vérifient le code, pas le regard d'une autre personne. La protection de `main`
+      exige aussi une approbation (le principe des quatre yeux) : tant qu'elle manque, le merge
+      reste bloqué, même avec une CI entièrement verte.
+    explain_ref: graph.remote_ref
+    head: test-quantite
+    base: main
+    pr_state: open
+    max_approvals: 0
+    check_states:
+      ruff: success
+      pytest: success
+      gitleaks: success
+    mergeable: false
+    hints:
+      lead_text: >-
+        Les checks tournent l'un après l'autre. Quand les trois portent la marque ✓, comparez
+        le bouton « Merger » et le compteur « Approbations » du journal de revue.
+      partial_text: "Vue « Distant + PR » : « Approbations : ___ sur 1 »"
+      solution_text: >-
+        Vue « Distant + PR » : « Approbations : 0 sur 1 » dans le journal de revue, et la
+        raison sous « Merger »
+
+  - step_id: demander_la_revue
+    type: pr_state
+    title_text: Demander la revue au collègue
+    instruction_text: >-
+      Demandez la revue au collègue avec le bouton du journal de revue de la PR, puis lisez sa
+      réponse : le compteur d'approbations et « Merger » changent.
+    explanation_text: >-
+      Une fois les checks verts, le collègue relit votre changement et l'approuve. L'approbation
+      lève le dernier blocage : vous ne pouvez pas l'écrire vous-même.
+    explain_ref: graph.remote_ref
+    head: test-quantite
+    base: main
+    pr_state: open
+    min_approvals: 1
+    mergeable: true
+    hints:
+      lead_text: >-
+        Le bouton se trouve dans le journal de revue de la PR, à côté du compteur
+        d'approbations.
+      partial_text: "Vue « Distant + PR » : bouton « ___ une revue » du journal de revue"
+      solution_text: "Vue « Distant + PR » : bouton « Demander une revue » du journal de revue"
+
+  - step_id: merger_la_pr
+    type: pr_state
+    title_text: Merger la pull request approuvée
+    instruction_text: >-
+      Checks verts, approbation reçue : mergez la PR avec le bouton « Merger » de la vue
+      « Distant + PR ».
+    explanation_text: >-
+      Le merge intègre `test-quantite` dans `main` sur l'origine. Il a fallu réunir les checks
+      verts et l'approbation demandés par la protection de `main`.
+    explain_ref: graph.remote_ref
+    head: test-quantite
+    base: main
+    pr_state: merged
+    min_approvals: 1
+    hints:
+      lead_text: >-
+        Plus aucune raison ne s'affiche sous le bouton : il est disponible.
+      partial_text: "Vue « Distant + PR » : bouton « ___ » de la PR"
+      solution_text: "Vue « Distant + PR » : bouton « Merger » de la PR"

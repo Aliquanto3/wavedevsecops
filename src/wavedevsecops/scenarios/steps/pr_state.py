@@ -15,6 +15,7 @@ from pydantic import Field
 
 from wavedevsecops import github_sim
 from wavedevsecops.contracts import RepoState
+from wavedevsecops.contracts.github import CheckState, PullRequest
 from wavedevsecops.scenarios.steps._base import StepArgs, StepContext, Verdict
 
 log = logging.getLogger("wavedevsecops")
@@ -29,6 +30,13 @@ class Args(StepArgs):
     """État attendu de la PR."""
     min_approvals: int = Field(default=0, ge=0)
     """Approbations au moins attendues."""
+    max_approvals: int | None = Field(default=None, ge=0)
+    """Approbations au plus attendues (0 : la revue manque encore)."""
+    check_states: dict[str, CheckState] = Field(default_factory=dict)
+    """État attendu de chaque check, par `job_id`, sur les SHA courants de la PR (un résultat
+    périmé ne compte pas : le push qui le remplace remet le check en attente)."""
+    mergeable: bool | None = None
+    """`True` : « Merger » est actif ; `False` : la PR est bloquée (`merge-blocked`)."""
 
 
 def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
@@ -47,6 +55,23 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
             and pr.base == step.base
             and pr.state == step.pr_state
             and pr.approvals >= step.min_approvals
+            and (step.max_approvals is None or pr.approvals <= step.max_approvals)
+            and (step.mergeable is None or pr.mergeable is step.mergeable)
+            and _checks_match(pr, step.check_states)
         ):
             return Verdict(status="passed")
     return Verdict(status="pending")
+
+
+def _checks_match(pr: PullRequest, wanted: dict[str, CheckState]) -> bool:
+    """Chaque check demandé existe, à l'état voulu, pour les SHA courants de la PR."""
+    checks = {c.job_id: c for c in pr.checks}
+    for job_id, state in wanted.items():
+        check = checks.get(job_id)
+        if (
+            check is None
+            or check.state != state
+            or (check.head_sha, check.base_sha) != (pr.head_sha, pr.base_sha)
+        ):
+            return False
+    return True
