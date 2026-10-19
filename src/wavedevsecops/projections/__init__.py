@@ -23,6 +23,7 @@ from wavedevsecops.contracts import (
 )
 from wavedevsecops.gitio import Git
 from wavedevsecops.projections.graph import Layout, place
+from wavedevsecops.projections.remote import announce_remote, build_remote, previous_remote
 from wavedevsecops.projections.spans import Linker
 from wavedevsecops.projections.state import read_repo_state
 from wavedevsecops.projections.views import (
@@ -93,6 +94,16 @@ def project(
         restored = restored | frozenset(c.sha for c in state.commits if c.sha not in known)
         previous = None
     views = build_views(state, previous, restored, previous_graph(previous_views))
+    branch = state.head.ref.removeprefix("refs/heads/")
+    remote = build_remote(git, layout, branch)
+    before = previous_remote(previous_views)
+    news = announce_remote(before, remote) if before is not None else ""
+    views = views.model_copy(
+        update={
+            "remote": remote,
+            "announce_text": f"{views.announce_text} {news}".strip(),
+        }
+    )
     return Projected(views, Linker(state))
 
 
