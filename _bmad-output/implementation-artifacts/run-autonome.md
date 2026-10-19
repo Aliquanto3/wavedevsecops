@@ -397,6 +397,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:34 · 6.2 · fusion · CI branche verte (run complet success), commit de fusion sur main, story done ; 6.3 éligible ; identifiants du socle toujours à valider par Anaël (renommage mécanique si besoin) · 817360c
 - 2026-10-19 04:34 · 6.3 · dev · lancé (dev-story Sonnet ; modèle 6.2, identifiants conflit, stash, rebase, recuperation) · —
 - 2026-10-19 04:37 · 7.3 · second-avis · 1 high (secret affiché en clair : pre-commit run sans --redact, test tautologique), 3 medium (--no-verify admis et étape validée quand même, config pre-commit supprimable ou vidée, repo distant dans la config → git clone hors garde réseau), 3 low ; reviewer Opus lancé · —
+- 2026-10-19 04:48 · 7.4 ★ · review · rebase (app.py : restart et pipeline gardés), front ajouté (Voir la sortie, liens fichier:ligne, ⚠ Erreur de l'outil, Relancer le check, evidence_seen via check_output_seen), M1 (jobs restants en erreur, Relancer d'un check orphelin), test instable stabilisé, M2 (constat no_detail), M3 partiel (clone sans remote), L5, L7 corrigés ; L4, L8 écartés, L6 reporté à 7.5 ; 1323 passed, CI branche verte · b8dac37
+- 2026-10-19 04:48 · — · décision pour Anaël · 7.4 : intention check_output_seen ajoutée à la liste d'AD-17 (ou preuve à l'écriture du résultat) ; pas de bac à sable pour le code de l'apprenant dans le pipeline (même confiance que le terminal 7.2) ; Relancer affiché sans pipeline (409 expliqué) · —
+- 2026-10-19 04:48 · 7.4 ★ · fusion · rebase sur main (6.2) sans conflit, branche poussée, suite complète et CI en cours · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
