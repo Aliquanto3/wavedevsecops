@@ -435,6 +435,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:42 · 5.4 · dev · fini, 774 + 561 passed (timeout isolé de test_restart dû à la charge, rejoué seul vert), CI verte ; liste designate-list groupée par vue (refs désignables au clavier), aperçu du SHA dès 7 caractères, Placer dans la case, texte du 404 de resolve_sha aligné sur le critère · 18d6626
 - 2026-10-19 06:42 · 5.4 · second-avis · lancé · —
 - 2026-10-19 06:42 · 7.6 · dev · lancé (dev-story Sonnet ; 7.4 done) · —
+- 2026-10-19 06:47 · 9.3, 2.10 · CI · vertes (42784c7, 09e307c) · —
+- 2026-10-19 06:47 · 7.3 · CI · rouge : 2 tests de 9.3 (garde STATION_ORDER, nombre de cartes) cassés par le nouveau scénario de station secret-dans-un-commit ; corrigé par l'orchestrateur (ajout à STATION_ORDER, test aligné), 43 tests ciblés ; 6.3 rebasée dessus ; suite unique du sommet relancée, CI 7.3 et 6.3 relancées · e670a2a
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
