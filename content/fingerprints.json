@@ -8,6 +8,7 @@
     "llm/conflit.A": "55414326a2c2ecf8bca42b3420a5b3355e0b1e0e88c132ddc16f8be85630a8e1",
     "llm/defaut-de-lint.A": "2c812969810ebbd10e78e9a68c726ca7e653b44b4c163973bb466b2487a19793",
     "llm/gabarit-llm.A": "17e9bf730b1a134dbbacc7f289517b6fbd38b68b971284faabbb15aec7bf99c9",
+    "llm/outil-trop-puissant.A": "70762e836414655c299a5bd82d7b91bd81ae279134492b455b7f566986bf6025",
     "llm/pr-merge.A": "c63c25f28d4c24ed38db12afe2ba192b853034c1d8a56b8207a8815d5c46ef7d",
     "llm/pr-sans-revue.A": "1592d8b88d3029b2fa889a64545d77c074ab94a55e197c4c38eba8d9d35a1f8a",
     "llm/push-direct-main.A": "6c531121b3fe451a20a3c29e732ebc208dd4d0e2df692cee35f35c30d33a1f03",

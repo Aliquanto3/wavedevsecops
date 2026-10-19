@@ -142,7 +142,13 @@ jobs:
     # (dépendance ajoutée ou changée sans verrou à jour). Sans lui, `uv sync --frozen` installe le
     # verrou tel quel et ne voit pas qu'un `pyproject.toml` modifié l'a dépassé. Aucune installation
     # ni écriture : il compare seulement ; hors ligne (UV_OFFLINE) depuis le cache préchargé.
+    # uv n'a pas de sortie machine : sur un échec, l'exécution machine ne sert qu'à poser le
+    # constat en français (« Le verrou uv.lock ne correspond plus à pyproject.toml… »), au-dessus
+    # de la sortie brute de uv.
     human: [lock, --check]
+    machine:
+      - argv: [lock, --check]
+        parse: uv_lock_check
     exit_codes: {success: [0], failure: [1]}
 
   - job_id: quality_gate

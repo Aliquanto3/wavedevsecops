@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ from wavedevsecops.contracts.github import (
     Finding,
     Firing,
     GithubState,
+    HeadFile,
     PullRequest,
     Reaction,
     ReactionReview,
@@ -199,6 +201,10 @@ def canonical_digest(layout: Layout) -> str | None:
                 review.pop(name, None)
     if not data["reactions"]:
         del data["reactions"]  # sans réaction, l'empreinte reste celle d'avant la 3.4
+    for reaction in data.get("reactions", []):
+        for name in ("when_files", "otherwise"):  # vides : l'empreinte d'avant la 8.5
+            if not reaction[name]:
+                del reaction[name]
     text = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -234,6 +240,25 @@ def has_conflict(git: Git, layout: Layout, base_sha: str, head_sha: str) -> bool
 
 ConflictProbe = Callable[[str, str], bool | None]
 """`(base_sha, head_sha) -> conflit ?` ; `None` : fusion impossible à calculer."""
+
+
+def head_files_ok(git: Git, layout: Layout, sha: str, files: Iterable[HeadFile]) -> bool:
+    """Vrai si chaque fichier existe au commit `sha` de `origin.git` et ne nomme aucun de ses
+    identifiants interdits (mot entier, commentaires compris). Fichier absent ou illisible :
+    faux. Critère textuel, donc contournable par un code assez tordu : il rend visible le geste
+    enseigné, la relecture humaine reste la dernière barrière."""
+    for item in files:
+        shown = git.run("show", f"{sha}:{item.path}", cwd=layout.origin)
+        if shown.returncode != 0:
+            return False
+        for name in item.forbidden_names:
+            if re.search(rf"(?<![\w]){re.escape(name)}(?![\w])", shown.stdout):
+                return False
+    return True
+
+
+FilesProbe = Callable[[str, list[HeadFile]], bool]
+"""`(head_sha, fichiers) -> condition remplie ?` : lecture de `origin.git` par `_commit`."""
 
 
 def _requeue(check: Check, head_sha: str, base_sha: str) -> Check:
@@ -407,12 +432,17 @@ def pending_request(state: GithubState, pr: PullRequest) -> bool:
 
 
 def _react(
-    state: GithubState, opened: int | None, requested: int | None = None
+    state: GithubState,
+    opened: int | None,
+    requested: int | None = None,
+    files_ok: FilesProbe | None = None,
 ) -> tuple[GithubState, list[int]]:
     """Joue les réactions dues : revues ajoutées dans l'ordre, une seule fois par déclencheur.
 
     `opened` : numéro de la PR qui vient d'être ouverte (déclencheur `pr_opened`) ; `requested` :
-    numéro de la PR dont l'apprenant demande la revue (`review_requested`). Rend l'état
+    numéro de la PR dont l'apprenant demande la revue (`review_requested`). Une réaction à
+    `when_files` publie `otherwise` si `files_ok` refuse le commit de tête (sans `otherwise`,
+    elle attend le prochain commit) ; sans `files_ok`, la condition est refusée. Rend l'état
     et les numéros de PR modifiées ; ne recalcule pas les approbations (l'appelant le fait)."""
     pulls = {p.number: p for p in state.pulls}
     reactions = []
@@ -431,6 +461,13 @@ def _react(
                 continue
             if any(f.number == number and (on_open or f.head_sha == pr.head_sha) for f in fired):
                 continue
+            published = reaction.reviews
+            if reaction.when_files and not (
+                files_ok is not None and files_ok(pr.head_sha, reaction.when_files)
+            ):
+                published = reaction.otherwise
+                if not published:
+                    continue
             first = max((r.review_id for r in pr.reviews), default=0) + 1
             added = [
                 Review(
@@ -441,7 +478,7 @@ def _react(
                     commit_sha=pr.head_sha,
                     created_at=now_iso(),
                 )
-                for offset, r in enumerate(reaction.reviews)
+                for offset, r in enumerate(published)
             ]
             pulls[number] = pr.model_copy(update={"reviews": [*pr.reviews, *added]})
             fired.append(Firing(number=number, head_sha=pr.head_sha))
@@ -465,7 +502,12 @@ def _commit(
     """Recalcule, joue les réactions dues (ouverture, checks verts, revue demandée), puis écrit,
     en une seule écriture atomique."""
     result = _recompute(git, layout, state)
-    reacted, touched = _react(result.state, opened, requested)
+    reacted, touched = _react(
+        result.state,
+        opened,
+        requested,
+        lambda sha, files: head_files_ok(git, layout, sha, files),
+    )
     if touched:
         again = _recompute(git, layout, reacted)
         updated = sorted(set(result.updated) | set(touched) | set(again.updated))
@@ -538,6 +580,8 @@ def add_reaction(
     reviews: Iterable[ReactionReview],
     *,
     head: str | None = None,
+    when_files: Iterable[HeadFile] = (),
+    otherwise: Iterable[ReactionReview] = (),
 ) -> Reaction:
     """Déclare une réaction du collègue simulé (numérotée dans l'ordre de déclaration).
 
@@ -551,6 +595,8 @@ def add_reaction(
         author=author,
         head=head,
         reviews=list(reviews),
+        when_files=list(when_files),
+        otherwise=list(otherwise),
     )
     _save(layout, state.model_copy(update={"reactions": [*state.reactions, reaction]}))
     return reaction
@@ -872,6 +918,7 @@ __all__ = [
     "direct_push_blocked",
     "evaluate",
     "has_conflict",
+    "head_files_ok",
     "init",
     "is_contained",
     "load",

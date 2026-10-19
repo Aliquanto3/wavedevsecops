@@ -16,7 +16,7 @@ from pydantic import Field, field_validator
 
 from wavedevsecops import github_sim
 from wavedevsecops.contracts import RepoState
-from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, PullRequest
+from wavedevsecops.contracts.github import JOB_ID_PATTERN, CheckState, HeadFile, PullRequest
 from wavedevsecops.scenarios.steps._base import StepArgs, StepContext, Verdict
 
 log = logging.getLogger("wavedevsecops")
@@ -47,6 +47,10 @@ class Args(StepArgs):
     6.2 : le geste enseigné, pas un contournement)."""
     mergeable: bool | None = None
     """`True` : « Merger » est actif ; `False` : la PR est bloquée (`merge-blocked`)."""
+    head_files: list[HeadFile] = Field(default_factory=list)
+    """Fichiers du commit de tête de la PR (lus dans `origin.git`) : chacun existe et ne nomme
+    aucun identifiant interdit. Un check vert obtenu en contournant l'outil (`getattr` au lieu
+    d'`eval`) ou en supprimant le fichier ne valide pas l'étape (leçon 6.2)."""
 
     @field_validator("check_states", "sbom_has", "finding_has")
     @classmethod
@@ -78,9 +82,23 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
             and _checks_match(pr, step.check_states)
             and _sbom_match(pr, step.sbom_has)
             and _findings_match(pr, step.finding_has)
+            and _files_match(pr, step.head_files, ctx)
         ):
             return Verdict(status="passed")
     return Verdict(status="pending")
+
+
+def _files_match(pr: PullRequest, files: list[HeadFile], ctx: StepContext) -> bool:
+    """Les fichiers demandés remplissent leur condition au commit de tête de la PR."""
+    if not files:
+        return True
+    if ctx.git is None:
+        return False
+    try:
+        return github_sim.head_files_ok(ctx.git(), ctx.layout, pr.head_sha, files)
+    except Exception:  # noqa: BLE001 - un git indisponible ne valide rien et ne bloque rien
+        log.exception("Fichiers de la PR illisibles pour l'étape %s", ctx.step.step_id)
+        return False
 
 
 def _sbom_match(pr: PullRequest, wanted: dict[str, list[str]]) -> bool:

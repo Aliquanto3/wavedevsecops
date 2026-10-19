@@ -43,7 +43,7 @@ from wavedevsecops.wsfs import Layout as WorkspaceLayout
 ACTORS: dict[str, Actor] = {
     identity.email.lower(): persona  # type: ignore[misc]
     for persona, identity in PERSONAS.items()
-    if persona != "learner"
+    if persona in ("colleague", "agent")  # le relecteur (`reviewer`) ne commite jamais
 }
 """Adresse e-mail des personnages simulés → rôle ; toute autre adresse est l'apprenant."""
 

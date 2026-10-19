@@ -77,9 +77,7 @@ def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
         if isinstance(b, dict) and "id" in b
     }
     for job in pipeline.jobs:
-        # `uv lock --check` ne lit que son code de sortie : aucune exécution machine.
-        assert job.label_text and job.human and job.required
-        assert job.machine or job.job_id == "uv_lock"
+        assert job.label_text and job.human and job.required and job.machine
         assert registry.get(job.tool)  # résolu par le registre (AD-16)
         assert job.barrier in barriers, job.barrier
         assert job.exit_codes.meaning(0) == "success"

@@ -126,6 +126,17 @@ class ReactionReview(_Model):
     body_text: str = ""
 
 
+class HeadFile(_Model):
+    """Condition sur un fichier du commit de tête d'une PR : il existe et ne nomme aucun des
+    identifiants interdits (mot entier). Lue par le relecteur humain d'une réaction et par
+    l'étape `pr_state` (`head_files`) : le geste enseigné, pas seulement un check vert."""
+
+    path: str = Field(min_length=1)
+    """Chemin posix relatif à la racine du dépôt."""
+    forbidden_names: list[str] = Field(default_factory=list)
+    """Identifiants que le fichier ne doit plus contenir (`eval`, `getattr`…)."""
+
+
 class Firing(_Model):
     """Une PR (et son `head_sha` au moment du déclenchement) pour laquelle la réaction a joué."""
 
@@ -147,6 +158,10 @@ class Reaction(_Model):
     head: str | None = None
     """Branche de tête des PR concernées ; `None` : toutes."""
     reviews: list[ReactionReview] = Field(min_length=1)
+    when_files: list[HeadFile] = Field(default_factory=list)
+    """Le relecteur lit ces fichiers au commit de tête : s'ils ne remplissent pas la condition,
+    il publie `otherwise` à la place de `reviews` (ou rien, et la réaction attend)."""
+    otherwise: list[ReactionReview] = Field(default_factory=list)
     fired: list[Firing] = Field(default_factory=list)
 
 
