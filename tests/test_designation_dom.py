@@ -425,3 +425,60 @@ console.log(JSON.stringify({ bad, cleared }));
     assert out["bad"][2] == "alert" and "Aucun élément choisi" in out["bad"][3]
     assert out["bad"][4] == 0 and out["bad"][5] is True  # aucune réponse envoyée : l'essai reste entier
     assert out["cleared"] == [None, ""]
+
+
+def test_revue_apercu_perime_entree_pendant_l_attente_et_focus_apres_placer(tmp_path: Path) -> None:
+    """Revue 5.4 : M1 (aperçu de l'étape précédente), L2 (Entrée et anti-rebond), L3 (focus)."""
+    out = _js(
+        tmp_path,
+        """
+const field = $(".sha-field");
+const urls = [];
+const okA = { ok: true, status: 200, json: async () => ({ element_id: A, short_sha: "aaaaaaa", subject: "Add config" }) };
+resolver = async (url) => { urls.push(url); return okA; };
+const wait = () => new Promise((r) => setTimeout(r, 350));
+// L3 : « Placer » rend le focus au champ.
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+$(".sha-place").focus();
+$(".sha-place").click();
+await tick(); await tick();
+const focusAfterPlace = document.activeElement === field;
+$(".answer-clear").click();
+// M1 : aperçu posé, puis l'étape change pour une étape qui n'attend que des refs.
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+await wait();
+const panel2 = structuredClone(PANEL);
+panel2.steps[0].step_id = "q2";
+panel2.current_step_id = "q2";
+panel2.steps[0].designate.accept = ["ref"];
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 5, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: VIEWS, step_panel: panel2 });
+await tick();
+const cleared = [$(".sha-preview").textContent, $(".sha-place").hidden];
+press("Enter", { target: field });
+await tick(); await tick(); await tick();
+const refused = [slotText(), $(".sha-error").textContent, field.getAttribute("aria-invalid")];
+// L2 : Entrée avant la fin de l'anti-rebond, réponse lente : le commit est placé, une seule requête.
+const panel3 = structuredClone(PANEL);
+panel3.steps[0].step_id = "q3";
+panel3.current_step_id = "q3";
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 6, epoch: 0, state: "idle", reason_text: "",
+  fingerprint: "", views: VIEWS, step_panel: panel3 });
+await tick();
+urls.length = 0;
+resolver = (url) => { urls.push(url); return new Promise((r) => setTimeout(() => r(okA), 400)); };
+field.value = "aaaaaaa";
+field.dispatchEvent(makeEvent("input"));
+press("Enter", { target: field });
+await new Promise((r) => setTimeout(r, 700));
+console.log(JSON.stringify({ focusAfterPlace, cleared, refused, slow: [slotText(), urls.length] }));
+""",
+    )
+    assert out["focusAfterPlace"] is True
+    assert out["cleared"] == ["", True]
+    assert "Aucun élément choisi" in out["refused"][0]
+    assert out["refused"][1] == "Cette question n'attend pas de commit." and out["refused"][2] == "true"
+    assert "aaaaaaa" in out["slow"][0] and out["slow"][1] == 1

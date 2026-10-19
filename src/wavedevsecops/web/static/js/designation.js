@@ -439,7 +439,7 @@ export function createDesignateBlock({ designation, onIntent }) {
     }
     clearFeedback();
     if (found.ok && found.element_id) {
-      previewed = { prefix, found };
+      previewed = { prefix, found, step: askedFor };
       shaPreview.textContent = `${found.short_sha} · ${found.subject}${actorText(found.actor)}`;
       shaPlace.hidden = false;
       return found;
@@ -453,11 +453,22 @@ export function createDesignateBlock({ designation, onIntent }) {
   async function resolve() {
     const prefix = sha.value.trim();
     if (!prefix) return;
-    const found = previewed && previewed.prefix === prefix ? previewed.found : await lookup(prefix);
+    clearTimeout(debounce); // Entrée : la frappe en attente ne relance pas une seconde requête
+    const fresh = previewed && previewed.prefix === prefix && previewed.step === designation.stepId;
+    const found = fresh ? previewed.found : await lookup(prefix);
     if (!found) return;
+    if (!designation.accepts(String(found.element_id).split(":")[0])) {
+      clearFeedback(); // l'étape a changé depuis l'aperçu : le type est recontrôlé au placement
+      sha.setAttribute("aria-invalid", "true");
+      sha.setAttribute("aria-describedby", `${helpId} ${errId}`);
+      shaError.textContent = NOT_ACCEPTED_TEXT;
+      return;
+    }
+    const fromPlace = document.activeElement === shaPlace;
     designation.pick(found.element_id, `${found.short_sha} · ${found.subject}`);
     clearFeedback();
     sha.value = "";
+    if (fromPlace) sha.focus(); // « Placer » disparaît : le focus revient au champ, pas à body
   }
   shaPlace.addEventListener("click", resolve);
   sha.addEventListener("keydown", (event) => {
@@ -538,7 +549,16 @@ export function createDesignateBlock({ designation, onIntent }) {
     }
   }
 
+  let feedbackStep = designation.stepId;
+
   function refresh() {
+    if (designation.stepId !== feedbackStep) {
+      // Nouvelle étape : l'aperçu et la frappe en attente valaient pour l'ancienne.
+      feedbackStep = designation.stepId;
+      clearTimeout(debounce);
+      lookupSeq++;
+      clearFeedback();
+    }
     const armed = designation.armed;
     if (armed !== wasArmed) {
       live.textContent = armed ? ARMED_ANNOUNCE : DISARMED_ANNOUNCE; // bouton, Échap ou changement d'étape

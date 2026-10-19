@@ -24,3 +24,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 5.4 » ; c
 
 - Contrôles dans un navigateur réel pour Anaël : hauteur et défilement de la liste (240 px), contraste de « choisi » en clair et en sombre, ordre de Tab (bouton liste, filtre, éléments, SHA, Placer, Valider), annonce de l'aperçu au lecteur d'écran, comportement avec les vues Code et terminal (sans désignables pour l'instant).
 - Navigation aux flèches dans la liste : non faite, Tab suffit (boutons natifs) ; à revoir si la liste devient longue.
+
+## Revue
+
+Rebasée sur `story/6-3-scenarios-a-avances` (pile 5.5 + 6.4 + 9.3 + 2.10 + 7.3 + 6.3) ; un conflit dans `tests/test_designation_dom.py` (test 2.10 et tests 5.4 au même endroit), les deux gardés.
+
+- Medium · second avis M1 · corrigé : un changement d'étape vidait les cases mais pas l'aperçu ; « Placer » mettait le commit de l'étape précédente dans une étape `accept: ["ref"]`. Au changement d'étape, l'aperçu, l'anti-rebond et les réponses en vol sont annulés, et le type est recontrôlé au placement. Test `test_revue_apercu_perime_…` (échoue sans le correctif).
+- Low · second avis L2 · corrigé : Entrée annule l'anti-rebond de 250 ms ; une réponse lente n'est plus jetée par une seconde requête (même test, une seule requête).
+- Low · second avis L3 · corrigé : après « Placer », le focus revient au champ SHA au lieu de tomber sur `body` (même test).
+- Low · second avis L4 · rejeté : la projection envoie déjà au front `commit:<sha40>` (et l'apprenant voit son propre dépôt) ; le filtre ne révèle rien de plus.
+- Low · second avis L5 · rejeté : « choisi » est le texte exigé par l'AC ; le cacher aux lecteurs d'écran romprait la règle « libellé dans le nom » (WCAG 2.5.3) pour la commande vocale. Double annonce acceptée.
+- Info · second avis L6 · vérifié sans défaut : le panneau Scénario est hors de `.views-grid` ; `linking.js` et `explain.js` ne traitent que les nœuds de la grille, et les boutons de la liste n'ont pas `data-designable`, donc la capture du mode armé ne les reprend pas. Pas de double traitement.
+- Low · revue · reporté : un élément de la liste d'un type non attendu par l'étape est ignoré sans message (conforme à la spec) ; à revoir avec les contrôles navigateur d'Anaël.
+- Complexité : 0 constat. `drawList` reconstruit la liste à chaque notification quand elle est ouverte, en O(n) sur les désignables (quelques dizaines) ; pas de parcours quadratique.
