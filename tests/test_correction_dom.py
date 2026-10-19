@@ -206,6 +206,57 @@ console.log(JSON.stringify({ marks, hasBlock, posts, after: marksOf(), blocks: $
     assert out["armed"] == 1  # la désignation est rouverte
 
 
+def test_une_designation_suivante_armee_efface_les_marques_de_la_precedente(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const next = panelOf([
+  { step_id: "q", title_text: "Qui a cassé ?", instruction_text: "Regardez.", state: "done",
+    explanation_text: "Le commit B a écrasé la sauvegarde.", explain_ref: "", correction: correction(B, false) },
+  { step_id: "q2", title_text: "Et ensuite ?", instruction_text: "Désignez encore.", state: "current",
+    explanation_text: "", explain_ref: "", designate },
+], "q2");
+const store = setup(next);
+const shown = marksOf();
+$(".designate-button").click();
+const armed = marksOf();
+const node = $$(".graph-node").find((n) => n.getAttribute("data-element-id").includes("aaa"));
+node.click();
+console.log(JSON.stringify({ shown, armed, picked: marksOf(), label: node.getAttribute("aria-label"),
+  slot: $(".designate-slots").textContent, block: $$(".is-correction").length }));
+""",
+    )
+    assert out["shown"]["bbb"] == ["✗ Votre choix"]
+    assert out["armed"] == {"ccc": [], "bbb": [], "aaa": []}
+    assert out["picked"] == {"ccc": [], "bbb": [], "aaa": []}
+    assert out["label"] == "Commit aaaaaaa"
+    assert "Attendu" not in out["slot"] and "aaaaaaa" in out["slot"]
+    assert out["block"] == 1  # la correction précédente reste lisible dans le panneau
+
+
+def test_la_marque_d_une_ref_s_entend_dans_le_nom_du_noeud(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const REF = "ref:refs/heads/main";
+VIEWS.graph.nodes[2].refs = [{ element_id: REF, kind: "branch", name_text: "main", current: true, designable: true }];
+const store = setup(OPEN);
+const corr = correction(B, false);
+corr.slots[0].expected_element_id = REF;
+corr.slots[0].accepted_element_ids = [REF];
+answer(store, corr);
+const node = () => $$(".graph-node").find((n) => n.getAttribute("data-element-id").includes("aaa"));
+const marked = node().getAttribute("aria-label");
+const pill = node().querySelector(".graph-branch").textContent;
+$('[data-action="continue"]').click();
+console.log(JSON.stringify({ marked, pill, after: node().getAttribute("aria-label") }));
+""",
+    )
+    assert out["marked"] == "Commit aaaaaaa — main : ✓ Attendu"
+    assert out["pill"].endswith("✓ Attendu")
+    assert out["after"] == "Commit aaaaaaa"
+
+
 def test_une_etape_rouverte_montre_la_correction_sans_continuer(tmp_path: Path) -> None:
     out = _js(
         tmp_path,

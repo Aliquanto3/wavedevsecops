@@ -46,13 +46,22 @@ function clearMarks(root) {
   for (const badge of [...root.querySelectorAll(".verdict-mark")]) badge.remove();
   for (const node of root.querySelectorAll(".has-verdict")) {
     node.classList.remove("has-verdict", "is-verdict-right", "is-verdict-wrong", "is-verdict-expected");
-    const before = node.getAttribute("data-label-before");
-    if (before !== null) {
-      if (before) node.setAttribute("aria-label", before);
-      else node.removeAttribute("aria-label");
-      node.removeAttribute("data-label-before");
-    }
   }
+  for (const node of root.querySelectorAll("[data-label-before]")) {
+    node.setAttribute("aria-label", node.getAttribute("data-label-before"));
+    node.removeAttribute("data-label-before");
+  }
+}
+
+/**
+ * Élément qui porte le nom accessible de `node` : lui-même s'il a un `aria-label`, sinon le bouton
+ * nommé qui le contient (l'étiquette d'une ref dans un nœud du graphe), sinon aucun : le nom vient
+ * alors du texte, qui contient déjà la marque.
+ */
+function namedOwner(node, root) {
+  if (node.hasAttribute("aria-label")) return node;
+  const owner = node.parentElement && node.parentElement.closest("button[aria-label]");
+  return owner && root.contains(owner) ? owner : null;
 }
 
 /**
@@ -66,7 +75,11 @@ export function markCorrection(root, designation) {
   clearMarks(root);
   const correction = designation.correction;
   if (!correction) return;
+  // Une nouvelle désignation en cours (mode armé ou case remplie) l'emporte sur la correction de la
+  // précédente : ses marques masqueraient la sélection et s'ajouteraient au nom de l'élément choisi.
+  if (designation.armed || designation.pickedIds().size) return;
   const marks = marksOf(correction);
+  const named = new Map(); // élément nommé → textes à ajouter à son nom accessible
   for (const node of root.querySelectorAll("[data-designable]")) {
     const id = node.getAttribute("data-designate-id") || node.getAttribute("data-element-id");
     const kinds = marks.get(id);
@@ -76,14 +89,21 @@ export function markCorrection(root, designation) {
     if (kinds.includes("choice-wrong")) node.classList.add("is-verdict-wrong");
     if (kinds.includes("expected") || kinds.includes("equivalent")) node.classList.add("is-verdict-expected");
     const texts = kinds.map((kind) => KIND_TEXT[kind]);
-    const before = node.getAttribute("aria-label");
-    node.setAttribute("data-label-before", before || "");
-    if (before) node.setAttribute("aria-label", `${before} — ${texts.join(", ")}`);
+    const owner = namedOwner(node, root);
+    if (owner) {
+      const said = owner === node ? texts.join(", ") : `${(node.textContent || "").trim()} : ${texts.join(", ")}`;
+      named.set(owner, [...(named.get(owner) || []), said]);
+    }
     for (const kind of kinds) {
       const badge = el("span", `verdict-mark is-${kind}`, { "data-verdict": kind });
       badge.textContent = KIND_TEXT[kind];
       node.append(badge);
     }
+  }
+  for (const [owner, said] of named) {
+    const before = owner.getAttribute("aria-label");
+    owner.setAttribute("data-label-before", before);
+    owner.setAttribute("aria-label", `${before} — ${said.join(" ; ")}`);
   }
 }
 

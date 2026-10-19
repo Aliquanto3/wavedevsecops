@@ -33,5 +33,18 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 5.5 » ; c
 ## Reports
 
 - Marques dans les vues Code, terminal, preuves et distant : elles apparaîtront quand ces vues poseront `data-designable` + `data-element-id` et appelleront `markCorrection` après leur dessin, comme pour `markDesignated` (seul `repo.js` le fait aujourd'hui). 5.6 à 5.8 s'appuient sur ce contrat.
-- Marque sur une étiquette de ref dans un nœud : posée, mais le nom accessible du nœud (le bouton) ne la lit pas, seul le texte visible la montre.
+- (Levé en revue : la marque d'une étiquette de ref s'ajoute au nom accessible du nœud qui la contient.)
 - Contrôles dans un navigateur réel pour Anaël : contraste des marques et des tirets `danger` en clair et en sombre, tenue du texte « ✓ Votre choix · ✓ Attendu » sur une rangée étroite du graphe (troncature du sujet), lecture au lecteur d'écran (nom du nœud + marque, annonce « Désignation fausse… »), ordre de Tab (voir dans les vues, Continuer, Recommencer), retour du focus sur le titre après « Continuer ».
+
+## Revue
+
+Revue Opus du 2026-10-19, une passe, après rebase sur `origin/main` (6.5, 2.9, 3.5, 3.3, 7.2 ; 4.4 pas encore fusionnée). Second avis Haiku : aucun medium ni high.
+
+- Medium · second avis L2 · corrigé : deux désignations consécutives. Les marques de N restaient pendant que N+1 était armée ; elles masquaient la sélection, et un clic sur un élément marqué remplissait la case avec son nom accessible augmenté (« Commit aaaaaaa — ✓ Attendu », `labelOf`). `markCorrection` ne pose plus de marques en mode armé ou quand une case est remplie ; le bloc de correction reste lisible dans le panneau. Test `test_une_designation_suivante_armee_efface_les_marques_de_la_precedente` (rouge sans le correctif).
+- Low · second avis L3 · corrigé : la marque d'une étiquette de ref (sans `aria-label`, dans un bouton nommé) n'était pas lue. Elle s'ajoute au nom du bouton qui la contient (« Commit aaaaaaa — main : ✓ Attendu »), restitué à la fermeture. Test `test_la_marque_d_une_ref_s_entend_dans_le_nom_du_noeud`.
+- Low · second avis L1 · écarté : scénario fini sur une désignation. La dernière étape s'affiche alors comme une étape rouverte : correction relue sans « Continuer », et le bilan propose déjà « Recommencer ». Rien à continuer : c'est le comportement voulu.
+- Info · second avis L4 · écarté : « Continuer » est client seul, décision de la story (aucune intention serveur, la correction revient après un rechargement).
+- Low · second avis L8 · reporté : 4.4 n'est pas sur `main` au rebase, Recommencer reste simulé par `save_run(answers={})`. La 4.4 refait `run.json` par `initial_run` (réponses à zéro), donc l'hypothèse tient. À faire à l'intégration de 4.4 : dans `tests/test_correction_panel.py`, remplacer le `save_run` par l'intention `restart` réelle et vérifier que `correction` disparaît du panneau.
+- Low · second avis L9 · écarté : la CI n'installe pas Node, mais les images GitHub (Ubuntu, macOS, Windows) l'embarquent ; les tests DOM tournent en CI (voir le décompte des sauts dans le rapport de revue).
+- Info · revue · écarté : AD-2 parle de marques « portées par la projection » ; elles viennent de `answer_corrected` et du panneau serveur, pas de `views`. Le front ne calcule toujours rien. Écart justifié dans les Décisions.
+- Complexité : 0 constat. `markCorrection` parcourt les nœuds désignables à chaque dessin, comme `markDesignated` (O(n)). Le reste est en O(étapes) par rendu.
