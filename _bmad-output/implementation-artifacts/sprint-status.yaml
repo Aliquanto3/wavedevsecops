@@ -71,7 +71,7 @@ development_status:
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: done
   4-2-enregistrer-les-faits-du-premier-passage: done
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
-  4-4-recommencer-un-scénario-sans-perdre-son-score: in-progress
+  4-4-recommencer-un-scénario-sans-perdre-son-score: review
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
   4-6-ouvrir-des-indices-par-paliers: done
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: done
@@ -82,7 +82,7 @@ development_status:
   5-2-corriger-une-désignation-côté-serveur-en-un-seul-essai: done
   5-3-désigner-un-élément-dans-les-vues: done
   5-4-choisir-dans-une-liste-ou-par-sha: backlog
-  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: backlog
+  5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: in-progress
   5-6-le-scénario-b-env-committé: backlog
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog

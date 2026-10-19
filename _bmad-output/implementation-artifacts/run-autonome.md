@@ -348,6 +348,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:20 · 5.3 · fusion · CI branche verte sur 6 jobs, suite du sommet de pile 1173 passed, commit de fusion sur main, story done ; 5.4 et 5.5 éligibles · 9df9dbe
 - 2026-10-19 02:21 · 3.3 · fusion · CI branche verte sur 6 jobs, suite du sommet de pile 1173 passed, commit de fusion sur main, story done ; 2.10 éligible (2.7, 2.8, 3.3 done) · 7f11ee9
 - 2026-10-19 02:21 · 3.5 · fusion · rebase sur main sans conflit, branche poussée, suite complète et CI en cours · —
+- 2026-10-19 02:31 · 4.4 · dev · fini, 1094 passed / 42 skipped, CI verte sur 6 jobs ; intention restart (engine/restart.py) : hints.settle, initial_run, instantané 0 vérifié ou reconstruction par setup, repos idle ; fait scenario_reset ignoré par derive ; confirmation en ligne, encart content_changed · 1ed0226
+- 2026-10-19 02:31 · — · décision pour Anaël · 4.4 : ajouter scenario_reset à AD-14 du spine · —
+- 2026-10-19 02:31 · 4.4 · second-avis · lancé · —
+- 2026-10-19 02:31 · 5.5 · dev · lancé (dev-story Sonnet ; chemin critique de l'Epic 5) ; 5.4 attend 5.5 (même front), 2.10 au prochain créneau · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
