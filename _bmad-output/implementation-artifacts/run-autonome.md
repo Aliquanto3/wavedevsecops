@@ -394,6 +394,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:33 · 6.2 · fusion · suite complète 1333 passed / 46 skipped ; CI en attente de lecture (quota GitHub) · —
 - 2026-10-19 04:33 · 7.3 · dev · fini, 1283 passed / 48 skipped, CI verte ; hook pre-commit lançant pre-commit run (gitleaks --exit-code 3 --redact), trace cache/hook-pre-commit.json, evidence_seen secret-scan, scénario secret-dans-un-commit.A, step CI de provisionnement gitleaks · fc42d12
 - 2026-10-19 04:33 · 7.3 · second-avis · lancé ; aucun créneau de dev ouvert faute d'éligible sans conflit (6.3 attend 6.2, 5.4 attend 5.5, 7.5/7.6/8.1 attendent 7.4, 9.4 attend 2.10) · —
+- 2026-10-19 04:34 · 6.2 · fusion · CI branche verte (run complet success), commit de fusion sur main, story done ; 6.3 éligible ; identifiants du socle toujours à valider par Anaël (renommage mécanique si besoin) · 817360c
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
