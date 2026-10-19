@@ -1,13 +1,15 @@
 # WaveDevSecOps
 
-> ⚪ **En spécification** : aucun code pour l'instant.
+> 🟢 **v0.1.0** : le socle git (scénarios des modes A et B), la vue du graphe, le terminal du bac à sable, le quiz et le diagnostic des outils. Notes de version : [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
 
 Application pédagogique locale pour apprendre git et GitHub, puis la chaîne CI/CD et les
 concepts DevSecOps, pensée pour les personnes qui codent avec des agents (vibe coding) et
 doivent comprendre ce que l'agent fait sur leur dépôt. Pédagogie inspirée de
 [WaveStack](https://github.com/Aliquanto3/agentic-harness-training-demo).
 
-## Ce qui est prévu
+## Ce que l'application propose
+
+La v0.1.0 livre le socle git. Les stations de la chaîne DevSecOps arrivent ensuite (voir [Jalons](#jalons)).
 
 - **Du vrai git, hors ligne** : un dépôt bac à sable, un dépôt distant local et un GitHub
   simulé (PR, revue, merge, commits d'un collègue), dans des vues synchronisées.
@@ -65,9 +67,34 @@ interrompue reprend là où elle s'est arrêtée.
 - **Sans git ou si le clone échoue** : `export WDS_INSTALL_METHOD=zip` avant la commande (archive `tar.gz` de GitHub).
 - **Autre dossier** : `WDS_DATA_DIR`. Autre branche : `WDS_INSTALL_REF`.
 
+## Confidentialité et réseau
+
+L'application n'envoie aucune télémétrie et ne fait aucun appel réseau, sauf l'exécution facultative
+du code LLM (parcours LLM, sur confirmation de votre part). Le serveur n'écoute que sur
+`127.0.0.1`, et toute l'interface est servie par l'application elle-même, sans ressource externe.
+Seule l'installation (et sa mise à jour) télécharge : uv, git si besoin, les paquets et gitleaks.
+
+## Lancer
+
+Une fois l'installation faite, depuis le dossier de l'application (`app`, voir plus haut) :
+
+```sh
+uv run wavedevsecops
+```
+
+L'application ouvre votre navigateur sur une adresse locale protégée par un jeton. Relancer la
+commande rouvre l'instance déjà en cours. Option : `uv run wavedevsecops --window` (fenêtre dédiée,
+après `uv sync --extra window`).
+
+## Temps d'installation
+
+L'installeur mesure sa durée et l'écrit dans `install.json` (champ `duration_s`, dossier des
+données). Objectif : moins de 10 minutes, sans droits administrateur (AD-18, SM-2). La mesure
+chronométrée de la v0.1.0 est consignée dans les [notes de version](docs/releases/v0.1.0.md#temps-dinstallation).
+
 ## Jalons
 
-`v0.1` socle git → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
+`v0.1` socle git (livré : v0.1.0) → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
 
 ## Documents
 
