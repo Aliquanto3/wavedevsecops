@@ -93,6 +93,15 @@ function modeColumn(scenario, mode, onOpen) {
     detail.textContent = mode.detail_text;
     column.append(detail);
   }
+  appendActions(column, scenario, mode, onOpen, `Ouvrir en mode ${mode.mode}`);
+  return column;
+}
+
+/**
+ * Boutons d'un mode disponible : « Ouvrir », ou « Reprendre » / l'encart « Recommencer » de la
+ * Story 6.4. Partagé par les cartes du socle et les cartes de station (Story 9.3).
+ */
+function appendActions(column, scenario, mode, onOpen, openText) {
   const alert = el("p", "scenario-card-alert", { role: "alert" });
   const resume = mode.resume;
   const actions = [];
@@ -157,12 +166,11 @@ function modeColumn(scenario, mode, onOpen) {
     }
   }
   if (!resume || resume.can_resume) {
-    action(`Ouvrir en mode ${mode.mode}`, `Ouvrir ${scenario.title} en mode ${mode.mode}`, {}, {
+    action(openText, `Ouvrir ${scenario.title} en mode ${mode.mode}`, {}, {
       attrs: { "data-action": "open" },
     });
   }
   column.append(...actions, alert);
-  return column;
 }
 
 function card(scenario, onOpen) {
@@ -200,19 +208,9 @@ function stationMode(scenario, mode, onOpen) {
   state.textContent = mode.detail_text
     ? `${mode.state_text} · ${mode.detail_text}`
     : mode.state_text;
-  const alert = el("p", "scenario-card-alert", { role: "alert" });
-  const button = el("button", "btn btn-secondary", { type: "button", "data-mode": mode.mode });
-  button.textContent = "Ouvrir";
-  button.setAttribute("aria-label", `Ouvrir ${scenario.title}`);
-  button.addEventListener("click", async () => {
-    alert.textContent = "";
-    try {
-      await onOpen(scenario, mode);
-    } catch (err) {
-      alert.textContent = err.message;
-    }
-  });
-  column.append(state, button, alert);
+  column.append(state);
+  // Reprendre / Recommencer (Story 6.4) valent aussi pour une carte de station.
+  appendActions(column, scenario, mode, onOpen, "Ouvrir");
   return column;
 }
 

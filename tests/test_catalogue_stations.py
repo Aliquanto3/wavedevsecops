@@ -122,3 +122,55 @@ console.log(JSON.stringify({{
     assert out["off"] == "⊘ Indisponible · Nécessite pytest · Voir le diagnostic"
     assert (out["link"], out["offButtons"], out["discs"]) == ("/diagnostic", 0, 2)
     assert out["opened"] == [["defaut-de-lint", "A"]]
+
+
+def test_scenarios_de_station_livres_figurent_dans_l_ordre_conseille() -> None:
+    """Garde contre la dérive de `STATION_ORDER` (revue 9.3) : un scénario de station absent de
+    la liste prendrait le rang des scénarios hors ordre du socle, avant les stations connues, et
+    fausserait « Scénario suivant » et l'ordre du rapport."""
+    from wavedevsecops.scenarios.order import STATION_ORDER, STATIONS_SECTION
+    from wavedevsecops.web.catalogue import load_catalogue
+
+    content = Path(__file__).resolve().parents[1] / "content"
+    stations = {
+        loaded.scenario.scenario_id
+        for loaded in load_catalogue(Settings(content_dir=content))
+        if loaded.scenario.catalogue and loaded.scenario.section == STATIONS_SECTION
+    }
+    assert stations and stations <= set(STATION_ORDER)
+
+
+@pytest.mark.skipif(NODE is None, reason="Node absent : comportement JS non exécuté")
+def test_carte_de_station_reprendre_et_recommencer(tmp_path: Path) -> None:
+    """Reprendre et Recommencer (Story 6.4) valent aussi pour une carte de station (revue 9.3)."""
+    resume = {"can_resume": True, "step_number": 2, "step_total": 4, "text": "Étape 2 sur 4", "button_text": "Reprendre"}
+    blocked = {"can_resume": False, "step_number": 0, "step_total": 4, "blocked_text": "Ce scénario ne peut pas reprendre là où vous l'aviez laissé.", "restart_text": "Recommencer"}
+    group = json.loads(json.dumps(STATIONS["groups"][0]))
+    group["scenarios"][0]["modes"][0]["resume"] = resume
+    group["scenarios"][1]["modes"][0].update(available=True, resume=blocked)
+    del group["scenarios"][1]["modes"][0]["unavailable"]
+    catalogue = {**CATALOGUE, "sections": [*CATALOGUE["sections"], {**STATIONS, "groups": [group]}]}
+    out = _js(
+        tmp_path,
+        f"""
+const opened = [];
+renderCatalogue(main, {json.dumps(catalogue)}, async (s, m, how) => {{ opened.push([s.scenario_id, how]); }});
+const cards = $$(".station-card");
+const labels = (c) => c.querySelectorAll("button").map((b) => [b.textContent, b.getAttribute("aria-label")]);
+const first = labels(cards[0]);
+cards[0].querySelector('button[data-action="resume"]').dispatchEvent(makeEvent("click"));
+const step = cards[0].querySelector(".scenario-mode-step").textContent;
+const blockedButtons = labels(cards[1]);
+cards[1].querySelector('button[data-action="restart-ask"]').dispatchEvent(makeEvent("click"));
+cards[1].querySelector('button[data-action="restart-confirm"]').dispatchEvent(makeEvent("click"));
+await new Promise((r) => setTimeout(r, 0));
+console.log(JSON.stringify({{ first, step, blockedButtons, opened }}));
+""",
+    )
+    assert out["first"] == [
+        ["Reprendre", "Reprendre Trouver un défaut de lint en mode A"],
+        ["Ouvrir", "Ouvrir Trouver un défaut de lint en mode A"],
+    ]
+    assert out["step"] == "Étape 2 sur 4"
+    assert out["blockedButtons"] == [["Recommencer", "Recommencer Trouver un test cassé en mode A"]]
+    assert out["opened"] == [["defaut-de-lint", {"resume": True}], ["test-casse", {"restart": True}]]
