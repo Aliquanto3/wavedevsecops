@@ -313,14 +313,16 @@ export function mountLinking(root, { store, chipBar = null, fetchImpl, timers = 
     },
     true,
   );
+  // Un événement déjà traité par sa vue (`preventDefault`, ex. sortie de check) n'est pas rejoué.
   grid.addEventListener("click", (event) => {
+    if (event.defaultPrevented) return;
     const node = event.target.closest?.("[data-roving][data-element-id]");
     if (!node || node.tagName === "BUTTON" || event.target.closest?.("button")) return;
     if (String(globalThis.getSelection?.() ?? "")) return; // copier du texte n'est pas sélectionner
     selection.toggle(node.getAttribute("data-element-id"));
   });
   grid.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.defaultPrevented || (event.key !== "Enter" && event.key !== " ")) return;
     const node = event.target;
     if (!node.hasAttribute || node.tagName === "BUTTON") return;
     if (!node.hasAttribute("data-roving") || !node.hasAttribute("data-element-id")) return;

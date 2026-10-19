@@ -409,6 +409,7 @@ export function renderRemote(body, ctx, renderEmpty) {
       // Un clic dans le bloc tool-output le désigne, sauf s'il sert à sélectionner du texte.
       const block = event.target.closest && event.target.closest(".check-output");
       if (block && !String(globalThis.getSelection?.() ?? "")) {
+        event.preventDefault(); // traité ici : la sélection générique (linking.js) n'y revient pas
         selection.toggle(block.getAttribute("data-element-id"));
       }
       return;
