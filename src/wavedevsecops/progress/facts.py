@@ -195,6 +195,34 @@ class ProgressStore:
                 write_json_atomic(self.data_dir / FILENAME, {**data, "facts": stored})
             return added
 
+    def set_last_opened(self, track: str, scenario_id: str, mode: str) -> None:
+        """Consigne le dernier scénario ouvert (Story 6.4), clé de tête de `progress.json` ;
+        ce n'est pas un fait du premier passage : il se remplace à chaque ouverture."""
+        with self._lock:
+            data = ensure_progress(self.data_dir, datetime.now().astimezone())
+            current = {"track": track, "scenario_id": scenario_id, "mode": mode}
+            previous = data.get("last_opened")
+            if isinstance(previous, dict) and {k: previous.get(k) for k in current} == current:
+                return
+            stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+            write_json_atomic(
+                self.data_dir / FILENAME, {**data, "last_opened": {**current, "at": stamp}}
+            )
+
+    def last_opened(self) -> tuple[str, str, str] | None:
+        """`(parcours, scenario_id, mode)` du dernier scénario ouvert ; `None` s'il n'y en a pas."""
+        with self._lock:
+            path = self.data_dir / FILENAME
+            if not path.exists():
+                return None
+            raw = _read_json(path).get("last_opened")
+        if not isinstance(raw, dict):
+            return None
+        track, scenario_id, mode = raw.get("track"), raw.get("scenario_id"), raw.get("mode")
+        if isinstance(track, str) and isinstance(scenario_id, str) and isinstance(mode, str):
+            return track, scenario_id, mode
+        return None
+
     def progress(self, track: str, scenario_id: str, mode: str) -> ScenarioProgress:
         """États dérivés d'un scénario (une lecture du fichier)."""
         return derive(self.facts(), track, scenario_id, mode)

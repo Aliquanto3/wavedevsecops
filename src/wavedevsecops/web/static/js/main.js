@@ -93,8 +93,8 @@ async function showCatalogue(container) {
     renderCatalogue(
       container,
       catalogue,
-      async (scenario, mode) => {
-        const opened = await openMode(scenario, mode, { track: catalogue.track });
+      async (scenario, mode, how = {}) => {
+        const opened = await openMode(scenario, mode, { track: catalogue.track, ...how });
         window.location.assign(workspacePath(opened.workspace_id));
       },
       (picked) => {
