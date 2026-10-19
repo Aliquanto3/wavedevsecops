@@ -32,7 +32,10 @@ FactKind = Literal[
 ]
 ScenarioState = Literal["todo", "in_progress", "done"]
 RESTART_KIND = "scenario_reset"
-"""Fait d'une remise à zéro (story 4.4) : ni l'état ni le score du premier coup n'en dépendent."""
+"""Fait « remise à zéro » émis par Recommencer (story 4.4) : un fait par remise (`op_id` dans
+l'identité). Le rapport (6.5) les compte ; `derive` les ignore pour l'état, et ne retient pour le
+score et les indices que les faits d'avant la première remise. Contrat partagé : ne pas renommer
+sans aligner `derive` et `progress.report`."""
 
 
 class Fact(BaseModel):
@@ -205,9 +208,3 @@ class ProgressStore:
             if all(isinstance(part, str) for part in key):
                 groups.setdefault(key, []).append(raw)  # type: ignore[arg-type]
         return {key: derive(group, *key) for key, group in groups.items()}
-
-
-RESTART_KIND = "scenario_reset"
-"""Fait « remise à zéro » émis par Recommencer (story 4.4) : un fait par remise (`op_id` dans
-l'identité). Le rapport (6.5) les compte ; `derive` les ignore pour l'état, le score et les
-indices. Contrat partagé : ne pas renommer sans aligner `derive` et `progress.report`."""
