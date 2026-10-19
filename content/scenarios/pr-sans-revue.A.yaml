@@ -108,6 +108,7 @@ steps:
       ruff: success
       pytest: success
       gitleaks: success
+      bandit: success
     mergeable: false
     hints:
       lead_text: >-
