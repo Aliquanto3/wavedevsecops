@@ -97,6 +97,32 @@ def test_surfaces_suivent_le_jalon() -> None:
     assert [s.key for s in delivered_surfaces("v0.10")][-1] == "fiche"
 
 
+@pytest.mark.parametrize(("milestone", "served"), [("v0.1", False), ("v0.2", True)])
+def test_vocabulaire_masque_en_v01_servi_en_v02(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, milestone: str, served: bool
+) -> None:
+    """Story 9.4 : la page Vocabulaire n'apparaît qu'au jalon v0.2 (passage fait par la 9.5)."""
+    import functools
+
+    from wavedevsecops.web import create_app
+
+    monkeypatch.setattr(cli, "create_app", functools.partial(create_app, milestone=milestone))
+    inst = cli.start_instance(Settings(data_dir=tmp_path / "data"))
+    try:
+        resp, _ = get(inst, f"/?t={inst.token}")
+        jar = {"Cookie": resp.getheader("Set-Cookie", "").split(";")[0]}
+        resp, _ = get(inst, "/vocabulaire", jar)
+        assert resp.status == (200 if served else 404)
+        _, body = get(inst, "/api/shell", jar)
+        data = json.loads(body)
+        assert data["milestone"] == milestone
+        paths = [s["path"] for s in data["surfaces"]]
+        assert ("/vocabulaire" in paths) is served
+        assert "/fiche" not in paths
+    finally:
+        inst.stop()
+
+
 def test_point_de_vie_sous_cookie(instance: cli.Instance, cookie: dict[str, str]) -> None:
     resp, body = get(instance, "/api/health", cookie)
     assert resp.status == 200

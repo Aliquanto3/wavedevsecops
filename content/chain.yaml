@@ -69,7 +69,7 @@ stations:
         label: "Revue obligatoire"
         links:
           - {kind: check, label: "Approbations requises"}
-          - {kind: term, label: "Revue de code"}
+          - {kind: term, label: "Quatre yeux"}
       - id: protection
         label: "Protection de main"
         links:

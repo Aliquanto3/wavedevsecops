@@ -1,0 +1,60 @@
+/* Page Vocabulaire (Story 9.4) : un terme par entrée, avec sa barrière. */
+.glossary-list {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.glossary-entry {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-ink-soft);
+}
+
+.glossary-name {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-heading);
+}
+
+.glossary-definition {
+  margin: 0 0 var(--space-2);
+}
+
+.glossary-trace {
+  margin: 0;
+  color: var(--color-ink-soft);
+}
+
+.named-only-tag {
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-body-sm);
+  font-weight: normal;
+  color: var(--color-ink-soft);
+  border: var(--stroke-min) dashed var(--color-ink-soft);
+  border-radius: var(--radius-sm);
+}
+
+.glossary-see {
+  min-height: var(--hit-target-dense);
+  padding: 0 var(--space-2);
+  font: inherit;
+  color: var(--color-primary);
+  background: transparent;
+  border: var(--stroke-min) solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.glossary-detail .glossary-barrier {
+  margin-top: var(--space-2);
+}
+
+.glossary-detail .glossary-barrier p {
+  margin: 0 0 var(--space-1);
+}
+
+.glossary-detail .is-soon {
+  color: var(--color-ink-soft);
+}

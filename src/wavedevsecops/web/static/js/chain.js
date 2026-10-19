@@ -2,6 +2,7 @@
 // (`content/chain.yaml`, AD-2) : le front n'invente aucun texte ni lien. La carte se pose par-
 // dessus les vues, qui deviennent `inert` tant qu'elle est ouverte.
 import { el } from "./dom.js";
+import { registerBarrierShower } from "./glossary.js";
 
 const MAP_ID = "chain-map";
 const TOGGLE_ID = "chain-map-toggle";
@@ -119,6 +120,7 @@ export function mountChain(workspace, chain, { inertNodes = [] } = {}) {
   detail.append(hint);
 
   const buttons = [];
+  const placed = []; // { button, barrier, station } : pour « Voir la barrière » du vocabulaire
   function select(button, barrier) {
     for (const other of buttons) other.setAttribute("aria-pressed", String(other === button));
     const title = el("p", "chain-detail-title");
@@ -148,6 +150,7 @@ export function mountChain(workspace, chain, { inertNodes = [] } = {}) {
         button.addEventListener("click", () => select(button, barrier));
         button.addEventListener("mouseenter", () => select(button, barrier));
         buttons.push(button);
+        placed.push({ button, barrier, station: station.number });
         item.append(button);
         barriers.append(item);
       }
@@ -189,11 +192,22 @@ export function mountChain(workspace, chain, { inertNodes = [] } = {}) {
 
   toggle.addEventListener("click", () => (opened ? close() : open(null)));
 
+  // « Voir la barrière » (vocabulaire, Story 9.4) : la carte s'ouvre et sélectionne la barrière.
+  const unregister = registerBarrierShower((id) => {
+    const found = placed.find((item) => item.barrier.id === id);
+    if (!found) return false;
+    open(found.station);
+    select(found.button, found.barrier);
+    found.button.focus();
+    return true;
+  });
+
   return {
     band,
     isOpen: () => opened,
     close,
     destroy() {
+      unregister();
       close(false);
       band.remove();
     },

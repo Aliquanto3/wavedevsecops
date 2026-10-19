@@ -8,6 +8,7 @@
 // Les « i » sont posés après coup à côté des éléments déjà dessinés (un bouton ne contient pas un
 // autre bouton) ; ils ne sont pas dans la tabulation, les flèches de la vue les atteignent.
 import { el, richText } from "./dom.js";
+import { barrierDetail, loadGlossary, showBarrier, termText } from "./glossary.js";
 
 export const UNAVAILABLE_TITLE = "Explication indisponible";
 export const UNAVAILABLE_TEXT = "L'explication de cet élément n'est pas disponible pour le moment.";
@@ -42,6 +43,18 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
       })();
     }
     return catalogue;
+  }
+
+  let glossary = null; // Promise du vocabulaire, lu à la première explication qui cite un terme
+
+  function glossaryOf() {
+    if (!glossary) {
+      glossary = loadGlossary(fetcher).then((loaded) => ({
+        ui: loaded.ui,
+        byId: new Map(loaded.terms.map((term) => [term.id, term])),
+      }));
+    }
+    return glossary;
   }
 
   function keyOf(node) {
@@ -148,7 +161,14 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     if (!current || current.popover !== popover) return; // fermé ou remplacé pendant la lecture
     const entry = all[key];
     title.textContent = entry ? entry.title_text : UNAVAILABLE_TITLE;
-    richText(body, entry ? entry.body_text : UNAVAILABLE_TEXT);
+    const text = entry ? entry.body_text : UNAVAILABLE_TEXT;
+    if (text.includes("[[")) {
+      const vocabulary = await glossaryOf();
+      if (!current || current.popover !== popover) return;
+      termText(body, text, vocabulary.byId, (term, node) => openTerm(term, node, vocabulary.ui));
+    } else {
+      richText(body, text);
+    }
 
     const items = linkedItems(id);
     const toggle = el("button", "explain-links-toggle", {
@@ -186,6 +206,14 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     actions.append(toggle, closeButton);
     popover.append(actions, list);
 
+    trapKeys(popover);
+    document.body.append(popover); // hors de la disposition, comme le résumé lu au focus
+    place(popover, button);
+    popover.focus();
+  }
+
+  /** Échap ferme le popover (focus rendu au « i ») ; Tab en sortant le ferme aussi. */
+  function trapKeys(popover) {
     popover.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -202,8 +230,57 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
         close(true);
       }
     });
-    document.body.append(popover); // hors de la disposition, comme le résumé lu au focus
-    place(popover, button);
+  }
+
+  /** `glossary-term` d'une explication : sa définition, et « Voir la barrière » s'il en a une. */
+  function openTerm(term, node, ui) {
+    if (!current) return;
+    const { trigger, id } = current;
+    close(false);
+    counter += 1;
+    const titleId = `explain-title-${counter}`;
+    const popover = el("div", "explain-popover glossary-popover", {
+      role: "dialog",
+      "aria-labelledby": titleId,
+      tabindex: "-1",
+      "data-term": term.id,
+    });
+    const title = el("h3", "explain-title", { id: titleId });
+    title.textContent = term.term_text;
+    const body = el("p", "explain-body");
+    body.textContent = term.definition_text;
+    popover.append(title, body);
+    const actions = el("div", "explain-actions");
+    if (term.barrier && !term.named_only && ui) {
+      const regionId = `explain-term-detail-${counter}`;
+      const region = el("div", "glossary-detail", { id: regionId, "aria-live": "polite" });
+      popover.append(region);
+      const see = el("button", "explain-links-toggle glossary-see", {
+        type: "button",
+        "aria-expanded": "false",
+        "aria-controls": regionId,
+      });
+      see.textContent = ui.see_text;
+      see.addEventListener("click", () => {
+        // La barrière est dans la carte de l'espace : elle y est sélectionnée. Sinon, le détail
+        // (scénario qui la joue, ou « à venir ») s'affiche ici, annoncé par la région.
+        if (showBarrier(term.barrier.id)) return close(false);
+        const open = see.getAttribute("aria-expanded") === "true";
+        see.setAttribute("aria-expanded", String(!open));
+        region.replaceChildren(...(open ? [] : [barrierDetail(term, ui)]));
+      });
+      actions.append(see);
+    }
+    const closeButton = el("button", "explain-close", { type: "button" });
+    closeButton.textContent = (ui && ui.close_text) || CLOSE_LABEL;
+    closeButton.addEventListener("click", () => close(true));
+    actions.append(closeButton);
+    popover.append(actions);
+    current = { trigger, popover, id };
+    trigger.setAttribute("aria-expanded", "true");
+    trapKeys(popover);
+    document.body.append(popover);
+    place(popover, node.isConnected ? node : trigger);
     popover.focus();
   }
 

@@ -72,8 +72,8 @@ entries:
   remote.check:
     title_text: "Un check"
     body_text: >-
-      Un check est un contrôle automatique lancé sur le commit de la PR : tests, analyse du code,
-      recherche de secrets. Un check obligatoire en échec bloque la fusion.
+      Un check est un [[quality-gate|contrôle de qualité]] automatique lancé sur le commit de la PR : tests, analyse du code,
+      recherche de [[secrets-scanning|secrets]]. Un check obligatoire en échec bloque la fusion.
       Si vous poussez un nouveau commit, le résultat précédent n'est plus valable.
 
   remote.review:
@@ -81,7 +81,7 @@ entries:
     body_text: >-
       Une revue est l'avis d'une autre personne sur la PR : approuvée, modifications demandées
       ou simple commentaire. Une règle de protection peut exiger qu'une autre personne approuve
-      avant la fusion : c'est le principe des quatre yeux.
+      avant la fusion : c'est le principe des [[four-eyes|quatre yeux]].
 
   code.file:
     title_text: "Un fichier du diff"

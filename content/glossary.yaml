@@ -1,0 +1,77 @@
+# Vocabulaire de la chaîne (Story 9.4, AD-2, AD-7). Chaque terme mène à la barrière qui l'incarne.
+# `barrier_id` : barrière de `content/chain.yaml` (un test le vérifie) ; vide : aucune barrière.
+# `scenario_id` : scénario qui fait jouer la barrière ; vide ou absent du catalogue : « à venir ».
+# `named_only` : terme seulement nommé (aucune barrière, aucun scénario).
+# Dans une explication, `[[id|texte]]` pose un terme du vocabulaire (`glossary-term`).
+# Deux phrases par définition, en français, au vouvoiement.
+schema_version: 1
+
+ui:
+  see_text: "Voir la barrière"
+  barrier_title: "Barrière"
+  play_text: "La voir jouer : scénario {name}"
+  soon_text: "Scénario à venir"
+  named_only_text: "Nommé seulement"
+  none_text: "Le vocabulaire n'est pas disponible pour le moment."
+  close_text: "Fermer"
+
+terms:
+  - id: secrets-scanning
+    term_text: "Secrets scanning"
+    definition_text: >-
+      Le secrets scanning cherche dans le code et l'historique les clés, mots de passe et jetons
+      qui n'auraient jamais dû y entrer. Il doit bloquer avant que le secret ne quitte votre poste.
+    barrier_id: secret-scan
+    scenario_id: secret-dans-un-commit
+  - id: sast
+    term_text: "SAST"
+    definition_text: >-
+      Le SAST analyse le code source sans l'exécuter pour y repérer des constructions dangereuses.
+      Il donne un retour tôt, avant tout déploiement.
+    barrier_id: static-analysis
+  - id: sca
+    term_text: "SCA"
+    definition_text: >-
+      L'analyse de composition logicielle (SCA) compare les dépendances du projet aux failles
+      connues. Une version vulnérable est signalée avant d'arriver en production.
+    barrier_id: dependencies
+  - id: sbom
+    term_text: "SBOM"
+    definition_text: >-
+      Le SBOM est la liste détaillée des composants et des versions embarqués dans un logiciel.
+      Il sert de base à l'audit des dépendances : sans inventaire, impossible de savoir ce qu'une
+      faille touche.
+    barrier_id: dependencies
+  - id: quality-gate
+    term_text: "Quality gate"
+    definition_text: >-
+      Un quality gate est un seuil que la CI vérifie avant d'autoriser la suite. Tant que les
+      tests ne passent pas, la pull request reste bloquée.
+    barrier_id: tests
+    scenario_id: test-casse
+  - id: four-eyes
+    term_text: "Quatre yeux"
+    definition_text: >-
+      Le principe des quatre yeux demande qu'une seconde personne relise tout changement avant
+      sa fusion. Un seul regard laisse passer ce que l'auteur ne voit plus.
+    barrier_id: review
+    scenario_id: pr-sans-revue
+  - id: branch-protection
+    term_text: "Protection de branche"
+    definition_text: >-
+      La protection de branche interdit de pousser directement sur la branche principale. Elle
+      impose de passer par une pull request, avec des checks verts et une revue.
+    barrier_id: protection
+    scenario_id: push-direct-main
+  - id: traceability
+    term_text: "Traçabilité"
+    definition_text: >-
+      La traçabilité permet de retrouver qui a changé quoi, quand et pourquoi. Chaque
+      modification laisse une trace : commit, pull request, checks et revue.
+    trace_text: "Vous la retrouvez dans les PR et les checks de l'espace de travail."
+  - id: dast
+    term_text: "DAST"
+    definition_text: >-
+      Le DAST teste l'application en marche, de l'extérieur, comme le ferait un attaquant. Il est
+      nommé ici pour situer le vocabulaire, mais aucune barrière de l'atelier ne le joue.
+    named_only: true
