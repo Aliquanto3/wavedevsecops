@@ -30,6 +30,7 @@ PYTHON_PACKAGES = frozenset(
         "ruff",
         "pytest",
         "pytest-cov",
+        "pytest-xdist",
         "coverage",
         "diff-cover",
         "bandit",

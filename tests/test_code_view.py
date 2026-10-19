@@ -64,6 +64,7 @@ def _commit(space: Space, path: str, text: str) -> None:
 # --- save_file -------------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_enregistrer_ecrit_en_lf_et_git_status_voit_le_changement(
     space: Space, git_path: Path
 ) -> None:
@@ -74,6 +75,7 @@ def test_enregistrer_ecrit_en_lf_et_git_status_voit_le_changement(
     assert _status(space, git_path).strip() == "M a.txt"
 
 
+@pytest.mark.slow
 def test_enregistrer_un_nouveau_fichier_avec_une_empreinte_vide(
     space: Space, git_path: Path
 ) -> None:
@@ -82,6 +84,7 @@ def test_enregistrer_un_nouveau_fichier_avec_une_empreinte_vide(
     assert "?? nouveau.txt" in _status(space, git_path)
 
 
+@pytest.mark.slow
 def test_une_empreinte_perimee_est_refusee_avant_la_file(space: Space) -> None:
     _commit(space, "a.txt", "un\n")
     stale = code_intents.content_hash(b"un\n")
@@ -92,6 +95,7 @@ def test_une_empreinte_perimee_est_refusee_avant_la_file(space: Space) -> None:
     assert (space.layout.repo / "a.txt").read_text(encoding="utf-8") == "modifie ailleurs\n"
 
 
+@pytest.mark.slow
 def test_le_disque_qui_bouge_entre_la_reception_et_la_file_est_revu_dans_la_file(
     space: Space,
 ) -> None:
@@ -111,29 +115,34 @@ def test_le_disque_qui_bouge_entre_la_reception_et_la_file_est_revu_dans_la_file
     assert (space.layout.repo / "a.txt").read_text(encoding="utf-8") == "ailleurs\n"
 
 
+@pytest.mark.slow
 def test_un_fichier_existant_ne_s_enregistre_pas_avec_une_empreinte_vide(space: Space) -> None:
     _commit(space, "a.txt", "un\n")
     with pytest.raises(OperationRefused):
         _save(space, "a.txt", "x\n", base="")
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("path", ["../dehors.txt", ".git/config", "/etc/passwd", "a/../../b"])
 def test_un_chemin_hors_du_depot_est_refuse(space: Space, path: str) -> None:
     with pytest.raises(AppError):
         _save(space, path, "x\n", base="")
 
 
+@pytest.mark.slow
 def test_un_dossier_parent_absent_est_refuse(space: Space) -> None:
     with pytest.raises(AppError):
         _save(space, "absent/f.txt", "x\n", base="")
 
 
+@pytest.mark.slow
 def test_un_dossier_n_est_pas_un_fichier(space: Space) -> None:
     (space.layout.repo / "dossier").mkdir()
     with pytest.raises(AppError):
         _save(space, "dossier", "x\n", base="")
 
 
+@pytest.mark.slow
 def test_une_empreinte_qui_n_est_pas_hexadecimale_est_invalide(space: Space) -> None:
     with pytest.raises(OperationRefused):
         build_operation(
@@ -144,6 +153,7 @@ def test_une_empreinte_qui_n_est_pas_hexadecimale_est_invalide(space: Space) -> 
 # --- open_external ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_ouvrir_dans_mon_editeur_resout_le_chemin_par_wsfs(
     space: Space, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -155,6 +165,7 @@ def test_ouvrir_dans_mon_editeur_resout_le_chemin_par_wsfs(
     assert opened == [(space.layout.repo / "a.txt").resolve()]
 
 
+@pytest.mark.slow
 def test_ouvrir_dans_mon_editeur_refuse_un_chemin_hors_du_depot(
     space: Space, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -166,6 +177,7 @@ def test_ouvrir_dans_mon_editeur_refuse_un_chemin_hors_du_depot(
     assert opened == []
 
 
+@pytest.mark.slow
 def test_le_systeme_qui_n_ouvre_pas_le_fichier_le_dit(
     space: Space, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -181,6 +193,7 @@ def test_le_systeme_qui_n_ouvre_pas_le_fichier_le_dit(
 # --- diff projeté ----------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_diff_de_l_arbre_de_travail(space: Space, git_path: Path) -> None:
     _commit(space, "a.txt", "un\ndeux\ntrois\n")
     space.write("a.txt", "un\nDEUX\ntrois\nquatre\n")
@@ -209,6 +222,7 @@ def test_diff_de_l_arbre_de_travail(space: Space, git_path: Path) -> None:
     assert "2 lignes ajoutées" in file.a11y_name_text
 
 
+@pytest.mark.slow
 def test_tous_les_element_id_du_diff_suivent_la_grammaire_et_sont_uniques(
     space: Space, git_path: Path
 ) -> None:
@@ -224,6 +238,7 @@ def test_tous_les_element_id_du_diff_suivent_la_grammaire_et_sont_uniques(
     assert view.files[0].path == "a b.txt"
 
 
+@pytest.mark.slow
 def test_diff_d_un_commit_et_d_un_premier_commit(space: Space, git_path: Path) -> None:
     git = _git(space, git_path)
     repo = space.layout.repo
@@ -242,6 +257,7 @@ def test_diff_d_un_commit_et_d_un_premier_commit(space: Space, git_path: Path) -
     assert root.files[0].summary_text == "nouveau fichier · +1 −0"
 
 
+@pytest.mark.slow
 def test_diff_vide_et_cible_inconnue(space: Space, git_path: Path) -> None:
     git = _git(space, git_path)
     view = read_diff(git, space.layout.repo, "worktree")
@@ -251,6 +267,7 @@ def test_diff_vide_et_cible_inconnue(space: Space, git_path: Path) -> None:
             read_diff(git, space.layout.repo, bad)
 
 
+@pytest.mark.slow
 def test_renommage_suppression_et_binaire(space: Space, git_path: Path) -> None:
     repo = space.layout.repo
     _commit(space, "ancien.txt", "a\nb\nc\nd\ne\nf\n")
@@ -293,6 +310,7 @@ def test_un_diff_trop_long_est_coupe_et_le_dit(monkeypatch: pytest.MonkeyPatch) 
 # --- lectures HTTP ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_lectures_de_la_vue_code(tmp_path, instance, cookie) -> None:  # noqa: F811, ANN001
     root = tmp_path / "data" / "workspaces" / "llm" / "bac-a-sable-libre.A" / "repo"
     (root / "src").mkdir(exist_ok=True)
@@ -325,6 +343,7 @@ def test_lectures_de_la_vue_code(tmp_path, instance, cookie) -> None:  # noqa: F
     assert status == 404 and "introuvable" in body["reason_text"]
 
 
+@pytest.mark.slow
 def test_enregistrer_par_http_puis_conflit(tmp_path, instance, cookie) -> None:  # noqa: F811, ANN001
     root = tmp_path / "data" / "workspaces" / "llm" / "bac-a-sable-libre.A" / "repo"
     (root / "n.txt").write_text("un\n", encoding="utf-8")
@@ -347,6 +366,7 @@ def test_enregistrer_par_http_puis_conflit(tmp_path, instance, cookie) -> None: 
 # --- revue : non suivis, droits, ouverture sûre, garde d'écriture, taille ----------------------
 
 
+@pytest.mark.slow
 def test_un_fichier_cree_figure_dans_le_diff_de_l_arbre_de_travail(
     space: Space, git_path: Path
 ) -> None:
@@ -379,6 +399,7 @@ def test_l_enregistrement_garde_le_bit_executable(space: Space) -> None:
     assert stat.S_IMODE((space.layout.repo / "neuf.txt").stat().st_mode) == wsfs.NEW_FILE_MODE
 
 
+@pytest.mark.slow
 def test_save_file_est_refuse_apres_un_retablissement_echoue(space: Space) -> None:
     _commit(space, "a.txt", "un\n")
     run = load_run(space.layout)
@@ -388,6 +409,7 @@ def test_save_file_est_refuse_apres_un_retablissement_echoue(space: Space) -> No
     assert (space.layout.repo / "a.txt").read_text(encoding="utf-8") == "un\n"
 
 
+@pytest.mark.slow
 def test_la_taille_maximale_compte_les_octets(space: Space) -> None:
     wide = "é" * (code_intents.MAX_CONTENT // 2 + 1)  # sous la limite en caractères
     with pytest.raises(AppError):

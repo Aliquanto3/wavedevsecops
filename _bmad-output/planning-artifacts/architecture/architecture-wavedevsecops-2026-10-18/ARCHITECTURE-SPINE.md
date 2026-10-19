@@ -366,6 +366,7 @@ Règles de dépendance :
 | ruff | 0.17.1 |
 | pytest | 9.1.1 |
 | pytest-cov | 7.1.0 |
+| pytest-xdist | 3.8.0 |
 | coverage | 7.16.2 |
 | diff-cover | 10.6.0 |
 | bandit | 1.9.4 |

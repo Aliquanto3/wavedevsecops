@@ -70,6 +70,7 @@ def test_install_hooks_refuse_un_hook_inconnu() -> None:
         parse_scenario(text, "essai.A.yaml")
 
 
+@pytest.mark.slow
 def test_un_push_direct_sur_main_est_refuse_par_git(settings: Settings, git_path: Path) -> None:
     layout, git = _prepare(settings, git_path)
     before = git.internal("rev-parse", "main", cwd=layout.origin).strip()
@@ -81,6 +82,7 @@ def test_un_push_direct_sur_main_est_refuse_par_git(settings: Settings, git_path
     assert git.internal("rev-parse", "main", cwd=layout.origin).strip() == before
 
 
+@pytest.mark.slow
 def test_une_branche_non_protegee_passe(settings: Settings, git_path: Path) -> None:
     layout, git = _prepare(settings, git_path)
     git.internal("switch", "-q", "feature", cwd=layout.repo)
@@ -88,12 +90,14 @@ def test_une_branche_non_protegee_passe(settings: Settings, git_path: Path) -> N
     assert git.run("push", "origin", "feature", cwd=layout.repo).ok
 
 
+@pytest.mark.slow
 def test_une_protection_sans_blocage_laisse_passer(settings: Settings, git_path: Path) -> None:
     layout, git = _prepare(settings, git_path, HOOKS + "    block_direct_push: false\n")
     _commit(git, layout.repo, "libre.py")
     assert git.run("push", "origin", "main", cwd=layout.repo).ok
 
 
+@pytest.mark.slow
 def test_le_merge_de_la_pr_ne_passe_pas_par_le_hook(settings: Settings, git_path: Path) -> None:
     extra = HOOKS + "  - op: open_pr\n    head: '@feature'\n    title_text: Change la valeur\n"
     layout, git = _prepare(settings, git_path, extra)
@@ -151,6 +155,7 @@ def test_le_chemin_de_python_est_echappe_pour_sh(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.slow
 def test_l_empreinte_ne_depend_pas_du_chemin_de_python(settings: Settings, git_path: Path) -> None:
     """Revue 3.5 : la référence d'AD-18 d'un scénario avec hooks vaut sur tout poste."""
     from wavedevsecops.engine.fingerprint import fingerprint

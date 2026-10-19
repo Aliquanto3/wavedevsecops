@@ -66,7 +66,7 @@ jobs:
       # Contient les contrôles d'AD-13 (imports réseau, URL de static/, hook d'audit
       # socket.connect), les règles de dépendance d'AD-1 et la cohérence des versions d'AD-16.
       - name: pytest
-        run: uv run pytest -q --tb=short
+        run: uv run pytest -q --tb=short -n auto --durations=15
         env:
           WDS_EXERCISE_UV: "1"
           WDS_EXERCISE_DATA: ${{ runner.temp }}/wds-exercise

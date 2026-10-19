@@ -7,7 +7,7 @@ Architecture : `_bmad-output/planning-artifacts/architecture/*/ARCHITECTURE-SPIN
 
 - Installer : `uv sync`
 - Lint : `uv run ruff check .`
-- Tests : `uv run pytest -q --tb=short`
+- Tests rapides : `uv run pytest -q -m "not slow"` (ajouter `-n auto` pour paralléliser) ; suite complète : CI
 - Contrôle rapide de fin de story : `python .claude/cost-kit/controle_rapide.py`
 
 ## Règles à ne pas casser (vérifiées par les tests)

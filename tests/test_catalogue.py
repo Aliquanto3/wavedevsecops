@@ -87,6 +87,7 @@ def test_catalogue_derriere_le_cookie(instance: cli.Instance) -> None:
     assert status == 401
 
 
+@pytest.mark.slow
 def test_ouvrir_un_mode_prepare_l_espace_puis_le_rouvre(
     instance: cli.Instance, cookie: dict
 ) -> None:

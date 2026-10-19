@@ -39,6 +39,7 @@ def _alive(pid: int) -> bool:
     return True
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("leader_waits", [True, False], ids=["chef-vivant", "chef-sorti"])
 def test_delai_borne_avec_petit_enfant(tmp_path: Path, leader_waits: bool) -> None:
     pid_file = tmp_path / "pid"

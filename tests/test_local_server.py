@@ -122,6 +122,7 @@ def test_seconde_instance_ouvre_l_url_existante_sans_ecrire(
     assert "déjà lancé" in capsys.readouterr().out
 
 
+@pytest.mark.slow
 def test_verrou_perime_remplace(tmp_path: Path) -> None:
     data = tmp_path / "data"
     data.mkdir()

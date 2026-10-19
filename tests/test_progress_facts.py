@@ -110,6 +110,7 @@ def test_score_du_premier_coup() -> None:
     assert derive([], TRACK, SCENARIO, MODE).first_try_score is None
 
 
+@pytest.mark.slow
 def test_ecritures_concurrentes_sous_un_seul_verrou(tmp_path: Path) -> None:
     def submit(i: int) -> None:
         ProgressStore.for_dir(tmp_path).submit([fact(step_id=f"s{i}", op_id=f"op{i}")])

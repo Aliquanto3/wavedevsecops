@@ -56,6 +56,7 @@ def _prepare(settings: Settings, git_path: Path, extra: str = ""):
     return prepared.layout, Git.for_workspace(git_path, prepared.layout.root, settings)
 
 
+@pytest.mark.slow
 def test_branches_de_origin_et_proposition_d_ouvrir_une_pr(
     settings: Settings, git_path: Path
 ) -> None:
@@ -85,6 +86,7 @@ def test_branches_de_origin_et_proposition_d_ouvrir_une_pr(
     assert main.short_sha == main.sha[:7]
 
 
+@pytest.mark.slow
 def test_carte_de_pr_checks_blocage_et_journal(settings: Settings, git_path: Path) -> None:
     layout, git = _prepare(settings, git_path, PR_SETUP)
     remote = project(git, layout).views.remote
@@ -136,6 +138,7 @@ def test_carte_de_pr_checks_blocage_et_journal(settings: Settings, git_path: Pat
     assert parse_element_id(entry.element_id)[0] == "review"
 
 
+@pytest.mark.slow
 def test_pr_sans_protection_est_mergeable_et_la_pr_mergee_n_a_plus_de_bouton(
     settings: Settings, git_path: Path
 ) -> None:
@@ -155,6 +158,7 @@ def test_pr_sans_protection_est_mergeable_et_la_pr_mergee_n_a_plus_de_bouton(
     assert not {b.name_text: b for b in merged.branches}["origin/feature"].can_open_pr
 
 
+@pytest.mark.slow
 def test_pr_courante_celle_de_la_branche_locale_sinon_la_plus_recente(
     settings: Settings, git_path: Path
 ) -> None:
@@ -172,6 +176,7 @@ def test_pr_courante_celle_de_la_branche_locale_sinon_la_plus_recente(
     assert [(p.number, p.current) for p in on_feature.pulls] == [(1, True), (2, False)]
 
 
+@pytest.mark.slow
 def test_github_json_illisible_dit_l_erreur_sans_faire_echouer_la_projection(
     settings: Settings, git_path: Path
 ) -> None:
@@ -182,6 +187,7 @@ def test_github_json_illisible_dit_l_erreur_sans_faire_echouer_la_projection(
     assert views.remote.branches == [] and views.remote.pulls == []
 
 
+@pytest.mark.slow
 def test_annonce_des_changements_de_pr(settings: Settings, git_path: Path) -> None:
     layout, git = _prepare(settings, git_path)
     first = project(git, layout).views
@@ -219,6 +225,7 @@ def test_literal_redeclares_identiques_a_contracts_github() -> None:
         assert get_args(getattr(remote, name)) == get_args(getattr(github, name)), name
 
 
+@pytest.mark.slow
 def test_marques_designable_de_la_vue_distante(settings: Settings, git_path: Path) -> None:
     """Revue (contrat 5.2) : une désignation marque aussi branches, PR, checks et revues."""
     from wavedevsecops.engine.designation import mark_views

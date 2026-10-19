@@ -137,6 +137,7 @@ class Stream:
         self.conn.close()
 
 
+@pytest.mark.slow
 def test_etat_de_l_espace(instance: cli.Instance, cookie: dict) -> None:
     status, state = _call(instance, "GET", f"/api/ws/{WS}/state", cookie)
     assert status == 200
@@ -148,6 +149,7 @@ def test_etat_de_l_espace(instance: cli.Instance, cookie: dict) -> None:
     assert status == 404
 
 
+@pytest.mark.slow
 def test_intention_executee_et_diffusee_dans_l_ordre(instance: cli.Instance, cookie: dict) -> None:
     _call(instance, "GET", f"/api/ws/{WS}/state", cookie)
     stream = Stream(instance, cookie)
@@ -175,6 +177,7 @@ def test_intention_executee_et_diffusee_dans_l_ordre(instance: cli.Instance, coo
     assert all(e["workspace_id"] == WS and e["epoch"] == 0 for e in mine)
 
 
+@pytest.mark.slow
 def test_refus_et_erreurs_d_intention(instance: cli.Instance, cookie: dict) -> None:
     status, body = _call(
         instance, "POST", f"/api/ws/{WS}/echo_test", cookie, {"text": "x", "refuse": True}
@@ -188,6 +191,7 @@ def test_refus_et_erreurs_d_intention(instance: cli.Instance, cookie: dict) -> N
     assert status == 404
 
 
+@pytest.mark.slow
 def test_intention_sans_origine_refusee(instance: cli.Instance, cookie: dict) -> None:
     conn = _conn(instance)
     conn.request("POST", f"/api/ws/{WS}/echo_test", body=b'{"text": "x"}', headers=cookie)
@@ -195,6 +199,7 @@ def test_intention_sans_origine_refusee(instance: cli.Instance, cookie: dict) ->
     conn.close()
 
 
+@pytest.mark.slow
 def test_reprise_par_last_event_id(instance: cli.Instance, cookie: dict) -> None:
     _, state = _call(instance, "GET", f"/api/ws/{WS}/state", cookie)
     boot = state["boot_id"]
@@ -215,6 +220,7 @@ def test_reprise_par_last_event_id(instance: cli.Instance, cookie: dict) -> None
     assert replay[0]["seq"] == events[-1]["seq"] + 1
 
 
+@pytest.mark.slow
 def test_resync_si_boot_different_ou_sorti_du_tampon(instance: cli.Instance, cookie: dict) -> None:
     _, state = _call(instance, "GET", f"/api/ws/{WS}/state", cookie)
     stream = Stream(instance, cookie, last_event_id="ancien-lancement:3")

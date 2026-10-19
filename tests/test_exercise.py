@@ -150,6 +150,7 @@ def _run_tests(repo: Path) -> tuple[int | None, str]:
     return result.returncode, result.stdout + result.stderr
 
 
+@pytest.mark.slow
 def test_parcours_sans_ia_pose_le_gabarit_et_ses_tests_passent(
     tmp_path: Path, git_path: Path
 ) -> None:
@@ -161,6 +162,7 @@ def test_parcours_sans_ia_pose_le_gabarit_et_ses_tests_passent(
     assert code == 0, output
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("stage", LLM_STAGES)
 def test_parcours_llm_pose_chaque_stade_et_ses_tests_passent_hors_ligne(
     stage: str, tmp_path: Path, git_path: Path
@@ -174,6 +176,7 @@ def test_parcours_llm_pose_chaque_stade_et_ses_tests_passent_hors_ligne(
     assert code == 0, output
 
 
+@pytest.mark.slow
 def test_les_stades_avancent(tmp_path: Path, git_path: Path) -> None:
     seen = {}
     for stage in LLM_STAGES:

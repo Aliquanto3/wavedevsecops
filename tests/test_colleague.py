@@ -59,6 +59,7 @@ def _origin(git: Git, layout, *args: str) -> str:
     return git.internal(*args, cwd=layout.origin).strip()
 
 
+@pytest.mark.slow
 def test_commit_du_collegue_sur_origin_sans_toucher_au_local(
     settings: Settings, git_path: Path
 ) -> None:
@@ -80,6 +81,7 @@ def test_commit_du_collegue_sur_origin_sans_toucher_au_local(
     assert _origin(git, layout, "show", "main:app.py") == "valeur = 1"  # arbre précédent gardé
 
 
+@pytest.mark.slow
 def test_pull_apporte_le_commit_avec_le_badge_collegue(settings: Settings, git_path: Path) -> None:
     prepared, git = _prepare(settings, git_path, COLLEAGUE_COMMIT)
     layout = prepared.layout
@@ -99,6 +101,7 @@ def test_sha_du_commit_du_collegue_stable_sur_les_trois_os(
     assert prepared.aliases["sacha"] == f"commit:{FIXED_SHA}"
 
 
+@pytest.mark.slow
 def test_commit_du_collegue_sur_nouvelle_branche_et_racine(
     settings: Settings, git_path: Path
 ) -> None:
@@ -207,6 +210,7 @@ def test_reaction_a_l_ouverture_ne_rejoue_pas_et_respecte_head(
     assert again is not None and again.reviews == []
 
 
+@pytest.mark.slow
 def test_approbation_automatique_quand_les_checks_obligatoires_passent(
     settings: Settings, git_path: Path
 ) -> None:
@@ -276,6 +280,7 @@ def test_pas_d_approbation_sans_check_obligatoire_ni_check_en_echec(
         github_sim.set_check_state(git, layout, 1, "absent", "success")
 
 
+@pytest.mark.slow
 def test_empreinte_inchangee_par_l_heure_des_revues(
     settings: Settings, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

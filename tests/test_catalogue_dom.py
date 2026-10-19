@@ -38,6 +38,7 @@ def _js(tmp_path: Path, body: str) -> dict:
     return json.loads(_run(tmp_path, f"{PRELUDE}\n{body}"))
 
 
+@pytest.mark.slow
 def test_premier_passage_seul_le_choix_du_parcours(tmp_path: Path) -> None:
     out = _js(
         tmp_path,

@@ -150,6 +150,7 @@ def english(git_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(gitio._LANGUAGES, git_path, gitio.GitLanguage("en"))
 
 
+@pytest.mark.slow
 def test_git_status_dans_repo_avec_la_sequence_de_la_file(space: Space, english: None) -> None:
     result = space.run("git status")
     assert result.code == 0
@@ -161,6 +162,7 @@ def test_git_status_dans_repo_avec_la_sequence_de_la_file(space: Space, english:
     assert {lang for _, _, lang in result.output} == {"en"}
 
 
+@pytest.mark.slow
 def test_git_parle_francais_quand_la_locale_existe(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -180,6 +182,7 @@ def test_git_parle_francais_quand_la_locale_existe(
     assert {lang for _, _, lang in result.output} == {"fr"}
 
 
+@pytest.mark.slow
 def test_sans_locale_francaise_git_parle_anglais(
     space: Space, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -189,6 +192,7 @@ def test_sans_locale_francaise_git_parle_anglais(
     assert {lang for _, _, lang in result.output} == {"en"}
 
 
+@pytest.mark.slow
 def test_stderr_et_code_de_sortie_non_nul(space: Space, english: None) -> None:
     result = space.run("git switch branche-absente")
     assert result.code == 128 or result.code == 1
@@ -198,6 +202,7 @@ def test_stderr_et_code_de_sortie_non_nul(space: Space, english: None) -> None:
     assert "stdout" not in result.streams
 
 
+@pytest.mark.slow
 def test_commit_sans_identite_configuree_prend_celle_de_l_apprenant(
     space: Space, english: None
 ) -> None:
@@ -215,6 +220,7 @@ def test_commit_sans_identite_configuree_prend_celle_de_l_apprenant(
     assert space.run("git log -1 --format=%an").text("stdout").strip() == "Ada Lovelace"
 
 
+@pytest.mark.slow
 def test_commit_sans_message_garde_la_sortie_de_git_puis_explique(
     space: Space, english: None
 ) -> None:
@@ -230,6 +236,7 @@ def test_commit_sans_message_garde_la_sortie_de_git_puis_explique(
     assert ok.code == 0 and "app" not in ok.streams
 
 
+@pytest.mark.slow
 def test_revert_amend_et_merge_continue_aboutissent_sans_editeur(
     space: Space, english: None
 ) -> None:
@@ -259,6 +266,7 @@ def test_revert_amend_et_merge_continue_aboutissent_sans_editeur(
     assert space.run("git rebase --continue").code == 0
 
 
+@pytest.mark.slow
 def test_ligne_refusee_a_l_ecran_sans_lancer_git(space: Space) -> None:
     result = space.run("git status | cat")
     assert result.streams == ["refused"]
@@ -269,6 +277,7 @@ def test_ligne_refusee_a_l_ecran_sans_lancer_git(space: Space) -> None:
     assert not (space.layout.repo / "src" / "x").exists()
 
 
+@pytest.mark.slow
 def test_ligne_vide_ne_fait_rien(space: Space) -> None:
     before = len(space.events)
     op, future = space.start("   ")
@@ -276,6 +285,7 @@ def test_ligne_vide_ne_fait_rien(space: Space) -> None:
     assert len(space.events) == before and op.intent == "terminal_line"
 
 
+@pytest.mark.slow
 def test_push_pull_fetch_agissent_sur_origin_et_refusent_un_chemin(
     space: Space, english: None, tmp_path: Path
 ) -> None:
@@ -306,6 +316,7 @@ def test_push_pull_fetch_agissent_sur_origin_et_refusent_un_chemin(
     assert len(calls) == 3  # un refus n'appelle pas les crochets
 
 
+@pytest.mark.slow
 def test_push_sur_une_branche_protegee_est_refuse_et_explique(
     space: Space, english: None, git_path: Path
 ) -> None:
@@ -347,6 +358,7 @@ def _protect_main(space: Space, git_path: Path) -> gitio.Git:
     return git
 
 
+@pytest.mark.slow
 def test_un_refus_sans_avance_rapide_n_est_pas_attribue_a_la_protection(
     space: Space, english: None, git_path: Path
 ) -> None:
@@ -370,6 +382,7 @@ def test_un_refus_sans_avance_rapide_n_est_pas_attribue_a_la_protection(
     assert "protection de `main`" in forced.text("app")
 
 
+@pytest.mark.slow
 def test_push_all_explique_la_protection(space: Space, english: None, git_path: Path) -> None:
     """Revue 3.5 : `git push --all` depuis une autre branche vise aussi `main`."""
     space.identify()
@@ -383,6 +396,7 @@ def test_push_all_explique_la_protection(space: Space, english: None, git_path: 
     assert "protection de `main`" in refused.text("app")
 
 
+@pytest.mark.slow
 def test_le_terminal_repare_un_hook_dont_python_a_disparu(
     space: Space, english: None, git_path: Path
 ) -> None:
@@ -404,6 +418,7 @@ def test_le_terminal_repare_un_hook_dont_python_a_disparu(
     )
 
 
+@pytest.mark.slow
 def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None) -> None:
     def alter(ctx: OpContext) -> int:
         ctx.set_rest_state("quiz_altered")
@@ -420,6 +435,7 @@ def test_en_quiz_altered_seules_les_lectures_passent(space: Space, english: None
     assert space.run("git status ; ls").streams == ["refused"]
 
 
+@pytest.mark.slow
 def test_aucune_commande_n_attend_une_saisie(space: Space, english: None) -> None:
     for line in (
         "git log",
@@ -437,6 +453,7 @@ def test_aucune_commande_n_attend_une_saisie(space: Space, english: None) -> Non
         assert time.monotonic() - started < WAIT, line
 
 
+@pytest.mark.slow
 def test_ctrl_c_arrete_l_arbre_et_supprime_l_index_lock(
     space: Space, tmp_path: Path, english: None
 ) -> None:
@@ -462,6 +479,7 @@ def test_ctrl_c_arrete_l_arbre_et_supprime_l_index_lock(
     assert space.run("git commit --allow-empty -m y").code == 0
 
 
+@pytest.mark.slow
 def test_delai_depasse_arrete_l_arbre(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "data", terminal_timeout_s=2.0)
     space = Space(settings, git_path)
@@ -477,6 +495,7 @@ def test_delai_depasse_arrete_l_arbre(tmp_path: Path, git_path: Path) -> None:
         space.manager.close()
 
 
+@pytest.mark.slow
 def test_la_mise_en_veille_interrompt_la_commande(
     space: Space, tmp_path: Path, english: None
 ) -> None:
@@ -490,6 +509,7 @@ def test_la_mise_en_veille_interrompt_la_commande(
     assert not (space.layout.repo / ".git" / "index.lock").exists()
 
 
+@pytest.mark.slow
 def test_la_sortie_arrive_au_fil_de_l_eau(space: Space, tmp_path: Path, english: None) -> None:
     """Le premier morceau est publié alors que la commande tourne encore."""
     space.install_hold_hook(tmp_path)
@@ -509,6 +529,7 @@ def test_intention_enregistree_une_seule_fois() -> None:
     assert INTENTS["terminal_line"].model is TerminalLine
 
 
+@pytest.mark.slow
 def test_validation_de_l_intention(space: Space) -> None:
     from wavedevsecops.engine import InvalidIntent, build_operation
 
@@ -530,6 +551,7 @@ def server(tmp_path: Path, git_path: Path) -> Iterator[cli.Instance]:
         inst.stop()
 
 
+@pytest.mark.slow
 def test_intentions_terminal_line_et_interrupt_par_http(
     server: cli.Instance, git_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

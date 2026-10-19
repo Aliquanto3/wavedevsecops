@@ -370,6 +370,7 @@ def box(tmp_path: Path, git_path: Path, fake_env: None) -> Iterator[Box]:
         opened.close()
 
 
+@pytest.mark.slow
 def test_chaque_job_donne_un_check_ecrit_par_la_file(
     box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -465,6 +466,7 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(
     assert ["evidence_seen"] in facts
 
 
+@pytest.mark.slow
 def test_un_nouveau_sha_annule_le_run_et_rejette_ses_resultats(
     box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -505,6 +507,7 @@ def test_un_nouveau_sha_annule_le_run_et_rejette_ses_resultats(
     assert second.head_sha == new_sha and not second.cancelled
 
 
+@pytest.mark.slow
 def test_recommencer_annule_le_run_en_cours(box, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list = []
     _fake_tools(
@@ -533,6 +536,7 @@ def test_recommencer_annule_le_run_en_cours(box, monkeypatch: pytest.MonkeyPatch
     assert opened.runner.history[0].cancelled
 
 
+@pytest.mark.slow
 def test_un_resultat_d_un_ancien_epoch_est_refuse_par_la_file(box, monkeypatch) -> None:
     calls: list = []
     _fake_tools(
@@ -551,6 +555,7 @@ def test_un_resultat_d_un_ancien_epoch_est_refuse_par_la_file(box, monkeypatch) 
     assert opened.states()["ruff"] == "success"
 
 
+@pytest.mark.slow
 def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list = []
     behaviour = {
@@ -576,6 +581,7 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
     assert opened.pr().mergeable
 
 
+@pytest.mark.slow
 def test_une_erreur_interne_du_run_laisse_des_checks_termines(
     box, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -609,6 +615,7 @@ def test_une_erreur_interne_du_run_laisse_des_checks_termines(
     opened.wait(lambda: opened.states()["ruff"] == "success", "ruff relancé")
 
 
+@pytest.mark.slow
 def test_relancer_un_check_reste_en_cours_sans_run(box, monkeypatch) -> None:
     calls: list = []
     _fake_tools(
@@ -650,6 +657,7 @@ def test_ci_borne_la_sortie_et_signale_un_detail_illisible(
     assert finding.rule_id == ci.NO_DETAIL_RULE and "la sortie de l'outil" in finding.message_text
 
 
+@pytest.mark.slow
 def test_sans_pipeline_declare_aucun_run(
     tmp_path: Path, git_path: Path, fake_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -673,6 +681,7 @@ ALERT_S, LIMIT_S = 90.0, 180.0
 """Durée d'un run des jobs de l'Epic 7 sur le runner de CI : alerte, puis échec."""
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not USE_TEMPLATE_LOCK, reason="WDS_EXERCISE_UV=1 : cache uv préchargé")
 def test_vrais_outils_dans_le_pipeline(tmp_path: Path, git_path: Path) -> None:
     """Vrais ruff, pytest et gitleaks sur une PR qui met à jour une dépendance du uv.lock :

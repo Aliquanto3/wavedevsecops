@@ -76,6 +76,7 @@ def test_script_utf8_avec_bom() -> None:
     assert SCRIPT.read_bytes().startswith(b"\xef\xbb\xbf")
 
 
+@pytest.mark.slow
 def test_versions_git(tmp_path: Path) -> None:
     cases = {
         ("2.43.0.windows.1", "2.38"): "True",
@@ -292,6 +293,7 @@ def test_dossier_app_etranger_non_supprime(tmp_path: Path) -> None:
 # --- Story 7.1 : gitleaks vérifié et cache uv préchargé (AD-12, AD-15) ---------------------
 
 
+@pytest.mark.slow
 def test_gitleaks_et_cache_uv_provisionnes(tmp_path: Path) -> None:
     out = _install(tmp_path, WDS_INSTALL_SIMULATE_GIT="2.43.0")
     assert out.returncode == 0, out.stdout + out.stderr

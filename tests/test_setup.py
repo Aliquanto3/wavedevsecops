@@ -120,6 +120,7 @@ def test_bac_a_sable_libre(settings: Settings, free: LoadedScenario, git_path: P
     assert run["aliases"]["readme"] == "path:worktree:README.md"
 
 
+@pytest.mark.slow
 def test_meme_empreinte_quel_que_soit_le_poste(
     settings: Settings,
     free: LoadedScenario,
@@ -151,6 +152,7 @@ def test_meme_empreinte_quel_que_soit_le_poste(
     assert rebuilt.fingerprint == first.fingerprint
 
 
+@pytest.mark.slow
 def test_empreinte_suit_l_etat_et_ignore_le_reste(
     settings: Settings, free: LoadedScenario, git_path: Path
 ) -> None:
@@ -185,6 +187,7 @@ def test_empreinte_suit_l_etat_et_ignore_le_reste(
     assert fingerprint(layout, git) != reference
 
 
+@pytest.mark.slow
 def test_lien_de_l_apprenant_qui_sort_ou_vise_git(
     settings: Settings, free: LoadedScenario, git_path: Path, tmp_path: Path
 ) -> None:
@@ -212,6 +215,7 @@ def test_lien_de_l_apprenant_qui_sort_ou_vise_git(
     assert fingerprint(layout, git) != with_links
 
 
+@pytest.mark.slow
 def test_ops_branch_switch_et_alias(settings: Settings, git_path: Path) -> None:
     text = """\
 schema_version: 1

@@ -109,6 +109,7 @@ def _js(tmp_path: Path, snapshots: dict, body: str) -> dict:
         del os.environ["SNAPS"]
 
 
+@pytest.mark.slow
 def test_carte_de_pr_dans_l_ordre_de_l_ux(tmp_path: Path, snapshots: dict) -> None:
     out = _js(
         tmp_path,

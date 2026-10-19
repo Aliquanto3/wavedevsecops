@@ -404,6 +404,7 @@ def test_lien_vers_git_refuse(tmp_path: Path) -> None:
 # --- par la file d'opérations ----------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_commandes_de_fichiers_par_le_terminal(space: Space) -> None:  # noqa: F811
     assert space.run("echo bonjour > note.txt").code == 0
     assert (space.layout.repo / "note.txt").read_bytes() == b"bonjour\n"
@@ -415,6 +416,7 @@ def test_commandes_de_fichiers_par_le_terminal(space: Space) -> None:  # noqa: F
     assert not (space.layout.repo / "note.txt").exists()
 
 
+@pytest.mark.slow
 def test_refus_de_chemin_et_code_de_sortie_par_le_terminal(space: Space) -> None:  # noqa: F811
     refused = space.run("cat ../x")
     assert refused.code == 2 and refused.streams == ["refused"]

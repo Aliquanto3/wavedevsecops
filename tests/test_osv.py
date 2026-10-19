@@ -350,6 +350,7 @@ def _pip_audit(inst: cli.Instance, tmp_path: Path, pins: str, *extra: str) -> tu
     return proc.returncode, proc.stdout
 
 
+@pytest.mark.slow
 def test_pip_audit_bout_en_bout_vulnerable(instance: cli.Instance, tmp_path: Path) -> None:
     code, out = _pip_audit(instance, tmp_path, "jinja2==3.1.2\n", "-f", "json")
     assert code == 1

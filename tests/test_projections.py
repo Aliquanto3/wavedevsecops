@@ -114,6 +114,7 @@ def conformity(box: Sandbox, state: RepoState) -> None:
     assert set(graph.cells) == {c.sha for c in state.commits}
 
 
+@pytest.mark.slow
 def test_suite_d_etats_conforme_et_placement_stable(sandbox: Sandbox) -> None:
     box = sandbox
     states: list[RepoState] = []
@@ -202,6 +203,7 @@ def test_suite_d_etats_conforme_et_placement_stable(sandbox: Sandbox) -> None:
     assert {e.path for e in state.index} >= {"src/nouveau.py", "src/salut.py"}
 
 
+@pytest.mark.slow
 def test_vues_annotees(sandbox: Sandbox) -> None:
     box = sandbox
     before = box.state()
@@ -279,6 +281,7 @@ def test_vues_annotees(sandbox: Sandbox) -> None:
     assert [i.a11y_name_text for i in renamed] == ["Indexé : a.txt → c.txt, renommé"]
 
 
+@pytest.mark.slow
 def test_passages_liables(sandbox: Sandbox) -> None:
     box = sandbox
     box.run("tag", "v1.0")
@@ -371,6 +374,7 @@ def events() -> Iterator[list[Envelope]]:
     yield []
 
 
+@pytest.mark.slow
 def test_la_file_publie_les_vues_et_les_passages_relies(
     sandbox: Sandbox, settings: Settings, git_path: Path, events: list[Envelope]
 ) -> None:
@@ -418,6 +422,7 @@ def test_la_file_publie_les_vues_et_les_passages_relies(
     assert engine.snapshot()["views"]["prompt"]["text"] == "main"
 
 
+@pytest.mark.slow
 def test_ref_au_nom_unicode_et_stash(sandbox: Sandbox) -> None:
     """Revue 2.6 : U+2028 ou U+0085 dans un nom de ref ne coupe pas la lecture."""
     box = sandbox
@@ -434,6 +439,7 @@ def test_ref_au_nom_unicode_et_stash(sandbox: Sandbox) -> None:
     assert state.stash[0].message.endswith("essai suite")
 
 
+@pytest.mark.slow
 def test_projection_garde_les_cases_malgre_une_date_ancienne(
     sandbox: Sandbox, settings: Settings
 ) -> None:
