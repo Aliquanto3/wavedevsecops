@@ -146,7 +146,8 @@ console.log(JSON.stringify({
   slot: slot.textContent, clear: $$(".answer-clear").length, validated: slot.classList.contains("is-validated"),
   order: [...block.children].map((c) => c.className.split(" ")[0]),
   designateBlock: $$(".designate-block").length,
-  actions: $$(".notice-actions .btn").map((b) => b.textContent),
+  actions: $$(".is-correction .btn").map((b) => b.textContent),
+  foot: $$(".restart-foot .btn").map((b) => b.textContent),
 }));
 """,
     )
@@ -161,7 +162,8 @@ console.log(JSON.stringify({
     # Ordre fixe : correction (titre, résumé, cases) puis explication.
     assert out["order"] == ["step-explanation-title", "correction-summary", "answer-slot", "step-explanation-text", "notice-actions"]
     assert out["designateBlock"] == 0
-    assert out["actions"] == ["Continuer", "Recommencer"]
+    assert out["actions"] == ["Continuer"]  # « Recommencer » est au pied du panneau (4.4)
+    assert out["foot"] == ["Recommencer"]
 
 
 def test_continuer_retire_les_marques_et_garde_l_explication(tmp_path: Path) -> None:
@@ -192,7 +194,8 @@ const store = setup(reloaded(correction(B, false)));
 const marks = marksOf();
 const hasBlock = $$(".is-correction").length;
 const status = $$('[role="status"]').map((s) => s.textContent).join(" | ");
-$('[data-action="restart"]').click();
+$('[data-action="restart-ask"]').click(); // confirmation en ligne de 4.4
+$('[data-action="restart-confirm"]').click();
 await tick();
 store.setStepPanel(panelOf(STEPS({ state: "current", explanation_text: "", explain_ref: "", designate }), "q"));
 console.log(JSON.stringify({ marks, hasBlock, posts, after: marksOf(), blocks: $$(".is-correction").length,
@@ -201,7 +204,7 @@ console.log(JSON.stringify({ marks, hasBlock, posts, after: marksOf(), blocks: $
     )
     assert out["marks"] == {"ccc": ["≡ Accepté aussi"], "bbb": ["✗ Votre choix"], "aaa": ["✓ Attendu"]}
     assert out["hasBlock"] == 1
-    assert out["posts"] and out["posts"][0][0].endswith("/restart")
+    assert len(out["posts"]) == 1 and out["posts"][0][0].endswith("/restart")
     assert out["after"] == {"ccc": [], "bbb": [], "aaa": []} and out["blocks"] == 0
     assert out["armed"] == 1  # la désignation est rouverte
 
@@ -270,4 +273,4 @@ console.log(JSON.stringify({ closed, reopened: marksOf(), actions: $$(".is-corre
     )
     assert out["closed"]["bbb"] == []
     assert out["reopened"]["bbb"] == ["✗ Votre choix"]
-    assert out["actions"] == ["Recommencer"]  # rien à « Continuer » : on relit une étape passée
+    assert out["actions"] == []  # rien à « Continuer » : on relit une étape passée
