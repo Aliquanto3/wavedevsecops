@@ -55,7 +55,7 @@ development_status:
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: done
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: done
-  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: in-progress
+  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: review
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
   epic-2-retrospective: optional
 
@@ -71,7 +71,7 @@ development_status:
   4-1-valider-une-étape-sur-l-état-réel-du-dépôt: done
   4-2-enregistrer-les-faits-du-premier-passage: done
   4-3-prendre-des-instantanés-et-rétablir-un-état-exact: done
-  4-4-recommencer-un-scénario-sans-perdre-son-score: review
+  4-4-recommencer-un-scénario-sans-perdre-son-score: done
   4-5-exécuter-une-mauvaise-commande-de-quiz-puis-rétablir-l-état: done
   4-6-ouvrir-des-indices-par-paliers: done
   4-7-lire-le-bilan-à-la-fin-d-un-scénario: done
@@ -119,7 +119,7 @@ development_status:
   epic-9: in-progress
   9-1-se-situer-grâce-au-bandeau-de-la-chaîne: done
   9-2-déplier-la-carte-de-la-chaîne: done
-  9-3-trouver-les-scénarios-de-station-dans-le-catalogue: backlog
+  9-3-trouver-les-scénarios-de-station-dans-le-catalogue: in-progress
   9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: backlog
   9-5-publier-la-release-v0-2-0: backlog
   epic-9-retrospective: optional

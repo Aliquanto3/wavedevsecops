@@ -378,6 +378,12 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 03:31 · 4.4 · fusion · rebase sur main (conflit facts.py sur l'ancien nom du fait, scenario_reset gardé ; RESTART_KIND défini deux fois → une seule définition, par l'orchestrateur), tests ciblés 117 passed, suite complète et CI en cours · —
 - 2026-10-19 03:31 · 5.5 · second-avis · aucun medium ni high, aucune fuite de la correction avant soumission ; 6 low (pas de Continuer en fin de scénario, correction de N active pendant N+1 armée, marque hors nom accessible…) ; reviewer Opus lancé · —
 - 2026-10-19 03:31 · 7.4 ★ · second-avis · 3 medium (run refusé ou en exception sans état terminal + test instable, échec machine sans constat ni tool_error, code de l'apprenant sans bac à sable dans le pipeline), 5 low ; reviewer Opus lancé avec le front Distant + PR à compléter · —
+- 2026-10-19 04:05 · 4.4 · fusion · suite complète 1306 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done · 6ba00d1
+- 2026-10-19 04:09 · 6.2 · review · rebase (fingerprints.json régénéré, stable), H écarté (lu sans 3.3 ; vérification can_open_pr et merge.enabled ajoutée), M libellés « Distant + PR », M vouvoiement, L « signé », L -u, L test de restauration add-commit, 3 L de français corrigés ; pr_state silencieux écarté (AD-8), réévaluation d'étape reportée ; 1216 passed, CI branche verte · e13012d
+- 2026-10-19 04:09 · 6.2 · fusion · rebase sur main (4.4) sans conflit, empreintes et scénarios 36 passed, branche poussée, suite complète et CI en cours · —
+- 2026-10-19 04:09 · 2.10 · dev · fini, ~1215 passed, CI verte ; Views.links, names, explain (projections/links.py), content/explanations.yaml (13 clés) et GET /api/explanations, linking.js et explain.js ; barrier_id prévu pour 9.4 ; contrôles navigateur pour Anaël · 553bc1a
+- 2026-10-19 04:09 · 2.10 · second-avis · lancé · —
+- 2026-10-19 04:09 · 9.3 · dev · lancé (dev-story Sonnet ; section Stations du catalogue, attendue par 7.2) ; 5.4 attend 5.5 · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
