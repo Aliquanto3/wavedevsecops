@@ -1556,7 +1556,7 @@ afin de savoir réparer et expliquer cet incident.
 
 **Étant donné** la fin du scénario
 **Quand** l'encart « Ce qui l'aurait bloqué » s'affiche
-**Alors** il liste gitleaks (Station 1 · Poste local, secrets scanning) avec l'étiquette en tirets « Arrive en v0.2 » tant que la station n'est pas livrée, d'après la déclaration des jalons côté serveur
+**Alors** il liste gitleaks (Station 1 · Poste local, secrets scanning) avec l'étiquette en tirets « Arrive en v0.2 » tant que la station n'est pas livrée, d'après la déclaration des jalons côté serveur (livré par la story 5.9 : ce critère décrit le résultat attendu, 5.9 porte le travail)
 
 ### Story 5.7 : Le scénario B « `push --force` qui écrase un collègue »
 
@@ -1605,6 +1605,38 @@ afin de savoir finir le travail inachevé d'un agent.
 **Étant donné** les deux scénarios
 **Quand** la CI compare leurs setups
 **Alors** les empreintes de référence sont identiques sur les trois OS
+
+### Story 5.9 : Encart « Ce qui l'aurait bloqué » dans les scénarios B
+
+En tant qu'apprenant,
+je veux, à la fin d'un scénario B, voir quelles barrières auraient bloqué l'erreur de l'agent,
+afin de relier chaque incident à la barrière DevSecOps qui l'aurait évité.
+
+**Type :** dev
+
+**AD à respecter :** AD-7 (champ du schéma de scénario, lint de contenu), AD-17 (`step_explanation`), AD-2 (projection), convention Textes affichés · **Exigences :** FR-12, UX-DR8 (variante « Ce qui l'aurait bloqué ») · **Arbitrage :** la contradiction entre les stories 5.1 (qui ne prévoit pas l'encart) et 9.3 (qui retire l'étiquette « Arrive en v0.2 ») est tranchée : cette story livre l'encart, 9.3 ne fait que retirer l'étiquette et lier le scénario
+
+**Critères d'acceptation :**
+
+**Étant donné** le schéma d'un scénario B
+**Quand** un auteur déclare, pour la fin du scénario, une liste de barrières qui l'auraient bloqué (barrière, station, nom du scénario qui la joue)
+**Alors** le schéma pydantic l'accepte, le lint de contenu refuse une barrière inconnue de `content/barriers.yaml`, et un scénario sans cette liste reste valide
+
+**Étant donné** les scénarios B « `.env` committé », « `push --force` », « stash oublié » et « rebase laissé en conflit »
+**Quand** leurs déclarations sont écrites
+**Alors** chacun nomme ses barrières : gitleaks (Station 1 · Poste local, secrets scanning) pour `.env`, la protection de branche pour `push --force`, et ce que le contenu de chaque scénario justifie pour les deux autres, sans barrière inventée
+
+**Étant donné** une barrière dont la station n'est pas livrée, d'après la déclaration des jalons côté serveur
+**Quand** l'encart s'affiche à la fin du scénario
+**Alors** il liste la barrière avec l'étiquette en tirets « Arrive en v0.2 », sans lien
+
+**Étant donné** une barrière dont la station est livrée
+**Quand** l'encart s'affiche
+**Alors** l'étiquette n'apparaît pas et le nom du scénario de la barrière est un lien
+
+**Étant donné** le panneau du scénario
+**Quand** le scénario B se termine
+**Alors** le rendu `step-explanation` de la variante « Ce qui l'aurait bloqué » s'affiche après la correction, en français, sans toucher au score
 
 ## Epic 6 : Parcourir le socle git complet dans les deux parcours
 
@@ -1721,7 +1753,7 @@ afin de ne pas refaire le début.
 **Quand** l'apprenant clique
 **Alors** le scénario se rouvre à cette étape, sur le bac à sable conservé
 
-**Étant donné** un bac à sable disparu, ou dont l'empreinte ne correspond plus à l'étape, ou un `content_hash` incompatible
+**Étant donné** un bac à sable disparu ou inutilisable, ou un `content_hash` incompatible
 **Quand** l'apprenant reprend
 **Alors** un encart dit « Ce scénario ne peut pas reprendre là où vous l'aviez laissé. » et propose « Recommencer »
 
@@ -2288,6 +2320,30 @@ afin de valider SM-9.
 **Quand** Anaël finit les scénarios des stations 1 à 3 des deux parcours, sans indice
 **Alors** chaque barrière bloque sur son défaut prévu, et le résultat est consigné dans les notes de release
 **Et** sur le poste de référence, un run complet du pipeline dure 45 s au plus, et la mesure est consignée
+
+### Story 9.6 : Explications de la vue pipeline et lien actif Traçabilité
+
+En tant qu'apprenant,
+je veux des explications sur la vue pipeline, et un terme « traçabilité » qui mène à ce que j'ai produit,
+afin de comprendre ce que je vois et de retrouver les traces concrètes d'une chaîne.
+
+**Type :** dev
+
+**AD à respecter :** AD-2 (`explain_ref` porté par la projection), AD-7 (`content/explanations.yaml`, lint), convention Textes affichés · **Exigences :** FR-5, FR-33, UX-DR33 · **Complète :** story 9.4 (critère « traçabilité »)
+
+**Critères d'acceptation :**
+
+**Étant donné** la vue pipeline
+**Quand** l'apprenant ouvre l'explication d'un de ses éléments (job, check, sortie)
+**Alors** un `explain-popover` de deux ou trois phrases s'ouvre, tiré d'une entrée de `content/explanations.yaml` par `explain_ref`, et le lint de contenu refuse un `explain_ref` sans entrée
+
+**Étant donné** la page Vocabulaire
+**Quand** l'apprenant suit le terme « traçabilité » avec un espace ouvert
+**Alors** le lien mène aux PR et aux checks de cet espace
+
+**Étant donné** la page Vocabulaire sans espace ouvert
+**Quand** l'apprenant suit « traçabilité »
+**Alors** le terme n'est pas un lien mort : la page dit qu'il faut ouvrir un scénario de station pour voir des PR et des checks
 
 ## Epic 10 : Livrer une version taguée, la promouvoir et revenir en arrière (station 4)
 
