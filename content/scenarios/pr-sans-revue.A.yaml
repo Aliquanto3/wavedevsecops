@@ -110,6 +110,8 @@ steps:
       gitleaks: success
       bandit: success
       pip_audit: success
+      uv_lock: success
+      quality_gate: success
     mergeable: false
     hints:
       lead_text: >-

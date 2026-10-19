@@ -368,6 +368,8 @@ def test_pr_sans_revue_checks_verts_mais_merge_bloque_jusqu_a_la_revue(
         "gitleaks": "success",
         "bandit": "success",
         "pip_audit": "success",
+        "uv_lock": "success",
+        "quality_gate": "success",
     }
     # Checks verts, mais la revue obligatoire manque : seule cette raison bloque.
     assert not pr.mergeable and pr.approvals == 0

@@ -216,7 +216,7 @@ def test_le_scenario_declare_le_parcours_sans_ia_et_la_station_3() -> None:
         lead = step.hints.lead_text
         assert "3.1.6" not in lead  # le premier palier ne donne pas la réponse
     last = scenario.steps[-1]
-    assert last.check_states == {"pip_audit": "success"}
+    assert last.check_states == {"pip_audit": "success", "uv_lock": "success"}
     assert last.sbom_has == {"pip_audit": ["jinja2"]}  # ni fichier vidé, ni dépendance retirée
 
 
@@ -499,17 +499,22 @@ def test_le_depart_des_gabarits_est_vert_sous_pip_audit(
 
 
 @pytest.mark.slow
-def test_la_correction_ne_touche_pas_uv_lock_et_la_version_corrigee_y_est_deja(
+def test_le_verrou_porte_la_version_corrigee_seulement_et_la_correction_ne_le_touche_pas(
     prepared,
 ) -> None:
     """La version corrigée (jinja2 3.1.6) est celle du `uv.lock` du gabarit : déjà dans le cache
     préchargé, donc `uv sync --offline --frozen` (celui du pipeline) réussit avant comme après
-    la correction, sans réseau. Le commit du scénario ne modifie que les deux fichiers épinglés."""
+    la correction, sans réseau. Depuis la story 8.4, le commit du scénario déclare aussi jinja2
+    3.1.6 comme dépendance dans le verrou (les deux ajouts de `uv lock`) : `uv_lock` échoue tant
+    que `pyproject.toml` demande 3.1.2 et passe quand il demande 3.1.6."""
     layout, git, _ = prepared
     changed = git.run("diff", "--name-only", "HEAD~1", "HEAD", cwd=layout.repo)
-    assert sorted(changed.stdout.split()) == ["pyproject.toml", "requirements.txt"]
+    assert sorted(changed.stdout.split()) == ["pyproject.toml", "requirements.txt", "uv.lock"]
     lock = tomllib.loads((layout.repo / "uv.lock").read_text("utf-8"))
     assert {p["name"]: p["version"] for p in lock["package"]}["jinja2"] == "3.1.6"
+    (root,) = [p for p in lock["package"] if p["name"] == "inventory"]
+    assert root["dependencies"] == [{"name": "jinja2"}]
+    assert root["metadata"]["requires-dist"] == [{"name": "jinja2", "specifier": "==3.1.6"}]
 
 
 # ------------------------------------------------------------------ revue

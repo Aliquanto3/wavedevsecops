@@ -1,5 +1,5 @@
 // Pipeline du projet en Jenkins (syntaxe déclarative). Le même pipeline s'écrit dans
-// « .github/workflows/ci.yml » (GitHub Actions) et dans « .gitlab-ci.yml » (GitLab CI) : cinq
+// « .github/workflows/ci.yml » (GitHub Actions) et dans « .gitlab-ci.yml » (GitLab CI) : sept
 // tâches, l'une après l'autre.
 // Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 // surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
@@ -42,7 +42,8 @@ pipeline {
                 // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
                 sh 'uv sync --frozen'
                 // Le code de l'application (src/), sans les exemptions « # nosec ».
-                sh 'uv run bandit -r src -q --ignore-nosec'
+                // `--ini` : réglages de bandit lus hors de votre dépôt ({config} : dossier de la plateforme), donc un fichier .bandit déposé dans src/ n'écarte aucun test.
+                sh "uv run bandit -r src -q --ignore-nosec --ini '{config}/bandit.ini'"
             }
         }
         // wds:end
@@ -54,6 +55,29 @@ pipeline {
                 sh 'uv sync --frozen'
                 // Dépendances épinglées de requirements.txt, sans résolution ; {osv_url} : adresse du point OSV (dans WaveDevSecOps : le point local, base figée).
                 sh "uv run pip-audit --vulnerability-service osv --osv-url '{osv_url}' --no-deps --disable-pip --progress-spinner off -r requirements.txt"
+            }
+        }
+        // wds:end
+
+        // wds:job uv_lock
+        stage('Verrou des dépendances (uv)') {
+            steps {
+                // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
+                // Échoue si uv.lock ne correspond plus à pyproject.toml : `uv sync --frozen` ne le voit pas.
+                sh 'uv lock --check'
+            }
+        }
+        // wds:end
+
+        // wds:job quality_gate
+        stage('Couverture du nouveau code (quality gate)') {
+            steps {
+                // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
+                sh 'uv sync --frozen'
+                // Mesure de la couverture ; {config} : réglages de coverage hors de votre dépôt, {reports} : dossier des rapports du pipeline.
+                sh "uv run pytest -o addopts= --cov '--cov-config={config}/coverage.ini' '--cov-report=xml:{reports}/coverage.xml' -q --tb=short"
+                // Échoue sous 80 % de couverture des lignes modifiées ; {base_sha} : le commit de base de la PR (historique complet requis).
+                sh "uv run diff-cover '{reports}/coverage.xml' '--compare-branch={base_sha}' --fail-under=80"
             }
         }
         // wds:end

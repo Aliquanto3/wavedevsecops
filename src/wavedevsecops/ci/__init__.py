@@ -33,13 +33,22 @@ from wavedevsecops.registry import load_registry
 from wavedevsecops.wsfs import Layout
 
 Parse = Literal[
-    "ruff_json", "junit", "gitleaks_json", "bandit_json", "pip_audit_json", "cyclonedx_json"
+    "ruff_json",
+    "junit",
+    "gitleaks_json",
+    "bandit_json",
+    "pip_audit_json",
+    "cyclonedx_json",
+    "coverage_json",
+    "diff_cover_json",
 ]
 """Lecteurs livrés (`ci.findings.PARSERS`) ; les stories 8.x en ajoutent. `cyclonedx_json` lit
 le SBOM (composants), pas des constats."""
 
-TOKENS = frozenset({"repo", "base_sha", "osv_url", "report"})
-"""Jetons des argv, remplacés par `ci` ; `report` n'existe que dans une exécution machine."""
+TOKENS = frozenset({"repo", "base_sha", "osv_url", "report", "reports", "config"})
+"""Jetons des argv, remplacés par `ci` ; `report` n'existe que dans une exécution machine.
+`reports` : dossier des rapports du run, hors de l'arbre (story 8.4) ; `config` : dossier
+`content/ci/` des réglages d'outils que l'arbre de l'apprenant ne peut pas modifier."""
 _TOKEN = re.compile(r"\{([^{}]*)\}")
 
 TOOL_ERROR_RULE = "tool_error"
@@ -47,6 +56,8 @@ TOOL_ERROR_RULE = "tool_error"
 NOT_YOUR_CODE = "Ce n'est pas un défaut de votre code."
 NO_DETAIL_RULE = "no_detail"
 """Constat d'un échec dont l'exécution machine n'a rien donné : la sortie humaine reste là."""
+BEFORE_FAILED_RULE = "before_failed"
+"""Constat d'une commande `before` en échec (les tests de la quality gate) : état `failure`."""
 MAX_OUTPUT_CHARS = 60_000
 """Sortie humaine gardée dans le check : le début et surtout la fin (résumé des outils)."""
 
@@ -64,18 +75,35 @@ def _tokens_in(argv: list[str], allowed: frozenset[str]) -> list[str]:
 
 
 class MachineRun(BaseModel):
-    """Exécution machine du même outil sur le même arbre : la source des constats."""
+    """Exécution machine sur le même arbre : la source des constats. Le même outil que le job,
+    sauf `tool` (la quality gate lit `coverage json` en plus de `diff-cover`)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     argv: list[str] = Field(min_length=1)
     parse: Parse
+    tool: str | None = None
     when: Literal["failure", "always"] = "failure"
 
     @field_validator("argv")
     @classmethod
     def _known_tokens(cls, value: list[str]) -> list[str]:
         return _tokens_in(value, TOKENS)
+
+
+class Step(BaseModel):
+    """Commande lancée avant la sortie humaine d'un job (`before`), qui doit finir par le code 0 :
+    la quality gate mesure la couverture avec pytest avant que diff-cover ne la lise."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tool: str = Field(min_length=1)
+    argv: list[str] = Field(min_length=1)
+
+    @field_validator("argv")
+    @classmethod
+    def _known_tokens(cls, value: list[str]) -> list[str]:
+        return _tokens_in(value, TOKENS - {"report"})
 
 
 class ExitCodes(BaseModel):
@@ -110,6 +138,7 @@ class Job(BaseModel):
     tool: str = Field(min_length=1)
     required: bool = False
     barrier: str | None = None
+    before: list[Step] = Field(default_factory=list)
     human: list[str] = Field(default_factory=list)
     machine: list[MachineRun] = Field(default_factory=list)
     exit_codes: ExitCodes = Field(default_factory=ExitCodes)
@@ -307,11 +336,12 @@ def _spawn(
     venv: Path | None,
     settings: Settings,
     on_start: Callable[[Any], None] | None,
+    tool: str | None = None,
 ) -> tuple[Any, str]:
-    """Lance l'outil ; rend `(handle, "")` ou `(None, raison)`."""
+    """Lance l'outil (celui du job, ou `tool`) ; rend `(handle, "")` ou `(None, raison)`."""
     try:
         handle = toolrun.spawn_tool(
-            job.tool,
+            tool or job.tool,
             argv,
             cwd=tree,
             venv=venv if venv is not None else tree / ".venv-absent",
@@ -348,7 +378,9 @@ def _machine_findings(
         argv = expand(run.argv, {**tokens, "report": str(report)})
     except KeyError:
         return None, False
-    handle, why = _spawn(job, argv, tree=tree, venv=venv, settings=settings, on_start=on_start)
+    handle, why = _spawn(
+        job, argv, tree=tree, venv=venv, settings=settings, on_start=on_start, tool=run.tool
+    )
     if handle is None:
         return None, False
     result = toolrun.collect(handle)
@@ -378,17 +410,58 @@ def run_job(
     du run). Un job arrêté rend `interrupted=True` ; son résultat ne doit pas être écrit.
     """
     started = time.monotonic()
+    wsfs.make_dirs(reports_dir(tree))
+    tokens = {**tokens, "reports": str(reports_dir(tree)), "config": str(settings.ci_config_path())}
     try:
         argv = expand(job.human, tokens)
+        steps = [(step, expand(step.argv, tokens)) for step in job.before]
     except KeyError as missing:
         return error_result(job, f"ne peut pas démarrer : la valeur {{{missing}}} manque", started)
+    before_output = ""
+    for step, step_argv in steps:
+        handle, why = _spawn(
+            job,
+            step_argv,
+            tree=tree,
+            venv=venv,
+            settings=settings,
+            on_start=on_start,
+            tool=step.tool,
+        )
+        if handle is None:
+            return error_result(job, why, started)
+        done = toolrun.collect(handle)
+        if handle.interrupted:
+            return JobResult(job.job_id, "error", interrupted=True)
+        before_output += done.stdout + done.stderr
+        if done.timed_out or done.returncode is None:
+            delay = f"{settings.pipeline_job_timeout_s:g}"
+            finding = tool_error(job, f"n'a pas fini en {delay} s et a été arrêté")
+            elapsed = int((time.monotonic() - started) * 1000)
+            return JobResult(
+                job.job_id, "error", bound_output(before_output), [finding], [], elapsed
+            )
+        if done.returncode != 0:
+            # Les tests (ou la mesure) ont échoué : sans eux, la valeur n'est pas calculable.
+            finding = Finding(
+                rule_id=BEFORE_FAILED_RULE,
+                severity="error",
+                message_text=(
+                    f"{step.tool} a échoué (code {done.returncode}) : "
+                    f"{job.tool} n'a rien à mesurer tant que {step.tool} échoue."
+                ),
+            )
+            elapsed = int((time.monotonic() - started) * 1000)
+            return JobResult(
+                job.job_id, "failure", bound_output(before_output), [finding], [], elapsed
+            )
     handle, why = _spawn(job, argv, tree=tree, venv=venv, settings=settings, on_start=on_start)
     if handle is None:
         return error_result(job, why, started)
     result = toolrun.collect(handle)
     if handle.interrupted:
         return JobResult(job.job_id, "error", interrupted=True)
-    output = bound_output(result.stdout + result.stderr)
+    output = bound_output(before_output + result.stdout + result.stderr)
     findings: list[Finding] = []
     sbom: list[SbomComponent] = []
     if result.timed_out:
@@ -449,6 +522,7 @@ def run_job(
 
 
 __all__ = [
+    "BEFORE_FAILED_RULE",
     "MAX_OUTPUT_CHARS",
     "NO_DETAIL_RULE",
     "TOOL_ERROR_RULE",
@@ -459,6 +533,7 @@ __all__ = [
     "Job",
     "JobResult",
     "MachineRun",
+    "Step",
     "Parse",
     "Pipeline",
     "PipelineError",

@@ -344,6 +344,107 @@ def parse_cyclonedx_json(text: str, tree: Path) -> list[SbomComponent | Finding]
     return found
 
 
+QUALITY_GATE_THRESHOLD = 80
+"""Seuil de couverture du nouveau code, en %. Le même chiffre que `--fail-under` du job
+`quality_gate` de `content/pipeline.yaml` (un test les rapproche) : le lecteur l'affiche."""
+DIFF_COVERAGE_RULE = "diff_coverage"
+NO_DIFF_RULE = "diff_coverage_none"
+"""Constat quand le diff n'a aucune ligne mesurée : le vert ne prouve rien sur du code testé."""
+UNCOVERED_RULE = "uncovered_lines"
+TOTAL_COVERAGE_RULE = "total_coverage"
+
+
+def _ranges(lines: list[int]) -> str:
+    """`[59, 60, 61, 65]` -> « 59-61, 65 »."""
+    found: list[str] = []
+    start = previous = None
+    for line in sorted(set(lines)):
+        if start is None:
+            start = previous = line
+        elif line == previous + 1:
+            previous = line
+        else:
+            found.append(str(start) if start == previous else f"{start}-{previous}")
+            start = previous = line
+    if start is not None:
+        found.append(str(start) if start == previous else f"{start}-{previous}")
+    return ", ".join(found)
+
+
+def diff_coverage_text(percent: int | None, passed: bool) -> str:
+    """« Couverture du nouveau code n % · seuil 80 % · ✓ » : la ligne que le check affiche.
+    `percent` vide : aucune ligne mesurée dans le diff (rien à tester, donc rien de non testé)."""
+    mark = "✓" if passed else "✗"
+    value = "aucune ligne à mesurer" if percent is None else f"{percent} %"
+    return f"Couverture du nouveau code {value} · seuil {QUALITY_GATE_THRESHOLD} % · {mark}"
+
+
+def parse_diff_cover_json(text: str, tree: Path) -> list[Finding]:
+    """`diff-cover --format json:` : la valeur et le seuil (un constat `diff_coverage`, ✓ ou ✗),
+    puis un constat par fichier dont des lignes nouvelles ne sont couvertes par aucun test. Le
+    pourcentage est celui de diff-cover (entier, arrondi vers le bas) : celui du seuil."""
+    data = _json_dict(text, "diff-cover")
+    total = data.get("total_num_lines")
+    percent = data.get("total_percent_covered")
+    stats = data.get("src_stats")
+    if not isinstance(total, int) or not isinstance(stats, dict):
+        raise ValueError("la sortie machine de diff-cover est inattendue")
+    measured = total > 0
+    if measured and not isinstance(percent, int | float):
+        raise ValueError("la sortie machine de diff-cover est inattendue")
+    value = int(percent) if measured else None
+    passed = value is None or value >= QUALITY_GATE_THRESHOLD
+    found = [
+        Finding(
+            rule_id=DIFF_COVERAGE_RULE if measured else NO_DIFF_RULE,
+            severity="info" if passed else "error",
+            message_text=diff_coverage_text(value, passed),
+        )
+    ]
+    for name, item in stats.items():
+        if not isinstance(item, dict):
+            continue
+        missing = [n for n in item.get("violation_lines") or [] if isinstance(n, int)]
+        if not missing:
+            continue
+        path = relative_posix(str(name).replace("\\", "/"), tree)
+        count = len(missing)
+        noun = "ligne" if count == 1 else "lignes"
+        found.append(
+            Finding(
+                rule_id=UNCOVERED_RULE,
+                severity="error" if not passed else "info",
+                message_text=(
+                    f"{count} {noun} du nouveau code sans test : {_ranges(missing)}"
+                ),
+                path=path,
+                line=_line(min(missing)),
+            )
+        )
+    return found
+
+
+def parse_coverage_json(text: str, tree: Path) -> list[Finding]:
+    """`coverage json` : la couverture de tout le dépôt testé (information : le seuil ne porte
+    que sur le nouveau code). Aucun fichier mesuré : la mesure n'a pas eu lieu, illisible."""
+    data = _json_dict(text, "coverage")
+    totals = data.get("totals")
+    files = data.get("files")
+    if not isinstance(totals, dict) or not isinstance(files, dict) or not files:
+        raise ValueError("la mesure de couverture est vide ou inattendue")
+    try:
+        percent = int(float(totals["percent_covered"]))
+    except KeyError, TypeError, ValueError:
+        raise ValueError("la mesure de couverture est inattendue") from None
+    return [
+        Finding(
+            rule_id=TOTAL_COVERAGE_RULE,
+            severity="info",
+            message_text=f"Couverture de l'ensemble du dépôt : {percent} % (information).",
+        )
+    ]
+
+
 PARSERS: dict[str, Callable[[str, Path], list[Any]]] = {
     "ruff_json": parse_ruff_json,
     "junit": parse_junit,
@@ -351,6 +452,8 @@ PARSERS: dict[str, Callable[[str, Path], list[Any]]] = {
     "bandit_json": parse_bandit_json,
     "pip_audit_json": parse_pip_audit_json,
     "cyclonedx_json": parse_cyclonedx_json,
+    "coverage_json": parse_coverage_json,
+    "diff_cover_json": parse_diff_cover_json,
 }
 """Lecteur de chaque valeur de `parse` ; une valeur de `ci.Parse` sans lecteur est refusée.
 Un lecteur rend des `Finding`, sauf `cyclonedx_json` : des `SbomComponent` (le SBOM)."""

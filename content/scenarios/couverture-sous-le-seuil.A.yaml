@@ -1,0 +1,162 @@
+# Station 3 (Story 8.4) : une PR dont le nouveau code n'est pas testé, que la quality gate refuse.
+# Parcours sans IA. La branche `feature` porte déjà un commit : un module `alertes.py` de deux
+# fonctions, sans aucun test. Le pipeline simulé tourne sur la PR ; le check quality_gate mesure la
+# couverture du nouveau code (pytest --cov, puis diff-cover contre la base) : elle est sous le
+# seuil de 80 %, la PR est bloquée, puis le check repasse au vert quand des tests sont poussés.
+schema_version: 1
+scenario_id: couverture-sous-le-seuil
+mode: A
+title_text: Bloquer une PR sous le seuil de couverture
+section: stations
+station: 3
+tracks: [no_ai]
+tools: [git, diff-cover]
+pipeline: true
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  # `main` exige le check quality_gate avant tout merge ; un push direct y est refusé.
+  - op: set_protection
+    branch: main
+    required_checks: [quality_gate]
+  - op: switch
+    branch: feature
+    create: true
+  - op: write_file
+    path: src/inventory/alertes.py
+    content: |
+      """Alertes de réapprovisionnement : que commander, et en quelle quantité."""
+
+      from __future__ import annotations
+
+      from inventory.stock import Stock
+
+
+      def quantity_to_order(stock: Stock, name: str, target: int) -> int:
+          """Quantité à commander pour ramener l'article à `target`, jamais négative."""
+          missing = target - stock.quantity(name)
+          return max(missing, 0)
+
+
+      def order_lines(stock: Stock, targets: dict[str, int]) -> list[str]:
+          """Une ligne par article à commander, par ordre alphabétique."""
+          lines = []
+          for name in sorted(targets):
+              count = quantity_to_order(stock, name, targets[name])
+              if count > 0:
+                  lines.append(f"{name} : {count}")
+          return lines
+  - op: commit
+    message: Ajoute les alertes de réapprovisionnement
+steps:
+  - step_id: pousser_feature
+    type: repo_state
+    title_text: Pousser la branche vers l'origine
+    instruction_text: >-
+      Vous êtes sur la branche `feature`, qui porte un commit : un nouveau module
+      `src/inventory/alertes.py` calcule les quantités à commander. Aucun test ne l'accompagne.
+      Poussez cette branche vers l'origine pour pouvoir ouvrir une pull request.
+    explanation_text: >-
+      Une pull request ne se crée que pour une branche que l'origine connaît. Une fois la PR
+      ouverte, le pipeline mesurera ce que les tests couvrent du nouveau code avant qu'il
+      n'arrive sur `main`.
+    explain_ref: graph.remote_ref
+    expect:
+      head:
+        at: origin/feature
+    hints:
+      lead_text: >-
+        Le remote s'appelle `origin` ; la branche à envoyer, `feature`. L'option `-u` mémorise
+        le lien entre les deux.
+      partial_text: git push -u ___ feature
+      solution_text: git push -u origin feature
+
+  - step_id: ouvrir_pr
+    type: pr_state
+    title_text: Ouvrir la pull request
+    instruction_text: >-
+      Ouvrez une pull request de `feature` vers `main` avec le bouton « Ouvrir une PR » de la
+      vue « Distant + PR ». Le pipeline démarre aussitôt sur le commit de la PR.
+    explanation_text: >-
+      L'ouverture de la PR lance les contrôles automatiques du pipeline : lint, tests, secrets,
+      analyse de sécurité du code, audit des dépendances, verrou des dépendances, puis la quality
+      gate.
+    head: feature
+    base: main
+    pr_state: open
+    hints:
+      lead_text: >-
+        L'ouverture d'une PR ne passe pas par le terminal : elle se fait dans la vue
+        « Distant + PR », depuis la branche poussée `origin/feature`.
+      partial_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/___"
+      solution_text: "Vue « Distant + PR » : « Ouvrir une PR » sur origin/feature"
+
+  - step_id: lire_le_blocage
+    type: pr_state
+    title_text: Lire pourquoi la quality gate bloque la PR
+    instruction_text: >-
+      Attendez la fin du pipeline. Le check quality_gate doit passer à « Échec » et « Merger »
+      devenir inactif. Dépliez la ligne de détail du check : elle affiche la couverture du
+      nouveau code, le seuil de 80 % et les lignes qu'aucun test n'exécute. Ouvrez aussi
+      « Voir la sortie » pour lire le rapport de diff-cover.
+    explanation_text: >-
+      Une quality gate est un seuil que la CI vérifie avant d'autoriser la suite. Celle-ci ne
+      juge pas tout le dépôt, mais le nouveau code : diff-cover compare les lignes ajoutées par
+      la PR à celles que les tests exécutent. Ici, `alertes.py` n'est exécuté par aucun test :
+      0 % du nouveau code est couvert, sous le seuil de 80 %. Le check est obligatoire : tant
+      qu'il échoue, la PR ne peut pas être mergée.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      quality_gate: failure
+    finding_has:
+      quality_gate: [diff_coverage]
+    hints:
+      lead_text: >-
+        Le check quality_gate est dans la liste des checks de la PR, vue « Distant + PR ». Il
+        passe en dernier : patientez si les autres sont encore « En attente » ou « En cours ».
+      partial_text: "Vue « Distant + PR » : check ___ de la PR, puis « Voir la sortie »"
+      solution_text: >-
+        Vue « Distant + PR » : check quality_gate de la PR, puis « Voir la sortie ». Le détail
+        affiche « Couverture du nouveau code 0 % · seuil 80 % · ✗ » et les lignes de
+        src/inventory/alertes.py sans test.
+
+  - step_id: ajouter_les_tests
+    type: pr_state
+    title_text: Tester le nouveau code et faire repasser le check au vert
+    instruction_text: >-
+      Écrivez des tests pour les deux fonctions de `src/inventory/alertes.py`, dans un fichier
+      `tests/test_alertes.py`. Committez-les sur `feature`, puis poussez. Le pipeline repart sur
+      le nouveau commit et le check affiche « Couverture du nouveau code n % · seuil 80 % · ✓ ».
+    explanation_text: >-
+      Le correctif n'a pas besoin d'être validé à la main : le pipeline remesure la couverture
+      sur le nouveau commit, et le check repasse au vert de lui-même. C'est ce résultat, et non
+      votre commande, qui valide l'étape. Les raccourcis ne fonctionnent pas : le seuil est
+      fixé par la plateforme, les réglages de couverture de votre dépôt (`omit`,
+      `# pragma: no cover`) sont ignorés, et supprimer le module ne ferait pas l'affaire : la
+      quality gate doit toujours mesurer des lignes du nouveau code.
+    head: feature
+    base: main
+    pr_state: open
+    check_states:
+      quality_gate: success
+    finding_has:
+      quality_gate: [diff_coverage]
+    hints:
+      lead_text: >-
+        Un test appelle la fonction avec un cas précis et vérifie le résultat avec `assert`.
+        Pensez aux deux fonctions et au cas où l'article n'a rien à commander.
+      partial_text: >-
+        Dans tests/test_alertes.py : un test par fonction (quantity_to_order, order_lines) ; puis
+        git add, git commit et git push
+      solution_text: >-
+        Dans tests/test_alertes.py : un Stock avec « vis » en quantité 10, assert
+        quantity_to_order(stock, "vis", 15) == 5 et assert order_lines(stock, {"vis": 15}) ==
+        ["vis : 5"] ; puis git add, git commit et git push

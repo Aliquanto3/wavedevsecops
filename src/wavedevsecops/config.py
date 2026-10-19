@@ -119,6 +119,11 @@ class Settings(BaseModel):
         """`content/pipeline.yaml` : le pipeline simulé, décrit une seule fois (AD-10)."""
         return self.content_path() / "pipeline.yaml"
 
+    def ci_config_path(self) -> Path:
+        """`content/ci/` : réglages des outils du pipeline (bandit, coverage), hors de l'arbre de
+        l'apprenant, jeton `{config}` (story 8.4) : il ne peut pas les remplacer."""
+        return self.content_path() / "ci"
+
     def osv_path(self) -> Path:
         """`content/osv/` : l'extrait figé de la base de vulnérabilités (AD-11)."""
         return self.content_path() / "osv"

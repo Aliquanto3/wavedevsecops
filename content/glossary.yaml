@@ -47,10 +47,11 @@ terms:
   - id: quality-gate
     term_text: "Quality gate"
     definition_text: >-
-      Un quality gate est un seuil que la CI vérifie avant d'autoriser la suite. Tant que les
-      tests ne passent pas, la pull request reste bloquée.
-    barrier_id: tests
-    scenario_id: test-casse
+      Une quality gate est un seuil que la CI vérifie avant d'autoriser la suite. Ici, au moins
+      80 % du nouveau code doit être exécuté par des tests : sous ce seuil, la pull request reste
+      bloquée.
+    barrier_id: coverage
+    scenario_id: couverture-sous-le-seuil
   - id: four-eyes
     term_text: "Quatre yeux"
     definition_text: >-

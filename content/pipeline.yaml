@@ -21,6 +21,9 @@
 #   required    check obligatoire pour merger (en plus des `required_checks` de la protection).
 #   barrier     barrière de content/chain.yaml que ce check prouve (preuve `evidence_seen`
 #               soumise quand l'apprenant lit la sortie : vue Distant + PR).
+#   before      commandes lancées avant la sortie humaine, chacune `{tool, argv}` : elles doivent
+#               finir par le code 0, sinon le check est en échec (la quality gate mesure d'abord la
+#               couverture avec pytest). Leur sortie précède celle de l'outil dans le check.
 #   human       argv de la sortie humaine (après l'outil) : sortie affichée verbatim, stdout puis
 #               stderr, jamais réécrite. Son code de sortie fixe l'état du check.
 #   machine     exécutions machine du même outil sur le même arbre, d'où viennent les constats
@@ -39,12 +42,17 @@
 #   {base_sha}  SHA de la base de la PR (diff-cover --compare-branch={base_sha}, story 8.4).
 #   {osv_url}   point OSV local (Settings.osv_url, AD-11, story 8.3) ; vide : job en erreur.
 #   {report}    fichier de rapport de cette exécution machine, hors de l'arbre (machine seule).
+#   {reports}   dossier des rapports du run (`ci/<pr>-<sha7>.reports/`), hors de l'arbre : la
+#               couverture y est écrite, un fichier `coverage.xml` du dépôt ne la remplace pas.
+#   {config}    `content/ci/` : réglages d'outils hors de l'arbre de l'apprenant (bandit.ini,
+#               coverage.ini) ; un `.bandit` ou un `[tool.coverage]` du dépôt n'y change rien.
 #
 # Lecteurs `parse` livrés : ruff_json (`ruff check --output-format json`), junit (rapport
 # `--junitxml` de pytest : fichier du test en échec), gitleaks_json (`--report-format json`).
 # 8.1 a livré bandit_json, 8.3 pip_audit_json et cyclonedx_json (le SBOM : des composants, pas des
 # constats), 8.4 ajoute coverage_json et diff_cover_json : un lecteur par format, dans
-# `ci/findings.py`, et sa valeur dans `ci.Parse`.
+# `ci/findings.py`, et sa valeur dans `ci.Parse`. Une exécution machine peut viser un autre outil
+# que le job (`tool:`), comme `coverage json` dans la quality gate.
 schema_version: 1
 jobs:
   - job_id: ruff
@@ -93,9 +101,11 @@ jobs:
     # les exemptions `# nosec` écrites dans le code. Il sort 1 quand il trouve un défaut.
     # L'exécution machine tourne aussi sur un succès : un fichier que bandit n'a pas pu lire
     # (syntaxe) est sauté avec le code 0, et `ci` en fait un échec (`unscanned_file`).
-    human: [-r, src, -q, --ignore-nosec]
+    # `--ini {config}/bandit.ini` (story 8.4) : bandit lit ses réglages dans un fichier hors du
+    # dépôt, donc un `src/.bandit` déposé par l'apprenant (`skips = B307`) ne désactive rien.
+    human: [-r, src, -q, --ignore-nosec, --ini, "{config}/bandit.ini"]
     machine:
-      - argv: [-r, src, -q, --ignore-nosec, -f, json]
+      - argv: [-r, src, -q, --ignore-nosec, --ini, "{config}/bandit.ini", -f, json]
         parse: bandit_json
         when: always
     exit_codes: {success: [0], failure: [1]}
@@ -120,5 +130,45 @@ jobs:
         parse: pip_audit_json
       - argv: [--vulnerability-service, osv, --osv-url, "{osv_url}", --no-deps, --disable-pip, --progress-spinner, "off", -r, requirements.txt, -f, cyclonedx-json]
         parse: cyclonedx_json
+        when: always
+    exit_codes: {success: [0], failure: [1]}
+
+  - job_id: uv_lock
+    label_text: Verrou des dépendances (uv)
+    tool: uv
+    required: true
+    barrier: dependencies
+    # `uv lock --check` (story 8.4) : sort 1 si `uv.lock` ne correspond plus à `pyproject.toml`
+    # (dépendance ajoutée ou changée sans verrou à jour). Sans lui, `uv sync --frozen` installe le
+    # verrou tel quel et ne voit pas qu'un `pyproject.toml` modifié l'a dépassé. Aucune installation
+    # ni écriture : il compare seulement ; hors ligne (UV_OFFLINE) depuis le cache préchargé.
+    human: [lock, --check]
+    exit_codes: {success: [0], failure: [1]}
+
+  - job_id: quality_gate
+    label_text: Couverture du nouveau code (quality gate)
+    tool: diff-cover
+    required: true
+    barrier: coverage
+    # Mesure puis jauge (AD-10, story 8.4) : pytest mesure la couverture avec les réglages de
+    # `{config}/coverage.ini` (hors du dépôt : ni `omit`, ni `# pragma: no cover`, ni `addopts`
+    # du dépôt, remis à vide par `-o addopts=`, ne la réduisent) et écrit `coverage.xml` hors de
+    # l'arbre ; diff-cover compare ce rapport aux lignes modifiées depuis `{base_sha}` et échoue
+    # sous 80 % (`--fail-under=80`, le même chiffre que ci.findings.QUALITY_GATE_THRESHOLD).
+    # Les options de pytest s'écrivent `--option=valeur` : pytest prend une valeur détachée pour un
+    # chemin à collecter et en déduit sa racine (le dépôt de la plateforme au lieu de l'arbre).
+    # Les constats viennent de `coverage json` et de `diff-cover --format json:` : toujours lus,
+    # pour que le check affiche « Couverture du nouveau code n % · seuil 80 % · ✓ » même vert.
+    before:
+      - tool: pytest
+        argv: [-o, addopts=, --cov, "--cov-config={config}/coverage.ini", "--cov-report=term-missing:skip-covered", "--cov-report=xml:{reports}/coverage.xml", -q, --tb=short]
+    human: ["{reports}/coverage.xml", "--compare-branch={base_sha}", --fail-under=80]
+    machine:
+      - argv: ["{reports}/coverage.xml", "--compare-branch={base_sha}", --fail-under=80, --format, "json:{report}"]
+        parse: diff_cover_json
+        when: always
+      - tool: coverage
+        argv: [json, "--rcfile={config}/coverage.ini", -o, "{report}"]
+        parse: coverage_json
         when: always
     exit_codes: {success: [0], failure: [1]}
