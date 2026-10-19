@@ -343,6 +343,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:16 · 2.9 · dev · fini, 1051 passed, CI verte ; lot retenu pendant le silence post-commande, notice « Modifié hors de l'application », conflit dès que le disque change ; watch_quiet_ms 300 · 1e17ef0
 - 2026-10-19 02:16 · 2.9 · second-avis · lancé · —
 - 2026-10-19 02:16 · 7.4 ★ · dev · lancé (dev-story Opus ; pivot Sprint 2, ouvre 7.5, 7.6, 8.1) · —
+- 2026-10-19 02:17 · 7.2 · fusion · suite complète du sommet de pile (7.2 + 5.3 + 3.3) 1173 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 7.3 attend 3.5 · 43c095b
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
