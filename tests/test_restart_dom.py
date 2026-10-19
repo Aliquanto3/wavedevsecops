@@ -104,7 +104,7 @@ const noticeBefore = $(".notice-card") !== null;
 event(store, "engine_state", { state: "restoring", reason_text: "Remise à zéro du scénario en cours." });
 event(store, "op_started", { intent: "restart" });
 const waiting = text(".scenario-status");
-const result = event(store, "progress_updated", { track: "llm", scenario_id: "reprise", mode: "A", facts: ["scenario_restarted"], step_ids: [] });
+const result = event(store, "progress_updated", { track: "llm", scenario_id: "reprise", mode: "A", facts: ["scenario_reset"], step_ids: [] });
 event(store, "engine_state", { state: "idle", reason_text: "" });
 await tick();
 const done = { status: text(".scenario-status"), noticeAfter: $(".notice-card") !== null,
@@ -146,7 +146,7 @@ await new Promise((r) => setTimeout(r, 20));
 const withSummary = $(".score-summary") !== null;
 const send = (n, kind, payload) => sources[0].onmessage({ data: JSON.stringify({ boot_id: "b1", seq: n, epoch: 0, kind, payload }) });
 answer = FIRST;
-send(8, "progress_updated", { track: "llm", scenario_id: "reprise", mode: "A", facts: ["scenario_restarted"], step_ids: [] });
+send(8, "progress_updated", { track: "llm", scenario_id: "reprise", mode: "A", facts: ["scenario_reset"], step_ids: [] });
 await new Promise((r) => setTimeout(r, 20));
 const afterRestart = { summary: $(".score-summary") !== null, count: text(".step-count"), reads: reads.length };
 // Seconde fin de scénario : aucun fait nouveau, mais le verdict final relit le panneau.

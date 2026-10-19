@@ -223,7 +223,7 @@ export function createStore() {
       } else if (envelope.kind === "progress_updated") {
         // Le bilan est écrit par le serveur : à la fin du scénario, on relit l'état pour l'avoir.
         if ((payload.facts || []).includes("scenario_completed")) return "resync";
-        if ((payload.facts || []).includes("scenario_restarted")) {
+        if ((payload.facts || []).includes("scenario_reset")) {
           // Remise à zéro (4.4) : l'ancien verdict et l'ancien bilan n'ont plus cours ; le panneau
           // est relu auprès du serveur (`connectWorkspace`), qui écrit l'étape 1 sans bilan.
           patch.restarted = true;
@@ -307,7 +307,7 @@ export function connectWorkspace(store, workspaceId, options = {}) {
     // « Recommencer » (4.4) : le panneau repart de l'étape 1, sans bilan. Une seconde fin de
     // scénario n'ajoute aucun fait (le premier passage fait foi) : le bilan se relit au verdict.
     if (envelope.kind === "progress_updated") {
-      return (envelope.payload?.facts || []).includes("scenario_restarted");
+      return (envelope.payload?.facts || []).includes("scenario_reset");
     }
     if (envelope.kind === "step_verdict" && envelope.payload?.status === "passed") {
       if (!envelope.payload.next_step_id) return true;

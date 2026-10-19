@@ -321,12 +321,12 @@ def test_les_faits_du_premier_passage_sont_conserves(make_box) -> None:
     events = box.run("restart")
 
     after = box.facts()
-    assert [f for f in after if f["kind"] != "scenario_restarted"] == before
-    [restarted] = [f for f in after if f["kind"] == "scenario_restarted"]
+    assert [f for f in after if f["kind"] != "scenario_reset"] == before
+    [restarted] = [f for f in after if f["kind"] == "scenario_reset"]
     identity = (restarted["track"], restarted["scenario_id"], restarted["mode"])
     assert identity == ("llm", "reprise", "A")
     progress = _of(events, Kind.PROGRESS_UPDATED)
-    assert [e.payload["facts"] for e in progress] == [["scenario_restarted"]]
+    assert [e.payload["facts"] for e in progress] == [["scenario_reset"]]
     # Le score du premier coup reste celui du premier passage, même en refaisant juste.
     box.finish()
     assert [f for f in box.facts() if f["kind"] == "quiz_first_attempt"] == [
@@ -340,11 +340,11 @@ def test_chaque_remise_a_zero_ajoute_son_fait(make_box) -> None:
     box = make_box()
     box.run("restart")
     box.run("restart")
-    assert len(box.facts("scenario_restarted")) == 2
+    assert len(box.facts("scenario_reset")) == 2
 
 
 def test_une_remise_a_zero_ne_fait_pas_commencer_un_scenario() -> None:
-    fact = {"kind": "scenario_restarted", "track": "llm", "scenario_id": "x", "mode": "A"}
+    fact = {"kind": "scenario_reset", "track": "llm", "scenario_id": "x", "mode": "A"}
     assert derive([fact], "llm", "x", "A").state == "todo"
 
 
@@ -359,7 +359,7 @@ def test_le_bilan_disparait_apres_recommencer_et_revient_identique(make_box) -> 
 
     # Le front relit le panneau sur ce fait : il n'a plus de bilan et repart à l'étape 1.
     assert [e.payload["facts"] for e in _of(events, Kind.PROGRESS_UPDATED)] == [
-        ["scenario_restarted"]
+        ["scenario_reset"]
     ]
     panel = box.panel()
     assert panel["summary"] is None and panel["current_step_id"] == "annuler"

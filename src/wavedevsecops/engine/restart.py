@@ -9,7 +9,7 @@ Dans l'ordre :
    absent, si la restauration échoue ou si le `content_hash` du scénario a changé, l'espace est
    supprimé puis reconstruit par son setup, et son empreinte comparée à celle de
    `content/fingerprints.json` ;
-4. le fait `scenario_restarted` s'ajoute à `progress.json` : les faits du premier passage (score
+4. le fait `scenario_reset` s'ajoute à `progress.json` : les faits du premier passage (score
    du premier coup, indices) ne sont ni modifiés ni retirés.
 
 Si la reconstruction échoue aussi, l'erreur est publiée (`app_error`) et l'espace garde
@@ -50,7 +50,7 @@ MISMATCH_TEXT = (
     "L'espace reconstruit ne correspond pas à l'état de référence du scénario : il n'est pas "
     "fiable."
 )
-RESTARTED_FACT = "scenario_restarted"
+RESTARTED_FACT = "scenario_reset"
 
 
 class Restart(BaseModel):

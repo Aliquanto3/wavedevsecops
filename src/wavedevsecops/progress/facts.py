@@ -27,7 +27,7 @@ FactKind = Literal[
     "quiz_first_attempt",
     "hint_opened",
     "scenario_completed",
-    "scenario_restarted",
+    "scenario_reset",
     "evidence_seen",
 ]
 ScenarioState = Literal["todo", "in_progress", "done"]
@@ -69,7 +69,7 @@ class Fact(BaseModel):
             return (*base, self.barrier_id)
         if self.kind == "hint_opened":
             return (*base, self.step_id, self.tier)
-        if self.kind == "scenario_restarted":
+        if self.kind == "scenario_reset":
             return (*base, self.op_id)  # un fait par remise à zéro (story 4.4)
         return (*base, self.step_id)
 
