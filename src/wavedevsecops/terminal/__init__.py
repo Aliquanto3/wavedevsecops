@@ -24,7 +24,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from wavedevsecops import github_sim, gitio, hooks
-from wavedevsecops.contracts import AppError
+from wavedevsecops.contracts import AppError, element_id
 from wavedevsecops.engine import (
     INTENTS,
     Intent,
@@ -101,6 +101,13 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
     if command.sub == "push":
         # Le chemin de Python porté par les hooks suit l'application (environnement recréé).
         hooks.refresh(ctx.layout.hooks)
+    guarded = command.sub == "commit" and hooks.pre_commit_installed(ctx.layout.hooks)
+    if guarded and "--no-verify" in command.options:
+        # Story 7.3 : contourner la barrière que le scénario fait voir ne valide rien.
+        ctx.output(allow.message("no_verify"), "refused")
+        return EXIT_REFUSED
+    if command.sub == "commit":
+        hooks.clear_refusal(ctx.layout)
     try:
         handle = gitio.spawn_learner(
             tool,
@@ -115,12 +122,27 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
             "Ouvrez le diagnostic pour vérifier l'installation de git.",
         ) from exc
     ctx.on_interrupt(handle.terminate)
+    # Hook `pre-commit` de l'application (story 7.3) : la sortie du commit est tenue jusqu'à la
+    # fin, pour l'afficher en bloc `tool-output` si le hook refuse. Sans lui, elle coule au fil
+    # de l'eau.
+    held: list[tuple[str, str]] | None = [] if guarded else None
     for chunk in handle.chunks():
-        if chunk is not None:
+        if chunk is None:
+            continue
+        if held is not None:
+            held.append((chunk.text, chunk.stream))
+        else:
             ctx.output(chunk.text, chunk.stream, lang=language.lang)
 
     killed = handle.timed_out or handle.interrupted or ctx.interrupted
     code = handle.returncode
+    refusal = hooks.read_refusal(ctx.layout) if guarded and code and not killed else None
+    if held:
+        if refusal is not None:
+            ctx.output("".join(text for text, _ in held), "stdout", tool=refusal.tool)
+        else:
+            for text, stream in held:
+                ctx.output(text, stream, lang=language.lang)
     if killed:
         # L'arbre a été arrêté : un verrou d'index laissé derrière est périmé (AD-12), à
         # condition qu'aucun processus de l'arbre ne vive encore (il pourrait le tenir).
@@ -139,6 +161,11 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
         ctx.output(allow.message("exit_code", code=code), "exit")
         if command.missing_message:
             ctx.output(allow.message("missing_message"), "app")
+        if refusal is not None:
+            _show_hook_refusal(ctx, refusal, allow)
+            barrier = allow.hook_barriers.get(refusal.tool)
+            if barrier:
+                ctx.submit_evidence(barrier)  # la sortie de l'outil s'est affichée (AD-14)
     if code and command.sub == "push" and not killed:
         _explain_protection(ctx, tool, command, allow)
     if command.touches_origin:
@@ -148,6 +175,34 @@ def _run_git(ctx: OpContext, command: GitCommand, allow: Allowlist) -> int:
             except Exception:  # noqa: BLE001 - un crochet ne fait pas échouer la commande
                 log.exception("Crochet après %s dans %s", command.sub, ctx.workspace_id)
     return code if code is not None else EXIT_INTERRUPTED
+
+
+def _show_hook_refusal(ctx: OpContext, refusal: hooks.Refusal, allow: Allowlist) -> None:
+    """Panneau d'alerte (`role="alert"`) d'un commit refusé par le hook `pre-commit` : le commit
+    n'a pas été créé, avec un lien vers la ligne du secret (UX-DR37). La sortie réelle de l'outil
+    vient d'être affichée en bloc `tool-output`.
+
+    La cause vient de la trace du hook (une exécution machine de gitleaks), jamais du texte
+    de git (AD-2) ; les liens vers les lignes sont fixés par elle (AD-10)."""
+    spans: list[dict] = []
+    if refusal.tool == "gitleaks":
+        message = allow.message("hook_refused_secret")
+        found = [(path, rows[0]) for path, rows in sorted(refusal.lines.items()) if rows]
+        for path, row in found[:3]:
+            label = f"{path}:{row}"
+            start = len(message) + 1
+            spans.append(
+                {
+                    "start": start,
+                    "end": start + len(label),
+                    "text": label,
+                    "element_id": element_id("path", "worktree", path),
+                }
+            )
+            message = f"{message} {label}"
+    else:
+        message = allow.message("hook_refused")
+    ctx.output(message, "refused", spans=spans)
 
 
 FORCE_OPTIONS = frozenset({"-f", "--force", "--force-with-lease"})

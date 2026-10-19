@@ -445,6 +445,10 @@ def check_tool(name: str, tokens: list[Token], allow: Allowlist) -> ToolCommand:
     )
 
 
+PRE_COMMIT_SETUP = frozenset({"install", "uninstall", "install-hooks"})
+"""Sous-commandes de `pre-commit` qui posent ou retirent des hooks : refusées avec explication."""
+
+
 def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | ToolCommand | None:
     """Ligne tapée -> commande acceptée, `None` si la ligne est vide ; sinon `Refused`."""
     tokens = tokenize(line, allow)
@@ -466,6 +470,10 @@ def parse_line(line: str, allow: Allowlist) -> GitCommand | FileCommand | ToolCo
         raise Refused(f"{allow.message('metachar', found=symbol)} {allow.accepted()}")
     if head == "cd":
         raise Refused(f"{allow.message('cd')} {allow.accepted()}")
+    if head == "pre-commit" and len(tokens) > 1 and tokens[1].text in PRE_COMMIT_SETUP:
+        # Story 7.3 : les hooks sont posés par le scénario (`install_hooks`), pas par l apprenant.
+        reason = allow.message("pre_commit_install", sub=tokens[1].text)
+        raise Refused(f"{reason} {allow.accepted()}")
     if head != "git":
         raise Refused(f"{allow.message('unknown_command', command=head)} {allow.accepted()}")
     return check_git([token.text for token in tokens[1:]], allow)

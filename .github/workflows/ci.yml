@@ -49,6 +49,11 @@ jobs:
             rm -rf "$RUNNER_TEMP/preload-venv"
           done
 
+      # Story 7.3 : le vrai hook pre-commit lance le vrai gitleaks (archive officielle, somme
+      # vérifiée) depuis `<data>/tools/gitleaks/`, comme l'installeur le pose.
+      - name: Poser gitleaks pour le test du hook pre-commit
+        run: uv run python .github/scripts/provisionner_gitleaks.py "${{ runner.temp }}/wds-exercise"
+
       # AD-3 : git parle français quand une locale française existe. Sans elle, le test du
       # terminal en français est ignoré ; on la génère sous Linux pour qu'il tourne.
       - name: Locale française (git en français)

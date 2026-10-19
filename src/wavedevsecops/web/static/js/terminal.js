@@ -65,6 +65,23 @@ function markSpans(node, spans) {
   if (ids.length) node.setAttribute("data-span-ids", ids.join(" "));
 }
 
+/** Ajoute le texte de `entry` à `parent`, ses passages `spans` en liens vers la sélection partagée. */
+function appendWithLinks(parent, entry, selection) {
+  for (const part of splitSpans(entry.text, entry.spans)) {
+    if (!part.elementId) {
+      parent.append(document.createTextNode(part.text));
+      continue;
+    }
+    const link = el("button", "terminal-link", { type: "button", "data-element-id": part.elementId });
+    link.textContent = part.text;
+    link.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selection.toggle(part.elementId);
+    });
+    parent.append(link);
+  }
+}
+
 /** Bloc `tool-output` (UX-DR20) : sortie verbatim, étiquette au nom de l'outil, désignable. */
 function toolOutputNode(entry, selection) {
   const block = el("div", "tool-output", {
@@ -81,19 +98,7 @@ function toolOutputNode(entry, selection) {
   label.textContent = entry.tool;
   const body = el("pre", "tool-output-text");
   if (entry.lang === "en") body.setAttribute("lang", "en");
-  for (const part of splitSpans(entry.text, entry.spans)) {
-    if (!part.elementId) {
-      body.append(document.createTextNode(part.text));
-      continue;
-    }
-    const link = el("button", "terminal-link", { type: "button", "data-element-id": part.elementId });
-    link.textContent = part.text;
-    link.addEventListener("click", (event) => {
-      event.stopPropagation();
-      selection.toggle(part.elementId);
-    });
-    body.append(link);
-  }
+  appendWithLinks(body, entry, selection);
   block.append(label, body);
   if (outputId) {
     const designate = () => selection.toggle(outputId);
@@ -133,7 +138,8 @@ function entryNode(entry, selection) {
   }
   if (entry.kind === "refused") {
     const line = el("div", "terminal-line terminal-refused", { role: "alert" });
-    line.textContent = entry.text;
+    // Refus d'un hook (story 7.3) : un lien vers la ligne du secret, fixé par le serveur.
+    appendWithLinks(line, entry, selection);
     return line;
   }
   if (entry.kind === "exit") {

@@ -68,6 +68,16 @@ messages:
   timeout: "La commande a dépassé {seconds} s : elle a été arrêtée."
   interrupted: "Commande interrompue."
   protected_branch: "Refusé par la protection de `{branch}` : tout passe par une PR."
+  hook_refused_secret: >-
+    Refusé par le hook pre-commit : gitleaks a trouvé un secret. Le commit n'a pas été créé.
+  hook_refused: "Refusé par le hook pre-commit. Le commit n'a pas été créé."
+  no_verify: >-
+    « git commit --no-verify » est refusé ici : il saute le hook pre-commit, donc la recherche
+    de secrets. Retirez le secret du fichier, ajoutez-le de nouveau et committez sans cette
+    option.
+  pre_commit_install: >-
+    « pre-commit {sub} » est refusé : les hooks sont posés par le scénario, pas par vous. Le
+    hook pre-commit se lance tout seul à chaque « git commit ».
 
 # Options qu'aucune ligne n'obtient en dehors de la liste d'une sous-commande
 # (le refus les nomme « interdites » plutôt qu'« absentes de la liste »).
@@ -122,6 +132,11 @@ tools:
     barrier_id: tests
     options: ["-q", "--quiet", "-v", "--verbose", "-vv", "-x", "--exitfirst", "-k", "-m", "--tb", "--maxfail", "-r", "--no-header", "--disable-warnings", "-l", "--showlocals", "--collect-only", "--co"]
     value_options: ["-k", "-m", "--tb", "--maxfail", "-r"]
+
+# Hook pre-commit de l'application (story 7.3, AD-9, AD-14) : quand il refuse un commit, la
+# sortie de l'outil en cause est la preuve de cette barrière de `chain.yaml`.
+hook_barriers:
+  gitleaks: secret-scan
 
 # Chaque sous-commande git : `read` (vrai : lecture, admise pendant un quiz ; un objet : lecture
 # seulement si toutes ses conditions tiennent), `options`, `value_options` (options qui prennent

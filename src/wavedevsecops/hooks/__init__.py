@@ -3,7 +3,8 @@
 Chaque hook posé par l'op `install_hooks` est un script `#!/bin/sh` d'une ligne qui appelle ce
 point d'entrée. Un seul dossier `hooks/` sert `repo/` et `origin.git/` : le point d'entrée
 distingue le dépôt appelant par son dossier de travail (git lance un hook depuis la racine du
-dépôt, ou depuis le dépôt nu), et `pre-receive` n'agit que dans `origin.git/`.
+dépôt, ou depuis le dépôt nu), `pre-receive` n'agit que dans `origin.git/` et `pre-commit`
+(story 7.3) que dans `repo/`.
 
 Contrat (stories 3.5, 5.7, 7.3) :
 
@@ -23,16 +24,19 @@ pour rester la même d'un poste à l'autre (empreintes de référence d'AD-18).
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
 
 from wavedevsecops import github_sim, wsfs
+from wavedevsecops.config import Settings
 from wavedevsecops.wsfs import Layout
 
-HOOK_NAMES = ("pre-receive",)
+HOOK_NAMES = ("pre-receive", "pre-commit")
 """Hooks que l'op `install_hooks` sait poser ; un hook de plus s'ajoute ici et dans `HANDLERS`."""
 
 BRANCH_PREFIX = "refs/heads/"
@@ -125,7 +129,200 @@ def pre_receive(cwd: Path, stdin: TextIO, stderr: TextIO) -> int:
     return EXIT_REFUSED if refused else 0
 
 
-HANDLERS: dict[str, Callable[[Path, TextIO, TextIO], int]] = {"pre-receive": pre_receive}
+PRE_COMMIT_CONFIG = ".pre-commit-config.yaml"
+REFUSAL_FILE = "hook-pre-commit.json"
+"""Trace du dernier refus du hook `pre-commit`, écrite dans `cache/` : le terminal la lit pour
+expliquer le refus sans analyser la sortie de git (AD-2)."""
+GITLEAKS_ARGS = ("git", "--pre-commit", "--staged", "--no-banner")
+"""Arguments de gitleaks du `.pre-commit-config.yaml` du gabarit, repris pour l'exécution
+machine qui donne les fichier:ligne du refus (AD-10)."""
+
+MISSING_TOOL_TEXT = (
+    "Le hook « pre-commit » ne peut pas tourner : {tool} est indisponible ({reason}).\n"
+    "Le commit n'a pas été créé. Ouvrez le diagnostic pour voir l'état des outils.\n"
+)
+
+
+@dataclass(frozen=True)
+class Refusal:
+    """Refus du hook `pre-commit` : l'outil en cause et, pour gitleaks, les secrets trouvés."""
+
+    tool: str
+    """`gitleaks` (un secret a été trouvé) ou `pre-commit` (un autre hook a échoué)."""
+    lines: dict[str, list[int]]
+    """Fichier (posix, relatif à `repo/`) -> lignes des secrets ; vide hors gitleaks."""
+
+
+def clear_refusal(layout: Layout) -> None:
+    """Efface la trace du dernier refus (avant chaque `git commit` du terminal)."""
+    (layout.cache / REFUSAL_FILE).unlink(missing_ok=True)
+
+
+def read_refusal(layout: Layout) -> Refusal | None:
+    """Refus laissé par le hook depuis le dernier `clear_refusal`, ou `None`."""
+    raw = wsfs.read_bytes(layout.cache, REFUSAL_FILE)
+    if raw is None:
+        return None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+        lines = {str(k): [int(n) for n in v] for k, v in data["lines"].items()}
+        return Refusal(str(data["tool"]), lines)
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def pre_commit_installed(hooks_dir: Path) -> bool:
+    """Vrai si le hook `pre-commit` de l'application est posé dans `hooks/`."""
+    raw = wsfs.read_bytes(hooks_dir, "pre-commit")
+    return raw is not None and b" -m wavedevsecops.hooks pre-commit" in raw
+
+
+def repo_layout(cwd: Path) -> Layout | None:
+    """Espace dont `cwd` est le dépôt de travail `repo/` (un dossier `.git`), sinon `None`."""
+    if cwd.name != "repo" or not (cwd / ".git").exists():
+        return None
+    return Layout(cwd.parent)
+
+
+def pre_commit(cwd: Path, stdin: TextIO, stderr: TextIO) -> int:
+    """Lance le vrai `pre-commit run` sur le `.pre-commit-config.yaml` du dépôt (AD-9).
+
+    Les outils viennent de `toolrun` (registre, environnement hors ligne, `PRE_COMMIT_HOME` dans
+    `cache/`). Un outil manquant refuse le commit avec un renvoi au diagnostic. Après un échec,
+    la trace du refus (`REFUSAL_FILE`) dit si gitleaks a trouvé un secret, et où."""
+    layout = repo_layout(cwd)
+    if layout is None:
+        return 0
+    config = cwd / PRE_COMMIT_CONFIG
+    clear_refusal(layout)
+    problem = config_problem(config)
+    if problem is not None:
+        # Configuration retirée, vidée, distante ou hors des outils de l'application : le hook
+        # refuse au lieu de laisser passer en silence (le scénario fait foi, AD-9, AD-13).
+        stderr.write(problem + "\nLe commit n'a pas été créé.\n")
+        _write_refusal(layout, "pre-commit", {})
+        return EXIT_REFUSED
+    # Importé ici : `pre-receive` (appelé à chaque push) n'a pas besoin de `toolrun`.
+    from wavedevsecops import toolrun
+    from wavedevsecops.toolrun import findings
+
+    settings = Settings(data_dir=layout.root.parents[2])
+    venv = toolrun.venv_dir(layout.root)
+    uses_gitleaks = "gitleaks" in config.read_text(encoding="utf-8", errors="replace")
+    for tool in ("pre-commit", *(("gitleaks",) if uses_gitleaks else ())):
+        status = toolrun.resolve(tool, settings, venv=venv)
+        if not status.ok:
+            stderr.write(MISSING_TOOL_TEXT.format(tool=tool, reason=status.reason or status.state))
+            return EXIT_REFUSED
+    try:
+        handle = toolrun.spawn_tool(
+            "pre-commit",
+            ["run", "--color", "never"],
+            cwd=cwd,
+            venv=venv,
+            timeout=settings.tool_timeout_s,
+            settings=settings,
+        )
+    except (toolrun.ToolUnavailable, OSError) as exc:
+        stderr.write(MISSING_TOOL_TEXT.format(tool="pre-commit", reason=str(exc)))
+        return EXIT_REFUSED
+    result = toolrun.collect(handle)
+    stderr.write(result.stdout + result.stderr)
+    if result.returncode == 0:
+        return 0
+    found = findings.Findings()
+    if uses_gitleaks:
+        # Les fichier:ligne viennent d'une exécution machine de gitleaks sur l'index, jamais
+        # du texte (AD-10) ; le code 3 de gitleaks dit « secret trouvé » (comme le pipeline, 7.4).
+        found = findings.collect(
+            "gitleaks",
+            GITLEAKS_ARGS,
+            repo=cwd,
+            venv=venv,
+            cache=layout.cache,
+            settings=settings,
+            timeout=settings.tool_timeout_s,
+        )
+    lines = {path: sorted(rows) for path, rows in found.lines.items()}
+    _write_refusal(layout, "gitleaks" if lines else "pre-commit", lines)
+    return EXIT_REFUSED
+
+
+def _write_refusal(layout: Layout, tool: str, lines: dict[str, list[int]]) -> None:
+    layout.cache.mkdir(parents=True, exist_ok=True)
+    wsfs.write_text(layout.cache, REFUSAL_FILE, json.dumps({"tool": tool, "lines": lines}))
+
+
+HOOK_COMMANDS = frozenset({"gitleaks", "uv"})
+"""Premiers mots admis dans l'`entry` d'un hook : les outils que le registre résout et place en
+tête du PATH du hook (`toolrun.hook_environment`)."""
+
+CONFIG_TEXTS = {
+    "missing": (
+        "Le hook « pre-commit » ne trouve plus `.pre-commit-config.yaml` à la racine du dépôt. "
+        "Cette configuration fait partie du scénario : recommencez-le pour la retrouver."
+    ),
+    "unreadable": (
+        "Le hook « pre-commit » ne peut pas lire `.pre-commit-config.yaml` ({reason}). "
+        "Recommencez le scénario pour retrouver la configuration d'origine."
+    ),
+    "empty": (
+        "`.pre-commit-config.yaml` ne déclare plus aucun hook : la barrière serait désactivée. "
+        "Recommencez le scénario pour retrouver la configuration d'origine."
+    ),
+    "remote": (
+        "Le dépôt de hooks « {repo} » n'est pas accepté : l'application fonctionne hors ligne "
+        "et n'accepte que des hooks « repo: local »."
+    ),
+    "entry": (
+        "Le hook « {hook} » lance « {command} » : seuls gitleaks et uv, fournis par "
+        "l'application, sont acceptés ici."
+    ),
+}
+
+
+def config_problem(config: Path) -> str | None:
+    """Raison, en français, de refuser `.pre-commit-config.yaml`, ou `None` s'il est accepté.
+
+    Seuls les hooks `repo: local` (`language: system`, un outil de l'application) ou `meta` sont
+    admis : un dépôt distant ferait cloner `pre-commit` hors du garde réseau (AD-13). Une
+    configuration absente (le vrai `pre-commit` la refuse aussi) ou sans hook est refusée."""
+    import yaml
+
+    try:
+        data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return CONFIG_TEXTS["missing"]
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
+        return CONFIG_TEXTS["unreadable"].format(reason=type(exc).__name__)
+    repos = data.get("repos") if isinstance(data, dict) else None
+    if not isinstance(repos, list):
+        return CONFIG_TEXTS["unreadable"].format(reason="« repos » attendu")
+    count = 0
+    for entry in repos:
+        repo = entry.get("repo") if isinstance(entry, dict) else None
+        if repo not in ("local", "meta"):
+            return CONFIG_TEXTS["remote"].format(repo=repo)
+        declared = entry.get("hooks")
+        if not isinstance(declared, list):
+            return CONFIG_TEXTS["unreadable"].format(reason="« hooks » attendu")
+        for hook in declared:
+            if not isinstance(hook, dict):
+                return CONFIG_TEXTS["unreadable"].format(reason="hook illisible")
+            count += 1
+            if repo == "meta":
+                continue
+            words = str(hook.get("entry", "")).split()
+            if not words or words[0] not in HOOK_COMMANDS or hook.get("language") != "system":
+                command = words[0] if words else ""
+                return CONFIG_TEXTS["entry"].format(hook=hook.get("id", "?"), command=command)
+    return CONFIG_TEXTS["empty"] if count == 0 else None
+
+
+HANDLERS: dict[str, Callable[[Path, TextIO, TextIO], int]] = {
+    "pre-receive": pre_receive,
+    "pre-commit": pre_commit,
+}
 
 
 def main(argv: list[str], stdin: TextIO | None = None, stderr: TextIO | None = None) -> int:

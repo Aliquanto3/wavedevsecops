@@ -12,7 +12,7 @@ from test_catalogue_dom import CATALOGUE, NODE, _js
 
 from wavedevsecops import toolrun
 from wavedevsecops.config import Settings
-from wavedevsecops.scenarios.order import SOCLE_ORDER, catalogue_rank
+from wavedevsecops.scenarios.order import SOCLE_ORDER, STATION_ORDER, catalogue_rank
 from wavedevsecops.web.catalogue import catalogue_body
 
 
@@ -27,8 +27,8 @@ def test_section_stations_rangee_par_station(tmp_path: Path, monkeypatch) -> Non
     assert stations["title"] == "Stations"
     (group,) = stations["groups"]
     assert (group["station"], group["text"]) == (1, "Station 1 · Poste local")
-    lint, test = group["scenarios"]
-    assert (lint["scenario_id"], test["scenario_id"]) == ("defaut-de-lint", "test-casse")
+    lint, test, secret = group["scenarios"]
+    assert [s["scenario_id"] for s in (lint, test, secret)] == list(STATION_ORDER)
     assert lint["description"].startswith("Lancez ruff") and test["description"]
     # Un outil absent rend la carte indisponible, avec l'outil nommé.
     (lint_mode,) = lint["modes"]
