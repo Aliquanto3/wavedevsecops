@@ -384,6 +384,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:09 · 2.10 · dev · fini, ~1215 passed, CI verte ; Views.links, names, explain (projections/links.py), content/explanations.yaml (13 clés) et GET /api/explanations, linking.js et explain.js ; barrier_id prévu pour 9.4 ; contrôles navigateur pour Anaël · 553bc1a
 - 2026-10-19 04:09 · 2.10 · second-avis · lancé · —
 - 2026-10-19 04:09 · 9.3 · dev · lancé (dev-story Sonnet ; section Stations du catalogue, attendue par 7.2) ; 5.4 attend 5.5 · —
+- 2026-10-19 04:14 · 6.4 · dev · fini, 1277 passed / 46 skipped, CI verte ; last_opened dans progress.json, engine/resume.py check_resume, Reprendre ou encart dans le catalogue, POST /api/open avec resume ou restart ; restart de l'encart sans scenario_reset (à aligner sur 4.4) · ff14fb5
+- 2026-10-19 04:14 · 6.4 · second-avis · lancé ; créneau gardé pour 6.3 dès la fusion de 6.2, 5.4 attend 5.5 · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
