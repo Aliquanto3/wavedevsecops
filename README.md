@@ -1,6 +1,6 @@
 # WaveDevSecOps
 
-> 🟢 **v0.1.0** : le socle git (scénarios des modes A et B), la vue du graphe, le terminal du bac à sable, le quiz et le diagnostic des outils. Notes de version : [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
+> 🟢 **Version 0.1.0** : le socle git (scénarios des modes A et B), la vue du graphe, le terminal du bac à sable, le quiz et le diagnostic des outils. Notes de version : [docs/releases/v0.1.0.md](docs/releases/v0.1.0.md).
 
 Application pédagogique locale pour apprendre git et GitHub, puis la chaîne CI/CD et les
 concepts DevSecOps, pensée pour les personnes qui codent avec des agents (vibe coding) et
@@ -9,7 +9,7 @@ doivent comprendre ce que l'agent fait sur leur dépôt. Pédagogie inspirée de
 
 ## Ce que l'application propose
 
-La v0.1.0 livre le socle git. Les stations de la chaîne DevSecOps arrivent ensuite (voir [Jalons](#jalons)).
+La version 0.1.0 couvre le socle git. Les stations de la chaîne DevSecOps arrivent ensuite (voir [Jalons](#jalons)).
 
 - **Du vrai git, hors ligne** : un dépôt bac à sable, un dépôt distant local et un GitHub
   simulé (PR, revue, merge, commits d'un collègue), dans des vues synchronisées.
@@ -42,7 +42,9 @@ installation interrompue reprend là où elle s'est arrêtée.
 - **Derrière un proxy** : posez `HTTPS_PROXY` (et `NO_PROXY=127.0.0.1,localhost`) avant la commande ;
   la commande et l'installeur passent par lui (sinon par le proxy système), et l'installeur pose `UV_SYSTEM_CERTS=true`.
 - **Sans git ou si le clone échoue** : `$env:WDS_INSTALL_METHOD = 'zip'` avant la commande.
-- **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche : `$env:WDS_INSTALL_REF`.
+- **Autre dossier** : `$env:WDS_DATA_DIR`. Autre branche ou version : `$env:WDS_INSTALL_REF`.
+- **Version 0.1.0 exactement** (la commande ci-dessus installe la tête de `main`) :
+  `$env:WDS_INSTALL_REF = 'v0.1.0'` avant la commande, et `/v0.1.0/install.ps1` à la place de `/main/install.ps1`.
 
 ## Installer sous macOS et Linux (sans droits administrateur)
 
@@ -65,14 +67,16 @@ interrompue reprend là où elle s'est arrêtée.
 - **Derrière un proxy** : `export HTTPS_PROXY=http://proxy.entreprise:8080` (et `NO_PROXY=127.0.0.1,localhost`) avant la
   commande ; `curl` et l'installeur passent par lui, et l'installeur pose `UV_SYSTEM_CERTS=true`.
 - **Sans git ou si le clone échoue** : `export WDS_INSTALL_METHOD=zip` avant la commande (archive `tar.gz` de GitHub).
-- **Autre dossier** : `WDS_DATA_DIR`. Autre branche : `WDS_INSTALL_REF`.
+- **Autre dossier** : `WDS_DATA_DIR`. Autre branche ou version : `WDS_INSTALL_REF`.
+- **Version 0.1.0 exactement** (la commande ci-dessus installe la tête de `main`) :
+  `curl -fsSL https://raw.githubusercontent.com/Aliquanto3/wavedevsecops/v0.1.0/install.sh | WDS_INSTALL_REF=v0.1.0 sh`.
 
 ## Confidentialité et réseau
 
 L'application n'envoie aucune télémétrie et ne fait aucun appel réseau, sauf l'exécution facultative
-du code LLM (parcours LLM, sur confirmation de votre part). Le serveur n'écoute que sur
-`127.0.0.1`, et toute l'interface est servie par l'application elle-même, sans ressource externe.
-Seule l'installation (et sa mise à jour) télécharge : uv, git si besoin, les paquets et gitleaks.
+du code LLM (parcours LLM, sur confirmation de votre part) ; seules l'installation et sa mise à jour
+téléchargent (uv, git si besoin, les paquets, gitleaks). Le serveur n'écoute que sur `127.0.0.1`,
+et toute l'interface est servie par l'application elle-même, sans ressource externe.
 
 ## Lancer
 
@@ -94,7 +98,7 @@ chronométrée de la v0.1.0 est consignée dans les [notes de version](docs/rele
 
 ## Jalons
 
-`v0.1` socle git (livré : v0.1.0) → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
+`v0.1` socle git (version 0.1.0) → `v0.2` stations 1 à 3 → `v0.3` livraison → `v1.0` présentation.
 
 ## Documents
 

@@ -29,3 +29,16 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.7 ». Ty
 ## Tests
 
 Version : `tests/test_seed.py`. Aucune autre modification de code.
+
+## Revue
+
+- Medium · second avis 1 · corrigé : table du temps d'installation vide. Durées CI renseignées (run 39229127462 sur `40e58e5`, `duration_s`) : Windows 22,9 s, macOS 12 s, Ubuntu 12 s, présentées comme un plancher ; ligne « poste réel d'Anaël » à remplir.
+- Medium · second avis 2 · corrigé : les commandes installaient la tête de `main`. Installation épinglée documentée (README et notes : `WDS_INSTALL_REF=v0.1.0` et installeur pris à l'étiquette) ; défaut des installeurs inchangé. Vérifié : clone `--branch`, mise à jour `fetch` + `FETCH_HEAD` et archive `archive/<ref>.tar.gz` acceptent une étiquette.
+- Low · second avis 3 · corrigé : formulation neutre « version 0.1.0 » (bandeau, présentation, jalons).
+- Low · second avis 4 · corrigé : mention SM-1 laissée à remplir, règle conservée en note.
+- Low · second avis 5 · corrigé : limites connues réécrites pour un lecteur externe, sans numéros de story ni lien vers le journal du run.
+- Low · second avis 6 · rejeté : le jalon `v0.1` et la version `0.1.0` sont cohérents (jalon contre SemVer).
+- Low · second avis 7 · corrigé : exception réseau énoncée en une phrase (code LLM facultatif, installation et mise à jour).
+- Low · second avis 8 · rejeté : historique d'`epics.md`, hors périmètre.
+- Note : la section des 7 scénarios de stations est présentée comme un aperçu de la v0.2 ; leur masquage attend la décision d'Anaël.
+- Complexité : 0 constat (documentation et version seulement).
