@@ -91,7 +91,7 @@ development_status:
   epic-6: in-progress
   6-1-choisir-son-parcours-et-parcourir-le-catalogue: done
   6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: done
-  6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
+  6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: in-progress
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: review
   6-5-exporter-mon-rapport-de-progression: done
   6-6-exécuter-en-option-le-code-d-exercice-du-parcours-llm: done
