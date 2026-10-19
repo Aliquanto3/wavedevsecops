@@ -11,7 +11,7 @@ export const NO_SCENARIO_TEXT = "Aucun scénario n'est déclaré dans cette inst
 export async function openMode(
   scenario,
   mode,
-  { fetchImpl = (...a) => fetch(...a), track = null } = {},
+  { fetchImpl = (...a) => fetch(...a), track = null, resume = false, restart = false } = {},
 ) {
   const response = await fetchImpl("/api/open", {
     method: "POST",
@@ -20,6 +20,8 @@ export async function openMode(
     body: JSON.stringify({
       scenario_id: scenario.scenario_id,
       mode: mode.mode,
+      ...(resume ? { resume: true } : {}),
+      ...(restart ? { restart: true } : {}),
       ...(track || mode.track ? { track: track || mode.track } : {}),
     }),
   });
@@ -91,18 +93,53 @@ function modeColumn(scenario, mode, onOpen) {
     column.append(detail);
   }
   const alert = el("p", "scenario-card-alert", { role: "alert" });
-  const button = el("button", "btn btn-secondary", { type: "button", "data-mode": mode.mode });
-  button.textContent = `Ouvrir en mode ${mode.mode}`;
-  button.setAttribute("aria-label", `Ouvrir ${scenario.title} en mode ${mode.mode}`);
-  button.addEventListener("click", async () => {
-    alert.textContent = "";
-    try {
-      await onOpen(scenario, mode);
-    } catch (err) {
-      alert.textContent = err.message;
+  const resume = mode.resume;
+  const actions = [];
+  const action = (label, ariaLabel, how, extra = {}) => {
+    const button = el("button", extra.className || "btn btn-secondary", {
+      type: "button",
+      "data-mode": mode.mode,
+      ...(extra.attrs || {}),
+    });
+    button.textContent = label;
+    button.setAttribute("aria-label", ariaLabel);
+    button.addEventListener("click", async () => {
+      alert.textContent = "";
+      try {
+        await onOpen(scenario, mode, how);
+      } catch (err) {
+        alert.textContent = err.message;
+      }
+    });
+    actions.push(button);
+  };
+  if (resume) {
+    // « Reprendre » (Story 6.4) : l'étape conservée, ou l'encart qui propose « Recommencer ».
+    if (resume.can_resume) {
+      const step = el("p", "scenario-mode-step");
+      step.textContent = resume.text;
+      column.append(step);
+      action(resume.button_text, `${resume.button_text} ${scenario.title} en mode ${mode.mode}`, {
+        resume: true,
+      }, { className: "btn btn-primary", attrs: { "data-action": "resume" } });
+    } else {
+      const note = el("p", "scenario-mode-blocked", { role: "status" });
+      note.textContent = resume.blocked_text;
+      column.append(note);
+      action(
+        resume.restart_text,
+        `${resume.restart_text} ${scenario.title} en mode ${mode.mode}`,
+        { restart: true },
+        { attrs: { "data-action": "restart" } },
+      );
     }
-  });
-  column.append(button, alert);
+  }
+  if (!resume || resume.can_resume) {
+    action(`Ouvrir en mode ${mode.mode}`, `Ouvrir ${scenario.title} en mode ${mode.mode}`, {}, {
+      attrs: { "data-action": "open" },
+    });
+  }
+  column.append(...actions, alert);
   return column;
 }
 

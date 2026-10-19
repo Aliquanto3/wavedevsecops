@@ -36,11 +36,14 @@ from wavedevsecops.engine import (
     parse_workspace_id,
     workspace_id_for,
 )
+from wavedevsecops.engine.resume import CANNOT_RESUME_TEXT, ResumeCheck, check_resume
+from wavedevsecops.engine.workspace import resolve_git
 from wavedevsecops.progress import report as progress_report
 from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
 from wavedevsecops.scenarios.order import SOCLE_SECTION, catalogue_rank
 from wavedevsecops.web.shell import TRACKS, track_options
+from wavedevsecops.wsfs import Layout
 
 log = logging.getLogger("wavedevsecops")
 
@@ -56,6 +59,8 @@ STATE_TEXTS = {"todo": "À faire", "in_progress": "En cours", "done": "Terminé"
 UNAVAILABLE_TEXT = "⊘ Indisponible"
 DIAGNOSTIC_TEXT = "Voir le diagnostic"
 DIAGNOSTIC_PATH = "/diagnostic"
+RESUME_BUTTON_TEXT = "Reprendre"
+RESTART_BUTTON_TEXT = "Recommencer"
 
 
 class _ChainModel(BaseModel):
@@ -299,6 +304,23 @@ def report_data(settings: Settings) -> dict[str, Any]:
     return progress_report.build_report(settings.resolved_data_dir(), titles=titles, tracks=tracks)
 
 
+def resume_body(check: ResumeCheck) -> dict[str, Any] | None:
+    """Bloc `resume` d'un mode (Story 6.4) ; rien si le scénario est terminé."""
+    if not check.offered:
+        return None
+    body: dict[str, Any] = {
+        "can_resume": check.can_resume,
+        "step_number": check.step_number,
+        "step_total": check.step_total,
+    }
+    if check.can_resume:
+        body["text"] = f"Étape {check.step_number} sur {check.step_total}"
+        body["button_text"] = RESUME_BUTTON_TEXT
+    else:
+        body["blocked_text"] = CANNOT_RESUME_TEXT
+        body["restart_text"] = RESTART_BUTTON_TEXT
+    return body
+
 
 def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, Any]:
     """Catalogue du `track` choisi ; sans parcours, seulement le choix du parcours.
@@ -315,6 +337,7 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
     if track is None:
         return body
     progress = ProgressStore.for_dir(settings.resolved_data_dir()).all_progress()
+    last = ProgressStore.for_dir(settings.resolved_data_dir()).last_opened()
     labels = tool_labels(settings)
     probed: dict[str, bool] = {}
     grouped: dict[str, dict[str, Any]] = {}
@@ -341,6 +364,13 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
             "detail_text": detail_text(done) if done else "",
             "available": missing is None,
         }
+        if missing is None and last == (track, scenario.scenario_id, scenario.mode):
+            layout = Layout.for_scenario(
+                settings.workspaces_path(), track, scenario.scenario_id, scenario.mode
+            )
+            resume = resume_body(check_resume(layout, loaded, settings, resolve_git(settings)))
+            if resume is not None:
+                mode["resume"] = resume
         if missing is not None:
             mode["unavailable"] = {
                 "tool_id": missing[0],
@@ -450,6 +480,15 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 "Ouvrez le diagnostic pour voir quoi faire.",
             )
         workspace_id = workspace_id_for(track, loaded.scenario.key)
+        restart = body.get("restart") is True
+        if body.get("resume") is True and not restart:
+            check = await asyncio.to_thread(
+                lambda: check_resume(
+                    manager.layout(workspace_id), loaded, settings, resolve_git(settings)
+                )
+            )
+            if not check.can_resume:
+                return _refusal(409, f"{CANNOT_RESUME_TEXT} Recommencez le scénario.")
 
         def open_it() -> bool:
             """Vrai si l'espace est en préparation, faux s'il existait déjà.
@@ -462,10 +501,10 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
                 if pending is not None and not pending.done():
                     return True
                 preparing.pop(workspace_id, None)
-                if manager.layout(workspace_id).root.is_dir():
+                if manager.layout(workspace_id).root.is_dir() and not restart:
                     manager.get(workspace_id)
                     return False
-                _engine, future = manager.create(loaded, track)
+                _engine, future = manager.create(loaded, track, replace=restart)
                 preparing[workspace_id] = future
                 return True
 
@@ -475,6 +514,15 @@ def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: 
             return _refusal(409, refused.reason_text)
         except AppError as error:
             return _refusal(409, f"{error.cause_text} {error.action_text}")
+        try:
+            await asyncio.to_thread(
+                ProgressStore.for_dir(settings.resolved_data_dir()).set_last_opened,
+                track,
+                scenario_id,
+                mode,
+            )
+        except AppError as error:  # confort : l'ouverture réussit même si ce n'est pas consigné
+            log.warning("Dernier scénario ouvert non consigné : %s", error.cause_text)
         return JSONResponse(
             {
                 "workspace_id": workspace_id,
