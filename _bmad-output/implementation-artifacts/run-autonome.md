@@ -373,6 +373,11 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 03:20 · 7.4 ★ · dev · fini, CI verte sur 6 jobs (dont unshare -n) ; pipeline.yaml (ruff, pytest, gitleaks, jetons contrôlés), module ci/ (clone --shared, venv par uv.lock), engine/pipeline.py (un run par espace, annulation, résultats par la file avec epoch), intention check_rerun ; front Distant + PR (Voir la sortie, Relancer) non fait faute de 3.3 sur sa base · 6631d16
 - 2026-10-19 03:20 · 7.4 ★ · second-avis · lancé · —
 - 2026-10-19 03:20 · 7.3 · dev · lancé (dev-story Sonnet ; 3.5 et 7.1 done) · —
+- 2026-10-19 03:31 · 4.4 · review · rebase sans conflit, M1 (score et indices bornés au premier passage : _before_first_reset), M2 (garde restartPending), L3 (restoring écrit avec run.json), L4 (epoch transmis) corrigés ; L5 écarté ; non-rejeu de scenario_reset reporté ; 1218 passed, CI branche verte · fa17523
+- 2026-10-19 03:31 · — · décision pour Anaël · 4.4 : score et indices du seul premier passage, mais un scénario terminé au second passage compte « Terminé » · —
+- 2026-10-19 03:31 · 4.4 · fusion · rebase sur main (conflit facts.py sur l'ancien nom du fait, scenario_reset gardé ; RESTART_KIND défini deux fois → une seule définition, par l'orchestrateur), tests ciblés 117 passed, suite complète et CI en cours · —
+- 2026-10-19 03:31 · 5.5 · second-avis · aucun medium ni high, aucune fuite de la correction avant soumission ; 6 low (pas de Continuer en fin de scénario, correction de N active pendant N+1 armée, marque hors nom accessible…) ; reviewer Opus lancé · —
+- 2026-10-19 03:31 · 7.4 ★ · second-avis · 3 medium (run refusé ou en exception sans état terminal + test instable, échec machine sans constat ni tool_error, code de l'apprenant sans bac à sable dans le pipeline), 5 low ; reviewer Opus lancé avec le front Distant + PR à compléter · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
