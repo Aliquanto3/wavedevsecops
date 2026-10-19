@@ -81,7 +81,10 @@ def _by_snapshot(
     if snapshot is None or run.get("content_hash") != loaded.content_hash:
         return False
     aliases = run.get("aliases") if isinstance(run.get("aliases"), dict) else {}
-    save_run(ctx.layout, initial_run(loaded, track, snapshot.fingerprint, aliases, epoch=ctx.epoch))
+    fresh = initial_run(loaded, track, snapshot.fingerprint, aliases, epoch=ctx.epoch)
+    # `restoring` dans la même écriture : un arrêt avant la copie est repris au démarrage (4.3).
+    fresh["restoring"] = {"snapshot_id": 0, "epoch": ctx.epoch, "phase": "copy"}
+    save_run(ctx.layout, fresh)
     try:
         restore_snapshot(ctx.layout, git, ctx.settings, 0, epoch=ctx.epoch, sleep=sleep)
     except Exception:  # noqa: BLE001 - RestoreFailed ou erreur imprévue : on reconstruit
@@ -93,7 +96,7 @@ def _by_snapshot(
 def _rebuild(ctx: OpContext, git_path: Path, loaded: LoadedScenario, track: str) -> None:
     """Supprime l'espace, le reconstruit par son setup et compare son empreinte à la référence."""
     prepared = prepare_workspace(
-        loaded, track, settings=ctx.settings, git_path=git_path, replace=True
+        loaded, track, settings=ctx.settings, git_path=git_path, replace=True, epoch=ctx.epoch
     )
     key = reference_key(track, loaded.scenario.key)
     try:

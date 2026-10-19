@@ -70,6 +70,7 @@ export function createScenarioView({
   let hintStep = null; // étape à laquelle `hintTier` se rapporte
   let confirming = false; // confirmation de « Recommencer » ouverte dans le pied du panneau
   let focusTitle = false; // après une remise à zéro : le focus revient sur la consigne
+  let restartPending = false; // POST `restart` en cours : un second clic est ignoré
   let lastState = null;
   const uid = ++counter;
   const designateBlock = designation ? createDesignateBlock({ designation, onIntent }) : null;
@@ -152,6 +153,7 @@ export function createScenarioView({
 
   /** Ouvre la confirmation en ligne de « Recommencer » et y met le focus (bouton le moins grave). */
   function askRestart() {
+    if (restartPending) return;
     confirming = true;
     render(lastState);
     const cancel = root.querySelector('[data-action="restart-cancel"]');
@@ -166,9 +168,17 @@ export function createScenarioView({
   }
 
   async function confirmRestart() {
+    // Garde synchrone : un double clic pendant l'envoi ne poste qu'un seul `restart`.
+    if (restartPending) return;
+    restartPending = true;
     confirming = false;
     focusTitle = true;
-    const ok = onIntent ? await onIntent("restart", {}) : false;
+    let ok = false;
+    try {
+      ok = onIntent ? await onIntent("restart", {}) : false;
+    } finally {
+      restartPending = false;
+    }
     if (!ok) focusTitle = false;
     if (lastState) render(lastState);
   }

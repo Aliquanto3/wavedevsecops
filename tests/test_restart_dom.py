@@ -221,3 +221,30 @@ console.log(JSON.stringify({ before, hidden: link.hidden, label: link.textConten
     assert out["hidden"] is False
     assert (out["label"], out["href"]) == ("Voir le diagnostic", "/diagnostic")
     assert out["error"].startswith("L'espace n'a pas pu")
+
+
+def test_un_double_clic_sur_remettre_a_zero_n_envoie_qu_un_restart(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+let release;
+globalThis.fetch = (url, init) => {
+  posts.push([url, JSON.parse(init.body)]);
+  return new Promise((r) => { release = () => r({ ok: true, status: 202, json: async () => ({}) }); });
+};
+mount(FIRST);
+$('[data-action="restart-ask"]').click();
+const confirm = $('[data-action="restart-confirm"]');
+confirm.click();
+confirm.click();
+await tick();
+const during = posts.length;
+release();
+await tick(); await tick();
+$('[data-action="restart-ask"]').click();
+$('[data-action="restart-confirm"]').click();
+await tick();
+console.log(JSON.stringify({ during, after: posts.length }));
+""",
+    )
+    assert out == {"during": 1, "after": 2}

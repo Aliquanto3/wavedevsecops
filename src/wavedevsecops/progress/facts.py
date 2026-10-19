@@ -99,7 +99,11 @@ def derive(
         and f.get("kind") != "scenario_reset"
     ]
     validated = [f["step_id"] for f in mine if f.get("kind") == "step_validated"]
-    quizzes = [f for f in mine if f.get("kind") == "quiz_first_attempt"]
+    # Score du premier coup et indices : seuls les faits antérieurs à la première remise à zéro
+    # comptent (story 4.4, « mon premier passage reste la mesure »). `facts` est dans l'ordre
+    # d'ajout de `progress.json` (ajout seulement).
+    first_pass = _before_first_reset(facts, track, scenario_id, mode)
+    quizzes = [f for f in first_pass if f.get("kind") == "quiz_first_attempt"]
     correct = sum(1 for f in quizzes if f.get("correct") is True)
     done = any(f.get("kind") == "scenario_completed" for f in mine)
     return ScenarioProgress(
@@ -108,8 +112,22 @@ def derive(
         quiz_total=len(quizzes),
         quiz_correct=correct,
         first_try_score=round(100 * correct / len(quizzes)) if quizzes else None,
-        hints=sum(1 for f in mine if f.get("kind") == "hint_opened"),
+        hints=sum(1 for f in first_pass if f.get("kind") == "hint_opened"),
     )
+
+
+def _before_first_reset(
+    facts: list[dict[str, Any]], track: str, scenario_id: str, mode: str
+) -> list[dict[str, Any]]:
+    """Faits du scénario ajoutés avant son premier `scenario_reset` (tous s'il n'y en a pas)."""
+    kept: list[dict[str, Any]] = []
+    for f in facts:
+        if (f.get("track"), f.get("scenario_id"), f.get("mode")) != (track, scenario_id, mode):
+            continue
+        if f.get("kind") == "scenario_reset":
+            break
+        kept.append(f)
+    return kept
 
 
 def _identity(raw: dict[str, Any]) -> tuple[Any, ...]:

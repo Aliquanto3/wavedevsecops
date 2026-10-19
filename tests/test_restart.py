@@ -28,6 +28,7 @@ from wavedevsecops.engine import (
     write_references,
 )
 from wavedevsecops.engine.operations import QUIZ_REFUSED_TEXT, RESTORE_FAILED_TEXT
+from wavedevsecops.engine.snapshots import pending_restore
 from wavedevsecops.engine.steps import CONTENT_CHANGED_TEXT
 from wavedevsecops.events import Envelope, Kind
 from wavedevsecops.gitio import Git
@@ -195,6 +196,26 @@ def test_recommencer_rend_l_empreinte_de_l_instantane_0_et_l_etape_1(make_box) -
     assert _of(events, Kind.APP_ERROR) == []
 
 
+def test_restoring_est_pose_avec_le_run_json_remis_a_zero(make_box, monkeypatch) -> None:
+    """Un arrêt entre la réécriture de `run.json` et la copie reste repris au démarrage (4.3)."""
+    box = make_box()
+    box.run("quiz_choice", {"choice_id": "revert"})
+    seen: list[object] = []
+    original = restart.restore_snapshot
+
+    def spy(layout, *args, **kwargs):  # noqa: ANN001, ANN202
+        run = load_run(layout)
+        seen.append((run["step_id"], pending_restore(layout)))
+        return original(layout, *args, **kwargs)
+
+    monkeypatch.setattr(restart, "restore_snapshot", spy)
+    box.run("restart")
+    [(step_id, pending)] = seen
+    assert step_id == "annuler"
+    assert pending == {"snapshot_id": 0, "epoch": box.engine.epoch, "phase": "copy"}
+    assert box.run_json()["restoring"] is None
+
+
 def test_recommencer_n_est_pas_un_retablissement_marque(make_box) -> None:
     box = make_box()
     box.run("quiz_choice", {"choice_id": "revert"})
@@ -334,6 +355,40 @@ def test_les_faits_du_premier_passage_sont_conserves(make_box) -> None:
     ]
     score = ProgressStore.for_dir(box.settings.resolved_data_dir()).progress("llm", "reprise", "A")
     assert (score.quiz_total, score.quiz_correct) == (1, 0)
+
+
+def test_le_second_passage_ne_compte_ni_dans_le_score_ni_dans_les_indices(make_box) -> None:
+    """Une étape jamais répondue au premier passage ne prend pas de « premier essai » ensuite."""
+    box = make_box()
+    box.run("hint_open", {"tier": 1})
+    box.run("restart")
+    box.run("hint_open", {"tier": 1})
+    box.run("hint_open", {"tier": 2})
+    box.finish()
+    # Les faits du second passage existent (journal), mais ne comptent pas.
+    assert box.facts("quiz_first_attempt") and len(box.facts("hint_opened")) == 2
+    score = ProgressStore.for_dir(box.settings.resolved_data_dir()).progress("llm", "reprise", "A")
+    assert (score.quiz_total, score.first_try_score, score.hints) == (0, None, 1)
+    assert score.state == "done"
+
+
+def test_derive_ne_compte_que_les_faits_d_avant_la_premiere_remise_a_zero() -> None:
+    def fact(kind: str, **extra: object) -> dict:
+        return {"kind": kind, "track": "llm", "scenario_id": "x", "mode": "A", **extra}
+
+    facts = [
+        fact("quiz_first_attempt", step_id="a", correct=False),
+        fact("hint_opened", step_id="a", tier=1),
+        {**fact("quiz_first_attempt", step_id="a", correct=True), "scenario_id": "autre"},
+        fact("scenario_reset", op_id="r1"),
+        fact("quiz_first_attempt", step_id="b", correct=True),
+        fact("hint_opened", step_id="b", tier=1),
+        fact("scenario_reset", op_id="r2"),
+        fact("step_validated", step_id="b"),
+    ]
+    got = derive(facts, "llm", "x", "A")
+    assert (got.quiz_total, got.quiz_correct, got.first_try_score, got.hints) == (1, 0, 0, 1)
+    assert (got.state, got.steps_validated) == ("in_progress", ["b"])
 
 
 def test_chaque_remise_a_zero_ajoute_son_fait(make_box) -> None:

@@ -73,8 +73,12 @@ def prepare_workspace(
     settings: Settings | None = None,
     git_path: Path | None = None,
     replace: bool = False,
+    epoch: int = 0,
 ) -> PreparedWorkspace:
-    """Construit l'espace du scénario pour `track` ; `replace` reconstruit un espace existant."""
+    """Construit l'espace du scénario pour `track` ; `replace` reconstruit un espace existant.
+
+    `epoch` : celui de l'opération qui reconstruit (« Recommencer », 4.4), écrit dans `run.json`.
+    """
     settings = settings or get_settings()
     scenario = loaded.scenario
     if track not in scenario.tracks:
@@ -101,7 +105,7 @@ def prepare_workspace(
         wsfs.remove_tree(layout.root)
         raise
     _prepare_tool_environment(scenario.tools, layout, settings)
-    wsfs.write_json(layout.run_json, initial_run(loaded, track, digest, aliases))
+    wsfs.write_json(layout.run_json, initial_run(loaded, track, digest, aliases, epoch=epoch))
     return PreparedWorkspace(layout, digest, aliases)
 
 
