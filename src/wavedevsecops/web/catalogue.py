@@ -41,7 +41,7 @@ from wavedevsecops.engine.resume import CANNOT_RESUME_TEXT, ResumeCheck, check_r
 from wavedevsecops.progress import report as progress_report
 from wavedevsecops.progress.facts import ProgressStore, ScenarioProgress
 from wavedevsecops.scenarios import LoadedScenario, ScenarioError, load_scenario, scenario_files
-from wavedevsecops.scenarios.order import SOCLE_SECTION, catalogue_rank
+from wavedevsecops.scenarios.order import SOCLE_SECTION, STATIONS_SECTION, catalogue_rank
 from wavedevsecops.web.shell import TRACKS, track_options
 from wavedevsecops.wsfs import Layout
 
@@ -51,6 +51,8 @@ DEFAULT_TRACK = "no_ai"
 """Parcours d'ouverture par défaut : le parcours sans IA (le choix de parcours vient en 6.1)."""
 SOCLE_TITLE = "Socle git"
 SOCLE_SUBTITLE = "Les gestes git de base, dans un dépôt qui ne risque rien."
+STATIONS_TITLE = "Stations"
+STATIONS_SUBTITLE = "Une barrière de la chaîne à la fois, vue jouer sur un cas prévu."
 PICKER_QUESTION = (
     "Choisissez votre parcours. Les deux suivent la même progression ; "
     "seul le code d'exercice change."
@@ -343,13 +345,24 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
     grouped: dict[str, dict[str, Any]] = {}
     for loaded in load_catalogue(settings):
         scenario = loaded.scenario
-        if not scenario.catalogue or scenario.section not in (None, SOCLE_SECTION):
+        if not scenario.catalogue or scenario.section not in (
+            None,
+            SOCLE_SECTION,
+            STATIONS_SECTION,
+        ):
             continue
         if track not in scenario.tracks:
             continue
         entry = grouped.setdefault(
             scenario.scenario_id,
-            {"scenario_id": scenario.scenario_id, "title": scenario.title_text, "modes": []},
+            {
+                "scenario_id": scenario.scenario_id,
+                "title": scenario.title_text,
+                "description": scenario.description_text or "",
+                "section": scenario.section or SOCLE_SECTION,
+                "station": scenario.station,
+                "modes": [],
+            },
         )
         done = progress.get((track, scenario.scenario_id, scenario.mode))
         state = done.state if done else "todo"
@@ -381,10 +394,10 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
                 "diagnostic_path": DIAGNOSTIC_PATH,
             }
         entry["modes"].append(mode)
-    scenarios = sorted(grouped.values(), key=lambda s: catalogue_rank(s["scenario_id"]))
+    ordered = sorted(grouped.values(), key=lambda s: catalogue_rank(s["scenario_id"]))
+    scenarios = [e for e in ordered if e["section"] == SOCLE_SECTION]
     for number, entry in enumerate(scenarios, start=1):
         entry["number"] = number
-        entry["modes"].sort(key=lambda m: m["mode"])
     body["sections"] = [
         {
             "key": SOCLE_SECTION,
@@ -393,7 +406,36 @@ def catalogue_body(settings: Settings, track: str | None = None) -> dict[str, An
             "scenarios": scenarios,
         }
     ]
+    stations = _station_groups([e for e in ordered if e["section"] == STATIONS_SECTION], settings)
+    if stations:
+        body["sections"].append(
+            {
+                "key": STATIONS_SECTION,
+                "title": STATIONS_TITLE,
+                "subtitle": STATIONS_SUBTITLE,
+                "groups": stations,
+            }
+        )
+    for entry in ordered:
+        entry["modes"].sort(key=lambda m: m["mode"])
+        entry.pop("section", None)
     return body
+
+
+def _station_groups(entries: list[dict[str, Any]], settings: Settings) -> list[dict[str, Any]]:
+    """Scénarios de station rangés par station, dans l'ordre des stations (Story 9.3)."""
+    if not entries:
+        return []
+    texts = load_chain_texts(settings)
+    names = {s.number: s.name for s in texts.stations} if texts else {}
+    by_station: dict[int, list[dict[str, Any]]] = {}
+    for entry in entries:
+        by_station.setdefault(entry["station"] or 0, []).append(entry)
+    groups = []
+    for number in sorted(by_station):
+        text = f"Station {number} · {names[number]}" if number in names else f"Station {number}"
+        groups.append({"station": number, "text": text, "scenarios": by_station[number]})
+    return groups
 
 
 def install_catalogue_routes(app: FastAPI, manager: WorkspaceManager, settings: Settings) -> None:

@@ -57,6 +57,8 @@ class Scenario(BaseModel):
     scenario_id: str = Field(pattern=KEBAB_PATTERN)
     mode: Mode
     title_text: str = Field(min_length=1)
+    description_text: str | None = None
+    """Une phrase de présentation, affichée sur la carte du catalogue (Story 9.3)."""
     section: str | None = None
     catalogue: bool = True
     """Faux : scénario interne (gabarit d'exercice, empreinte de référence), jamais proposé à

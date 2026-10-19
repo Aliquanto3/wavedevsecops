@@ -93,6 +93,15 @@ function modeColumn(scenario, mode, onOpen) {
     detail.textContent = mode.detail_text;
     column.append(detail);
   }
+  appendActions(column, scenario, mode, onOpen, `Ouvrir en mode ${mode.mode}`);
+  return column;
+}
+
+/**
+ * Boutons d'un mode disponible : « Ouvrir », ou « Reprendre » / l'encart « Recommencer » de la
+ * Story 6.4. Partagé par les cartes du socle et les cartes de station (Story 9.3).
+ */
+function appendActions(column, scenario, mode, onOpen, openText) {
   const alert = el("p", "scenario-card-alert", { role: "alert" });
   const resume = mode.resume;
   const actions = [];
@@ -157,12 +166,11 @@ function modeColumn(scenario, mode, onOpen) {
     }
   }
   if (!resume || resume.can_resume) {
-    action(`Ouvrir en mode ${mode.mode}`, `Ouvrir ${scenario.title} en mode ${mode.mode}`, {}, {
+    action(openText, `Ouvrir ${scenario.title} en mode ${mode.mode}`, {}, {
       attrs: { "data-action": "open" },
     });
   }
   column.append(...actions, alert);
-  return column;
 }
 
 function card(scenario, onOpen) {
@@ -178,6 +186,66 @@ function card(scenario, onOpen) {
   for (const mode of scenario.modes) modes.append(modeColumn(scenario, mode, onOpen));
   article.append(head, modes);
   return article;
+}
+
+/** Ligne d'état d'un mode de station : un seul paragraphe, l'outil manquant nommé s'il y a lieu. */
+function stationMode(scenario, mode, onOpen) {
+  const column = el("div", "scenario-mode is-compact", {
+    "data-mode": mode.mode,
+    "data-state": mode.state,
+  });
+  const state = el("p", "scenario-mode-state");
+  if (!mode.available) {
+    column.classList.add("is-unavailable");
+    const info = mode.unavailable;
+    state.append(`${info.text} · ${info.needs_text} · `);
+    const link = el("a", "scenario-mode-link", { href: info.diagnostic_path });
+    link.textContent = info.diagnostic_text;
+    state.append(link);
+    column.append(state);
+    return column;
+  }
+  state.textContent = mode.detail_text
+    ? `${mode.state_text} · ${mode.detail_text}`
+    : mode.state_text;
+  column.append(state);
+  // Reprendre / Recommencer (Story 6.4) valent aussi pour une carte de station.
+  appendActions(column, scenario, mode, onOpen, "Ouvrir");
+  return column;
+}
+
+/** Carte d'un scénario de station (Story 9.3) : titre, une phrase, une seule ligne d'état. */
+function stationCard(scenario, onOpen) {
+  const article = el("article", "scenario-card station-card", {
+    "data-scenario": scenario.scenario_id,
+  });
+  const title = el("h4", "scenario-card-title");
+  title.textContent = scenario.title;
+  article.append(title);
+  if (scenario.description) {
+    const description = el("p", "station-card-description");
+    description.textContent = scenario.description;
+    article.append(description);
+  }
+  const modes = el("div", "scenario-modes");
+  for (const mode of scenario.modes) modes.append(stationMode(scenario, mode, onOpen));
+  article.append(modes);
+  return article;
+}
+
+function stationGroups(section, onOpen) {
+  const wrap = el("div", "station-groups");
+  for (const group of section.groups) {
+    const id = `catalogue-station-${group.station}`;
+    const block = el("section", "station-group", { "aria-labelledby": id });
+    const heading = el("h3", "station-title", { id });
+    heading.textContent = group.text;
+    const cards = el("div", "scenario-cards");
+    for (const scenario of group.scenarios) cards.append(stationCard(scenario, onOpen));
+    block.append(heading, cards);
+    wrap.append(block);
+  }
+  return wrap;
 }
 
 /**
@@ -201,6 +269,11 @@ export function renderCatalogue(container, catalogue, onOpen, onPick = () => {})
     heading.textContent = section.title;
     const subtitle = el("p", "subtitle");
     subtitle.textContent = section.subtitle;
+    if (section.groups) {
+      block.append(heading, subtitle, stationGroups(section, onOpen));
+      container.append(block);
+      continue;
+    }
     const cards = el("div", "scenario-cards");
     if (section.scenarios.length === 0) {
       const empty = el("p", "empty");
