@@ -59,7 +59,7 @@ class Blocker(BaseModel):
     station: int = Field(ge=1, le=4)
     """Station de la barrière ; le lint vérifie qu'elle est bien celle de la chaîne."""
     scenario_id: str = Field(pattern=KEBAB_PATTERN)
-    """Scénario (mode A) qui fait jouer la barrière ; il doit exister au catalogue."""
+    """Scénario qui fait jouer la barrière (mode A en pratique) ; il doit exister au catalogue."""
     reason_text: str = Field(min_length=1)
     """Une phrase : pourquoi cette barrière aurait arrêté l'erreur (texte affiché)."""
 

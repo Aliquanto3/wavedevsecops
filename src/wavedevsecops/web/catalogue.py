@@ -95,6 +95,8 @@ class ChainStation(_ChainModel):
     name: str
     description: str = ""
     delivered: bool = True
+    milestone: str = ""
+    """Jalon annoncé d'une station non livrée (« Arrive en <milestone> » de l'encart 5.9)."""
     tools: list[ChainTool] = []
     barriers: list[ChainBarrier] = []
 

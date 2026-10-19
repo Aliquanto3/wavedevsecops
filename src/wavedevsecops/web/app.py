@@ -230,7 +230,7 @@ def create_app(
     workspaces = workspaces or WorkspaceManager(
         settings,
         osv_url=settings.osv_url(port),
-        blockers=lambda scenario: blockers_body(scenario, settings, milestone),
+        blockers=lambda scenario: blockers_body(scenario, settings),
     )
     app.state.workspaces = workspaces
     install_workspace_routes(app, workspaces)

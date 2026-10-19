@@ -98,6 +98,8 @@ class StepRunner:
         self._settings = settings
         self._progress = progress
         self._blockers = blockers
+        # Encart par scénario : recalculé seulement quand le scénario est relu (fichier modifié).
+        self._blockers_cache: dict[str, tuple[Scenario, dict[str, Any] | None]] = {}
         self._cache: dict[Path, tuple[tuple[int, int], Scenario | None]] = {}
         self._hashes: dict[Path, tuple[tuple[int, int], str]] = {}
 
@@ -406,11 +408,16 @@ class StepRunner:
         """Encart « Ce qui l'aurait bloqué » du scénario terminé ; `None` s'il n'en a pas."""
         if self._blockers is None or not scenario.blocked_by:
             return None
+        cached = self._blockers_cache.get(scenario.key)
+        if cached is not None and cached[0] is scenario:
+            return cached[1]
         try:
-            return self._blockers(scenario)
+            body = self._blockers(scenario)
         except Exception:  # noqa: BLE001 - un encart illisible ne bloque pas le panneau
             log.exception("Encart des barrières de %s", scenario.key)
             return None
+        self._blockers_cache[scenario.key] = (scenario, body)
+        return body
 
     # --------------------------------------------------------------- panneau
     def panel(self, engine: WorkspaceEngine) -> dict[str, Any] | None:

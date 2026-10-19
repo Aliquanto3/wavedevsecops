@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 """Encart « Ce qui l'aurait bloqué » (story 5.9) : schéma, lint de contenu, déclarations des
-scénarios B, projection serveur selon le jalon (livrée ou non) et rendu du panneau sous Node."""
+scénarios B, projection serveur selon `delivered` de `chain.yaml` (livrée ou non) et rendu du panneau sous Node."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ from test_shell_js import NODE, _run
 from wavedevsecops.config import Settings
 from wavedevsecops.engine.steps import StepRunner
 from wavedevsecops.scenarios import ScenarioError, load_scenario, parse_scenario, scenario_files
+from wavedevsecops.web import blockers as blockers_module
 from wavedevsecops.web.blockers import blockers_body, catalogue_scenario_titles, chain_barriers
-from wavedevsecops.web.shell import STATION_MILESTONES, station_delivered
+from wavedevsecops.web.catalogue import load_chain_texts
 
 BASE = """
 schema_version: 1
@@ -109,55 +110,99 @@ def test_stash_et_rebase_ne_declarent_rien() -> None:
         assert _scenario(key).blocked_by == []
 
 
-# --------------------------------------------------------------------- projection selon le jalon
+# ---------------------------------------------------- projection selon `delivered` de la chaîne
 def _scenario(key: str):
     settings = Settings()
     return load_scenario(settings.scenarios_path() / f"{key}.yaml", settings).scenario
 
 
-def test_station_livree_selon_le_jalon() -> None:
-    assert not station_delivered(1, "v0.1")
-    assert station_delivered(1, "v0.2") and station_delivered(2, "v0.3")
-    assert not station_delivered(4, "v0.2") and not station_delivered(9, "v9.0")
-    assert set(STATION_MILESTONES) == {1, 2, 3, 4}
+def _chain_with(monkeypatch: pytest.MonkeyPatch, station: int, **changes: Any) -> None:
+    """Chaîne réelle, une station modifiée (`delivered`, `milestone`) : seule source de livraison."""
+    chain = load_chain_texts(Settings())
+    assert chain is not None
+    stations = [s.model_copy(update=changes) if s.number == station else s for s in chain.stations]
+    patched = chain.model_copy(update={"stations": stations})
+    monkeypatch.setattr(blockers_module, "load_chain_texts", lambda settings=None: patched)
 
 
-def test_station_non_livree_etiquette_en_tirets_sans_lien() -> None:
-    body = blockers_body(_scenario("add-commit.B"), Settings(), "v0.1")
+def test_stations_1_et_2_livrees_dans_le_contenu_actuel() -> None:
+    """Arbitrage du 2026-10-19 : stations en aperçu dès la v0.1.0, la station 1 reste livrée.
+    Encart cohérent avec le bandeau : lien, aucune étiquette « Arrive en »."""
+    for key, scenario_id in (
+        ("add-commit.B", "secret-dans-un-commit"),
+        ("push-pull.B", "push-direct-main"),
+    ):
+        body = blockers_body(_scenario(key), Settings())
+        assert body is not None
+        (item,) = body["items"]
+        assert item["delivered"] is True and item["soon_text"] is None
+        assert item["scenario"]["id"] == scenario_id and item["scenario"]["title_text"]
+
+
+def test_station_non_livree_etiquette_en_tirets_sans_lien(monkeypatch: pytest.MonkeyPatch) -> None:
+    _chain_with(monkeypatch, 1, delivered=False, milestone="v0.2")
+    body = blockers_body(_scenario("add-commit.B"), Settings())
     assert body is not None and body["title_text"] == "Ce qui l'aurait bloqué"
     (item,) = body["items"]
-    assert item["barrier_id"] == "secret-scan" and item["station_text"].startswith(
-        "Station 1 · Poste local"
-    )
+    assert item["barrier_id"] == "secret-scan"
+    assert item["station_text"] == "Station 1 · Poste local"
+    assert item["label"] == "Pas de secret dans le commit"
     assert item["delivered"] is False
     assert item["soon_text"] == "Arrive en v0.2"
     assert item["scenario"] is None
     assert item["reason_text"].strip()
 
 
+def test_station_non_livree_sans_jalon_porte_bientot(monkeypatch: pytest.MonkeyPatch) -> None:
+    _chain_with(monkeypatch, 2, delivered=False, milestone="")
+    (item,) = blockers_body(_scenario("push-pull.B"), Settings())["items"]
+    assert item["soon_text"] == "Bientôt" and item["scenario"] is None
+
+
 def test_station_livree_pas_d_etiquette_et_scenario_en_lien() -> None:
-    body = blockers_body(_scenario("push-pull.B"), Settings(), "v0.2")
+    body = blockers_body(_scenario("push-pull.B"), Settings())
     assert body is not None
     (item,) = body["items"]
     assert item["delivered"] is True and item["soon_text"] is None
     assert item["scenario"] == {
         "id": "push-direct-main",
-        "title_text": catalogue_scenario_titles(Settings())["push-direct-main"],
+        "title_text": "Voir la protection de main refuser un push direct",
     }
 
 
+def test_station_4_annonce_son_jalon() -> None:
+    chain = load_chain_texts(Settings())
+    (station,) = [s for s in chain.stations if s.number == 4]
+    assert station.delivered is False and station.milestone == "v0.3"
+
+
 def test_sans_declaration_aucun_encart() -> None:
-    assert blockers_body(_scenario("stash.B"), Settings(), "v0.2") is None
+    assert blockers_body(_scenario("stash.B"), Settings()) is None
 
 
 def test_le_panneau_porte_l_encart_via_le_resolveur() -> None:
     settings = Settings()
-    runner = StepRunner(settings, None, lambda scenario: blockers_body(scenario, settings, "v0.1"))
-    assert (
-        runner._blockers_of(_scenario("add-commit.B"))["items"][0]["soon_text"] == "Arrive en v0.2"
-    )
+    runner = StepRunner(settings, None, lambda scenario: blockers_body(scenario, settings))
+    assert runner._blockers_of(_scenario("add-commit.B"))["items"][0]["barrier_id"] == "secret-scan"
     assert runner._blockers_of(_scenario("rebase.B")) is None
     assert StepRunner(settings)._blockers_of(_scenario("add-commit.B")) is None
+
+
+def test_l_encart_est_calcule_une_fois_par_lecture_du_scenario() -> None:
+    """Le panneau est recalculé à chaque état demandé : l'encart (chaîne + catalogue) ne l'est pas."""
+    calls: list[str] = []
+
+    def resolver(scenario) -> dict:
+        calls.append(scenario.key)
+        return {"title_text": "x", "items": []}
+
+    runner = StepRunner(Settings(), None, resolver)
+    scenario = _scenario("add-commit.B")
+    for _ in range(5):
+        runner._blockers_of(scenario)
+    assert calls == ["add-commit.B"]
+    runner._blockers_of(_scenario("add-commit.B"))  # scénario relu (fichier modifié) : recalculé
+    assert calls == ["add-commit.B", "add-commit.B"]
 
 
 def test_un_resolveur_en_echec_ne_bloque_pas_le_panneau() -> None:

@@ -47,19 +47,8 @@ def track_options() -> list[dict[str, str]]:
     return [{"key": k, "label": label, "text": text} for k, label, text in TRACKS]
 
 
-STATION_MILESTONES: dict[int, str] = {1: "v0.2", 2: "v0.2", 3: "v0.2", 4: "v0.3"}
-"""Jalon qui livre chaque station de la chaîne (AD-2) : l'encart « Ce qui l'aurait bloqué » (5.9)
-annonce « Arrive en <jalon> » tant que le jalon courant ne l'a pas atteint."""
-
-
 def _version(milestone: str) -> tuple[int, ...]:
     return tuple(int(part) for part in milestone.lstrip("v").split("."))
-
-
-def station_delivered(station: int, milestone: str = CURRENT_MILESTONE) -> bool:
-    """Vrai si le jalon `milestone` livre la station (une station sans jalon déclaré : non)."""
-    declared = STATION_MILESTONES.get(station)
-    return declared is not None and _version(declared) <= _version(milestone)
 
 
 def delivered_surfaces(milestone: str = CURRENT_MILESTONE) -> list[Surface]:

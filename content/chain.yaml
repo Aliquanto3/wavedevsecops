@@ -1,7 +1,9 @@
 # Textes du bandeau et de la carte de la chaîne (Stories 9.1 et 9.2, AD-2).
 # Le serveur les projette tels quels : le front n'invente aucun texte ni lien.
 # Un outil absent du poste (sonde de `tools.toml`) s'affiche en tirets ;
-# une station `delivered: false` porte « Bientôt ».
+# une station `delivered: false` porte « Bientôt ». `delivered` est la seule source de livraison
+# des stations (bandeau, carte, glossaire, encart « Ce qui l'aurait bloqué » de la story 5.9) ;
+# `milestone` annonce le jalon d'une station non livrée (« Arrive en v0.3 » dans l'encart).
 schema_version: 1
 
 label: "Chaîne de livraison"
@@ -97,5 +99,6 @@ stations:
     name: "Livraison"
     description: "Le passage de la CI à la mise à disposition."
     delivered: false
+    milestone: "v0.3"
     tools: []
     barriers: []
