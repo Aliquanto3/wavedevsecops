@@ -75,7 +75,14 @@ async function showWorkspace(container, workspaceId) {
   showPathMenu();
   document.title = `${info.title} · WaveDevSecOps`;
   const store = createStore();
-  mountWorkspace(container, { title: info.title, store, chain: info.chain, track: info.track });
+  const initialPane = new URLSearchParams(window.location.search).get("vue");
+  mountWorkspace(container, {
+    title: info.title,
+    store,
+    chain: info.chain,
+    track: info.track,
+    initialPane,
+  });
   connectWorkspace(store, workspaceId);
 }
 

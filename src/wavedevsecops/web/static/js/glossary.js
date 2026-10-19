@@ -117,6 +117,18 @@ function buildEntry(term, ui) {
     const trace = el("p", "glossary-trace");
     trace.textContent = term.trace_text;
     entry.append(trace);
+    // Avec un espace de station ouvert, le serveur donne le lien ; sans espace, une phrase et jamais
+    // un lien mort (story 9.6).
+    const target = term.trace && term.trace.link;
+    if (target) {
+      const link = el("a", "glossary-trace-link", { href: target.href });
+      link.textContent = target.text;
+      entry.append(link);
+    } else if (term.trace && term.trace.none_text) {
+      const none = el("p", "glossary-trace-none");
+      none.textContent = term.trace.none_text;
+      entry.append(none);
+    }
   }
   return entry;
 }

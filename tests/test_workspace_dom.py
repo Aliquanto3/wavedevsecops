@@ -262,3 +262,29 @@ console.log(JSON.stringify(r));
     assert out["handles"] == 0
     # Un repli automatique ne se mémorise pas comme un masquage voulu.
     assert out["after"] == {"shown": ["remote"], "focus": "pane-remote-title", "saved": []}
+
+
+def test_parametre_vue_ouvre_l_espace_sur_distant_meme_masquee(tmp_path: Path) -> None:
+    """Lien « traçabilité » (story 9.6) : `?vue=remote` montre Distant + PR, titre au focus."""
+    out = _js(
+        tmp_path,
+        """
+const r = {};
+main.replaceChildren();
+mountWorkspace(main, { title: "Échec", store, storage, initialPane: "remote" });
+r.narrow = { shown: shown(), focus: focused() };
+$('[data-pane="remote"] [data-action="hide"]').click();
+main.replaceChildren();
+mountWorkspace(main, { title: "Échec", store, storage, initialPane: "remote" });
+r.hidden = { shown: shown().includes("remote"), focus: focused() };
+main.replaceChildren();
+mountWorkspace(main, { title: "Échec", store, storage, initialPane: "inconnue" });
+r.unknown = shown();
+console.log(JSON.stringify(r));
+""",
+        width=1000,
+    )
+    # Sous 1280 px, une seule vue : celle du paramètre, et non la première.
+    assert out["narrow"] == {"shown": ["remote"], "focus": "pane-remote-title"}
+    assert out["hidden"] == {"shown": True, "focus": "pane-remote-title"}
+    assert out["unknown"] == ["repo"]  # une vue inconnue est ignorée

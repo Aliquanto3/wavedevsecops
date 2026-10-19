@@ -26,7 +26,7 @@ const TOOL_MAXIMIZE = "⛶";
 /** Monte l'espace de travail dans `container` et rend `{ destroy }`. */
 export function mountWorkspace(
   container,
-  { title, store, storage, chain = null, onSelect, track, fetchImpl },
+  { title, store, storage, chain = null, onSelect, track, fetchImpl, initialPane = null },
 ) {
   const panes = listPanes();
   const byId = new Map(panes.map((pane) => [pane.id, pane]));
@@ -628,6 +628,9 @@ export function mountWorkspace(
   }
   arrange(true);
   renderMenuState();
+  // `?vue=<id>` (lien « traçabilité » du vocabulaire, story 9.6) : l'espace s'ouvre sur cette vue,
+  // réaffichée si elle était masquée ou repliée, son titre au focus.
+  if (initialPane && byId.has(initialPane)) showById(initialPane);
   let observer = null;
   if (typeof ResizeObserver !== "undefined") {
     observer = new ResizeObserver(() => {

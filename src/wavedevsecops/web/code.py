@@ -25,6 +25,7 @@ from wavedevsecops.engine import WorkspaceManager, resolve_git
 from wavedevsecops.engine.code_intents import content_hash
 from wavedevsecops.gitio import Git, GitError
 from wavedevsecops.projections.diff import WORKTREE, read_diff
+from wavedevsecops.projections.views import pipeline_explain_ref
 from wavedevsecops.web.workspaces import _engine, _refusal, _Refused
 
 log = logging.getLogger("wavedevsecops")
@@ -103,7 +104,14 @@ def pipeline_view(git: Git, layout: wsfs.Layout, pipeline: ci.Pipeline, number: 
         "title_text": f"Pipeline de la PR n°{number}, commit {pull.head_sha[:7]}",
         "read_only_text": READ_ONLY_TEXT,
         "not_executed_text": NOT_EXECUTED_TEXT,
-        "jobs": [{"job_id": job.job_id, "label_text": job.label_text} for job in pipeline.jobs],
+        "jobs": [
+            {
+                "job_id": job.job_id,
+                "label_text": job.label_text,
+                "explain_ref": pipeline_explain_ref(job.job_id),
+            }
+            for job in pipeline.jobs
+        ],
         "tabs": [_tab(item, pipeline) for item in files],
         "findings": [f.model_dump(mode="json") for f in findings],
         "notice_text": MARKS_NOTE_TEXT if findings else "",

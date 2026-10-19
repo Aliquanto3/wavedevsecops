@@ -46,6 +46,23 @@ EXPLAIN_CHECK = "remote.check"
 EXPLAIN_REVIEW = "remote.review"
 EXPLAIN_SBOM = "remote.sbom"
 EXPLAIN_DIFF_FILE = "code.file"
+PIPELINE_JOB_IDS = (
+    "ruff",
+    "pytest",
+    "gitleaks",
+    "bandit",
+    "pip_audit",
+    "uv_lock",
+    "quality_gate",
+)
+"""Les jobs de `content/pipeline.yaml` ayant une explication (story 9.6) ; un test les aligne."""
+
+
+def pipeline_explain_ref(job_id: str, default: str = "") -> str:
+    """`explain_ref` d'un job du pipeline, de son check et de sa sortie : `pipeline.<job_id>`."""
+    return f"pipeline.{job_id}" if job_id in PIPELINE_JOB_IDS else default
+
+
 EXPLAIN_REFS = (
     EXPLAIN_COMMIT,
     EXPLAIN_COMMIT_LOST,
@@ -61,6 +78,7 @@ EXPLAIN_REFS = (
     EXPLAIN_SBOM,
     EXPLAIN_DIFF_FILE,
     EXPLAIN_TOOL_OUTPUT,
+    *(pipeline_explain_ref(job_id) for job_id in PIPELINE_JOB_IDS),
 )
 """Clés de `content/explanations.yaml` citées par les projections (le test de contenu vérifie
 que chacune y figure, et que chaque entrée est citée)."""

@@ -255,3 +255,27 @@ console.log(JSON.stringify({ text: body.textContent, terms, clicked, code: $$("c
     assert out["clicked"] == ["sast"] and out["code"] == 1
     assert out["none"] is False and out["handled"] is True and out["missed"] is False
     assert out["seen"] == ["static-analysis", "secret-scan"] and out["after"] is False
+
+
+@pytestmark_node
+def test_tracabilite_lien_avec_espace_et_phrase_sans_lien_mort(tmp_path: Path) -> None:
+    out = _js(
+        tmp_path,
+        """
+const base = glossary.terms.filter((t) => t.id === "traceability").map((t) => ({ ...t }));
+const draw = (trace) => {
+  renderVocabulary(main, { ui: glossary.ui, terms: [{ ...base[0], trace }] });
+  const a = $(".glossary-trace-link");
+  return {
+    link: a ? { href: a.getAttribute("href"), text: a.textContent } : null,
+    none: $(".glossary-trace-none") ? $(".glossary-trace-none").textContent : null,
+    dead: $$("a").filter((x) => !x.getAttribute("href")).length,
+  };
+};
+const open = draw({ link: { href: "/espace/sans-ia.x.A", text: "Voir les PR et les checks de votre espace" } });
+const closed = draw({ link: null, none_text: "Ouvrez un scénario de station pour voir des PR et des checks." });
+console.log(JSON.stringify({ open, closed }));
+""",
+    )
+    assert out["open"] == {"link": {"href": "/espace/sans-ia.x.A", "text": "Voir les PR et les checks de votre espace"}, "none": None, "dead": 0}
+    assert out["closed"] == {"link": None, "none": "Ouvrez un scénario de station pour voir des PR et des checks.", "dead": 0}

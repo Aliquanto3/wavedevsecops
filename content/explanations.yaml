@@ -104,3 +104,60 @@ entries:
       Voici ce que l'outil a affiché, sans retouche. Un échec y est nommé avec le fichier et la
       ligne en cause, que vous pouvez suivre dans les autres vues. Lancée par la CI avec la même
       configuration et les mêmes versions, la même commande devrait donner le même verdict.
+
+  # --- Vue pipeline (story 9.6) : une entrée par job de content/pipeline.yaml, clé `pipeline.<job_id>`.
+  # Elle sert au job (vue Code, onglet Pipeline), à son check (vue Distant + PR) et à sa sortie.
+  pipeline.ruff:
+    title_text: "Le job de lint (ruff)"
+    barrier_id: lint
+    body_text: >-
+      Ce job relit le code sans l'exécuter pour y repérer les fautes de style et les erreurs
+      évidentes. La sortie nomme chaque problème avec son fichier, sa ligne et sa règle.
+      Corrigez la ligne citée, recommitez, et le job repasse au vert.
+
+  pipeline.pytest:
+    title_text: "Le job de tests (pytest)"
+    barrier_id: tests
+    body_text: >-
+      Ce job lance les tests du projet et échoue dès qu'un seul test échoue. La sortie nomme le
+      test en cause et ce qu'il attendait. Un vert ne prouve que ce que les tests vérifient.
+
+  pipeline.gitleaks:
+    title_text: "Le job de recherche de secrets (gitleaks)"
+    barrier_id: secret-scan
+    body_text: >-
+      Ce job fait du [[secrets-scanning|secrets scanning]] : il cherche dans le code et
+      l'historique les clés et les mots de passe. Supprimer le secret du dernier commit ne suffit
+      pas, car il reste dans l'historique : il faut le révoquer.
+
+  pipeline.bandit:
+    title_text: "Le job d'analyse de sécurité (bandit)"
+    barrier_id: static-analysis
+    body_text: >-
+      Ce job fait du [[sast|SAST]] : il lit le code Python sans l'exécuter et signale les
+      constructions dangereuses. Chaque constat indique sa gravité, sa règle, le fichier et la
+      ligne à corriger.
+
+  pipeline.pip_audit:
+    title_text: "Le job d'audit des dépendances (pip-audit)"
+    barrier_id: dependencies
+    body_text: >-
+      Ce job fait de l'analyse de composition ([[sca|SCA]]) : il compare chaque dépendance aux
+      failles connues et produit le [[sbom|SBOM]]. Un échec cite la dépendance et l'identifiant
+      de la vulnérabilité ; la correction passe par une version corrigée.
+
+  pipeline.uv_lock:
+    title_text: "Le job de verrou des dépendances (uv)"
+    barrier_id: dependencies
+    body_text: >-
+      Ce job vérifie que le fichier verrou correspond bien aux dépendances déclarées. Sans cet
+      accord, deux machines pourraient installer des versions différentes. Régénérez le verrou et
+      commitez-le pour que le job repasse au vert.
+
+  pipeline.quality_gate:
+    title_text: "Le job de couverture (quality gate)"
+    barrier_id: coverage
+    body_text: >-
+      Cette [[quality-gate|quality gate]] mesure la part du code nouveau couverte par les tests
+      et la compare à un seuil. Sous le seuil, la PR reste bloquée. Ajoutez des tests sur les
+      lignes nouvelles non couvertes que la sortie liste.
