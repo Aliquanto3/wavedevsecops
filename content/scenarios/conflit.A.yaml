@@ -88,15 +88,26 @@ steps:
       in_progress: ""
       index:
         clean: true
+      tree:
+        markers_absent: [src/bonjour.py]
       commits:
         - ahead_of: "@depart"
           min: 3
+          merges: true
     foreseen:
       - when:
           in_progress: merge
         reason_text: >-
           La fusion est toujours en cours. Corrigez le fichier dans la vue Code (plus aucun
           marqueur), indexez-le avec `git add`, puis terminez avec `git commit`.
+      - when:
+          in_progress: ""
+          tree:
+            markers_present: [src/bonjour.py]
+        reason_text: >-
+          Le commit est enregistré, mais `src/bonjour.py` contient encore des marqueurs de
+          conflit : `git add` ne vérifie pas le contenu. Supprimez les lignes `<<<<<<<`,
+          `=======` et `>>>>>>>` dans la vue Code, puis commitez la correction.
       - when:
           in_progress: ""
           commits:

@@ -118,16 +118,38 @@ steps:
         branch: feature
       index:
         clean: true
+      tree:
+        markers_absent: [src/bonjour.py]
       commits:
         - "on": feature
           ahead_of: "@depart"
           min: 2
+          merges: false
     foreseen:
       - when:
           in_progress: rebase
         reason_text: >-
           Le rebase est toujours en cours. Corrigez le fichier (plus aucun marqueur), indexez-le
           avec `git add`, puis demandez à git de continuer.
+      - when:
+          in_progress: ""
+          tree:
+            markers_present: [src/bonjour.py]
+        reason_text: >-
+          Le rebase est terminé, mais `src/bonjour.py` contient encore des marqueurs de conflit :
+          `git add` ne vérifie pas le contenu. Supprimez les lignes `<<<<<<<`, `=======` et
+          `>>>>>>>` dans la vue Code, puis commitez la correction.
+      - when:
+          commits:
+            - "on": feature
+              ahead_of: "@depart"
+              min: 1
+              merges: true
+        reason_text: >-
+          `feature` contient un commit de fusion : l'historique n'est pas linéaire. L'étape
+          attend un rebase, qui rejoue votre commit sur `origin/main` sans fusion. Ramenez
+          `feature` sur `origin/feature` (`git reset --hard origin/feature`), puis relancez le
+          rebase.
       - when:
           in_progress: ""
           head:

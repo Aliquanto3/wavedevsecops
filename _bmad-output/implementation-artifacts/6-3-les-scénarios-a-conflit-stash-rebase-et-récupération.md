@@ -19,7 +19,13 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.3 » ; F
   - **rebase** (4 étapes) : `feature` déjà poussée, le collègue a changé la même ligne sur `main`. `git fetch`, `git rebase origin/main` (conflit, `in_progress: rebase`), résolution puis `git rebase --continue` (historique linéaire, deux commits depuis le départ), quiz « pousser une branche réécrite » (`--force-with-lease` ; `push` refusé ; `--force` expliqué comme imprudent).
   - **recuperation** (3 étapes) : `git reset --hard HEAD~1` (le commit « Note une idée d'amélioration » n'est jamais poussé, donc réellement perdu), quiz `git reflog` (contre `git log` et `git stash list`), puis restauration par `git reset --hard HEAD@{1}` (toute autre position du reflog ou nouvelle branche + `reset` convient si `main` retrouve le commit). Le commit perdu est affiché en tirets (`lost`) du `reset` à la restauration.
 - `content/fingerprints.json` : huit empreintes de plus (`scripts/update_fingerprints.py`), deux par scénario, stables sur deux générations.
-- Aucun changement de code partagé : les ops (`switch`, `colleague_commit`, `push`, `commit`) et les types d'étape (`repo_state` avec `in_progress` et `stash`, `quiz`) suffisent.
+- Ops existantes (`switch`, `colleague_commit`, `push`, `commit`) et types d'étape `repo_state` et `quiz`.
+- **Conditions ajoutées à `repo_state`** (revue, code partagé de la 4.1 ; optionnelles, rétrocompatibles, documentées dans la docstring du module) :
+  - `head.contains`, `branches[].contains` : tel commit (`@alias`, ref, SHA) est accessible depuis HEAD ou la branche ;
+  - `commits[].merges` : `false` = aucun commit de fusion parmi les commits comptés (historique linéaire), `true` = au moins un ;
+  - `tree.markers_absent`, `tree.markers_present` : lignes de marqueurs de conflit (`<<<<<<<`, `|||||||`, `>>>>>>>` avec ou sans étiquette, `=======` seul) absentes ou présentes ;
+  - `tree.contains` : `[{path, text}]`, le fichier contient le texte.
+  Les conditions de contenu lisent l'arbre de travail via `ctx.layout.repo` (fins de ligne normalisées en LF, 1 Mio lu au plus, chemin relatif au dépôt imposé, cible résolue dans le dépôt) ; sans espace ou fichier absent, elles échouent (échec fermé).
 - Tests `tests/test_scenarios_socle.py`, étendu aux huit scénarios : lint de contenu (consigne, explication, trois paliers dont un blanc, aucun avertissement, clés d'explication valides), chaque scénario joué de bout en bout dans les deux parcours (8 parties de plus) avec état final vérifié (fusion à deux parents, marqueurs absents, pile vide, historique de `feature` linéaire et origine réécrite, commit perdu puis plus en tirets), et les erreurs réalistes : `merge --abort`, `git add` avec marqueurs, `pull` refusé et `reset --hard` rattrapable, `stash drop`, `rebase --abort`, `push` refusé, `git log` à la place du reflog, `reset --mixed` qui laisse le fichier.
 
 ## Décisions
@@ -33,11 +39,22 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 6.3 » ; F
 
 ## Reports
 
-- **Marqueurs de conflit restants** : aucune condition de `repo_state` ne lit le contenu d'un fichier ; un `git add` d'un fichier avec marqueurs suivi de `git commit` valide l'étape « conflit ». Le test final vérifie l'absence de marqueurs, l'étape non. Une condition `tree.content_absent` serait un ajout au code partagé (4.1) : hors périmètre.
 - **Identifiants** `conflit`, `stash`, `rebase`, `recuperation` : imposés par `SOCLE_ORDER`, en attente de validation d'Anaël ; un renommage touche les quatre fichiers, `SOCLE_ORDER`, `fingerprints.json` et `SOLUTIONS` du test.
-- **Rebase vs fusion** : l'étape de résolution du rebase accepte aussi un historique à trois commits (fusion) si l'apprenant a quitté le rebase puis fusionné ; non bloquant, `lancer_le_rebase` ayant déjà exigé un rebase.
 - Les scénarios B correspondants (5.6 à 5.8) ne sont pas touchés. Relecture pédagogique du français (ton, vouvoiement, justesse des effets des mauvaises réponses) à faire par Anaël.
 
 ## Revue
 
-À faire (second avis, puis reviewer).
+Revue Opus (une passe), après rebase sur `origin/main` (sans conflit ; empreintes inchangées et stables sur deux générations : elles ne portent que sur le setup). Contournements du second avis tous reproduits par un test qui échoue sans les nouvelles conditions (8 tests « ne_valide_pas » de `tests/test_scenarios_socle.py`), conditions testées unitairement en LF et CRLF (`tests/test_steps.py`).
+
+- High · second avis · corrigé · conflit, `resoudre` : `git add` d'un fichier encore marqué puis commit validait l'étape. `tree.markers_absent: [src/bonjour.py]` attendu, `foreseen` dédié (« contient encore des marqueurs ») ; `merges: true` en plus, car `merge --abort` puis deux commits ordinaires atteignaient aussi les trois commits.
+- High · second avis · corrigé · rebase, `resoudre` : `rebase --abort` puis `merge` validait ; `commits[].merges: false` et `foreseen` qui indique le retour (`git reset --hard origin/feature`, puis rebase), chemin testé. Le cas « `git add` avec marqueurs + `rebase --continue` » existait aussi : `tree.markers_absent` et `foreseen` dédié.
+- Medium · second avis · corrigé · récupération, `restaurer` : un nouveau commit au même sujet validait. Condition `head.contains: "@idee"` (le commit perdu lui-même) à la place du sujet ; `foreseen` dédié (« pas le commit perdu, toujours en tirets »).
+- Medium · second avis · corrigé · stash, `reprendre` : `stash drop` puis réécriture validait. `tree.contains` exige la ligne mise de côté et le titre du collègue dans `README.md`. Réécrire exactement le même texte reste accepté : l'état est alors identique (AD-7).
+- Medium · revue · corrigé · 6.2, `push-pull` / `recuperer` : un `docs/guide.md` créé et commité avec « guide » dans le message validait sans `pull` ; `head.contains: "@commit-collegue"`.
+- Medium · revue · corrigé · 6.2, `pr-merge` / `recuperer_main` : un commit local « Merge pull request #1 from feature » validait ; `head.at: origin/main` (la `main` protégée de l'origine ne reçoit que le merge de la PR).
+- Low · second avis · corrigé · récupération : l'explication proposait `git branch sauvetage <sha>`, que l'étape refuse (`main` doit retrouver le commit) ; remplacé par `git reset --hard <sha>`.
+- Low · second avis · corrigé · premiers paliers de `perdre_le_commit` et `restaurer` reformulés (plus de sous-commande ni de syntaxe `HEAD@{n}`).
+- Low · second avis · rejeté · paliers 2 `git add ___`, `git rebase ___` : la commande partielle est le principe du palier 2 (AD-7, 4.6) ; le blanc porte l'argument à trouver.
+- Low · second avis · corrigé · explication du quiz `retrouver` : ne donne plus `HEAD@{1}`, réponse de l'étape suivante.
+- 6.2, autres étapes `repo_state` relues (`add-commit`, `branche`, `push-pull` / `commiter_a_partager` et `pousser`, `pr-merge` / `commiter_sur_feature` et `pousser_feature`) : pas de contournement trouvé, l'état attendu y est le geste lui-même.
+- Complexité : 0 constat (`contains` parcourt une fois les commits accessibles, contenu lu une fois par fichier et par jugement).

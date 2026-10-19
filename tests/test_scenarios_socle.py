@@ -628,3 +628,108 @@ def test_recuperation_reset_mixed_laisse_le_fichier_et_n_est_pas_valide(make_box
     failed = box.verdicts("perdre_le_commit")[-1]
     assert failed["passed"] is False and "idee.txt" in failed["reason_text"]
     assert box.current() == "perdre_le_commit"
+
+
+# ------------------------------------------- contournements refusés (revue de la story 6.3)
+FIX_BONJOUR = SOLUTIONS["conflit"][1][1][:2]  # réécrit src/bonjour.py sans marqueur
+
+
+def test_conflit_marqueurs_commites_ne_valident_pas(make_box) -> None:
+    box = make_box("conflit", "no_ai")
+    box.play(line("git merge feature"))
+    box.play(line("git add src/bonjour.py"))  # marqueurs encore présents
+    box.play(line('git commit -m "Fusionne feature"'))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "marqueurs" in failed["reason_text"]
+    assert box.current() == "resoudre"
+    for gesture in FIX_BONJOUR:  # on suit la raison : corriger puis commiter
+        box.play(gesture)
+    box.play(line("git add src/bonjour.py"))
+    box.play(line('git commit -m "Retire les marqueurs"'))
+    assert box.current() is None
+
+
+def test_conflit_abandon_puis_commits_ordinaires_ne_valident_pas(make_box) -> None:
+    box = make_box("conflit", "llm")
+    box.play(line("git merge feature"))
+    box.play(line("git merge --abort"))
+    for name in ("a", "b"):  # trois commits depuis `depart`, mais aucune fusion
+        box.play(line(f'echo "{name}" > {name}.txt'))
+        box.play(line(f"git add {name}.txt"))
+        box.play(line(f'git commit -m "Ajoute {name}"'))
+    assert box.current() == "resoudre"
+
+
+def test_rebase_remplace_par_une_fusion_ne_valide_pas(make_box) -> None:
+    box = make_box("rebase", "no_ai")
+    _play_until(box, "rebase", "lancer_le_rebase")
+    box.play(line("git rebase origin/main"))
+    box.play(line("git rebase --abort"))
+    box.play(line("git merge origin/main"))
+    for gesture in FIX_BONJOUR:
+        box.play(gesture)
+    box.play(line("git add src/bonjour.py"))
+    box.play(line('git commit -m "Fusionne origin/main"'))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "fusion" in failed["reason_text"]
+    assert box.current() == "resoudre"
+    # La raison donne la voie de retour : revenir sur origin/feature puis rebaser.
+    box.play(line("git reset --hard origin/feature"))
+    box.play(line("git rebase origin/main"))
+    for gesture in SOLUTIONS["rebase"][2][1]:
+        box.play(gesture)
+    assert box.current() == "pousser_apres_rebase"
+
+
+def test_rebase_continue_avec_marqueurs_ne_valide_pas(make_box) -> None:
+    box = make_box("rebase", "llm")
+    _play_until(box, "rebase", "lancer_le_rebase")
+    box.play(line("git rebase origin/main"))
+    box.play(line("git add src/bonjour.py"))  # marqueurs encore présents
+    box.play(line("git rebase --continue"))
+    failed = box.verdicts("resoudre")[-1]
+    assert failed["passed"] is False and "marqueurs" in failed["reason_text"]
+    assert box.current() == "resoudre"
+
+
+def test_recuperation_nouveau_commit_au_meme_message_ne_restaure_pas(make_box) -> None:
+    box = make_box("recuperation", "no_ai")
+    _play_until(box, "recuperation", "restaurer")
+    box.play(line('echo "Une idee" > idee.txt'))
+    box.play(line("git add idee.txt"))
+    box.play(line('git commit -m "Note une idée d\'amélioration"'))
+    failed = box.verdicts("restaurer")[-1]
+    assert failed["passed"] is False and "tirets" in failed["reason_text"]
+    assert box.current() == "restaurer"
+    assert _lost_subjects(box) == ["Note une idée d'amélioration"]
+    box.play(line("git reset --hard HEAD@{2}"))  # le vrai commit, retrouvé dans le reflog
+    assert box.current() is None
+
+
+def test_stash_drop_puis_reecriture_ne_valide_pas(make_box) -> None:
+    box = make_box("stash", "llm")
+    _play_until(box, "stash", "reprendre")
+    box.play(line("git stash drop"))
+    box.play(line('echo "Ma section" >> README.md'))  # README modifié, pile vide
+    assert box.current() == "reprendre"
+
+
+def test_push_pull_faux_guide_commite_ne_valide_pas(make_box) -> None:
+    box = make_box("push-pull", "no_ai")
+    _play_until(box, "push-pull", "recuperer")
+    box.play(line("mkdir docs"))
+    box.play(line('echo "Guide" > docs/guide.md'))
+    box.play(line("git add docs/guide.md"))
+    box.play(line('git commit -m "Ajoute le guide"'))
+    assert box.current() == "recuperer"
+    assert box.verdicts("recuperer")[-1]["passed"] is False
+
+
+def test_pr_merge_faux_commit_de_merge_ne_valide_pas(make_box) -> None:
+    box = make_box("pr-merge", "llm")
+    _play_until(box, "pr-merge", "recuperer_main")
+    box.play(line("git switch main"))
+    box.play(line('echo "x" > faux.txt'))
+    box.play(line("git add faux.txt"))
+    box.play(line('git commit -m "Merge pull request #1 from feature"'))
+    assert box.current() == "recuperer_main"

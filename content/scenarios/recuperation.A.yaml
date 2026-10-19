@@ -60,8 +60,8 @@ steps:
           `reset` décide aussi du sort des fichiers.
     hints:
       lead_text: >-
-        Une sous-commande fait reculer la branche ; une option décide si le dossier suit
-        (ici, il doit suivre et perdre le fichier).
+        Vous voulez que la branche recule d'un commit, et que votre dossier suive ce
+        recul au lieu de garder le fichier.
       partial_text: git reset ___ HEAD~1
       solution_text: git reset --hard HEAD~1
 
@@ -74,8 +74,8 @@ steps:
       `reset` ?
     explanation_text: >-
       Le reflog est le journal local des déplacements de `HEAD` et des branches. Tant qu'il n'est
-      pas purgé (plusieurs semaines par défaut), un commit « perdu » y reste, avec sa position :
-      `HEAD@{1}` désigne l'endroit où `HEAD` était juste avant le dernier déplacement.
+      pas purgé (plusieurs semaines par défaut), un commit « perdu » y reste, avec sa position
+      et son identifiant : de quoi le désigner à git comme n'importe quel commit.
     explain_ref: graph.commit_lost
     choices:
       - choice_id: reflog
@@ -106,16 +106,14 @@ steps:
       dans le dossier. Le commit n'est alors plus en tirets dans le graphe.
     explanation_text: >-
       `git reset --hard` accepte n'importe quelle position du reflog : en y ramenant `main`,
-      vous remettez le commit sur une branche et les fichiers dans le dossier. Un commit retrouvé
-      par son identifiant peut aussi recevoir une nouvelle branche (`git branch sauvetage <sha>`).
+      vous remettez le commit sur une branche et les fichiers dans le dossier. Son identifiant,
+      lu dans le reflog, convient aussi : `git reset --hard <sha>`. C'est ce commit-là qui est
+      restauré : un nouveau commit au même message ne le remplacerait pas.
     explain_ref: graph.commit_lost
     expect:
       head:
         branch: main
-      commits:
-        - ahead_of: "@depart"
-          min: 1
-          subject_contains: idée
+        contains: "@idee"
       tree:
         present: [idee.txt]
       index:
@@ -129,9 +127,18 @@ steps:
         reason_text: >-
           `main` est toujours sur le commit précédent. Repérez dans le reflog la position
           d'avant le `reset`, puis ramenez-y `main`.
+      - when:
+          head:
+            branch: main
+          tree:
+            present: [idee.txt]
+        reason_text: >-
+          `idee.txt` est revenu, mais pas le commit perdu : il est toujours en tirets dans le
+          graphe. Ramenez `main` sur ce commit-là, repéré dans le reflog, plutôt que d'en créer
+          un nouveau.
     hints:
       lead_text: >-
-        Le reflog numérote ses positions : `HEAD@{n}` désigne la nième avant l'actuelle. Repérez
-        celle d'avant la perte.
+        Le reflog vient de vous montrer où se trouvait `main` avant la perte : la commande
+        qui l'a fait reculer sait aussi la ramener à une position donnée.
       partial_text: "git reset --hard HEAD@{___}"
       solution_text: "git reset --hard HEAD@{1}"

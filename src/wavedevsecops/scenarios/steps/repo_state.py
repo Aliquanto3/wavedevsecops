@@ -4,14 +4,27 @@ La validation porte sur le `RepoState` relu après la commande, jamais sur le te
 commande qui mène à l'état attendu valide l'étape (AD-7). `expect` liste les conditions, toutes
 nécessaires ; `foreseen` décrit des états prévus mais pas encore suffisants, chacun avec sa
 raison. Un état qui bouge sans être ni attendu ni prévu donne `unexpected`.
+
+Conditions ajoutées par la story 6.3, toutes optionnelles (absentes, rien ne change) :
+- `head.contains`, `branches[].contains` : tel commit (`@alias`, ref, SHA) est accessible depuis
+  HEAD ou la branche ; un nouveau commit au même message ne le remplace pas ;
+- `commits[].merges` : `false` exige un historique linéaire (aucun commit de fusion parmi les
+  commits comptés), `true` au moins un commit de fusion ;
+- `tree.markers_absent`, `tree.markers_present` : marqueurs de conflit (lignes `<<<<<<<`,
+  `=======`, `>>>>>>>`) absents ou présents dans ces fichiers de l'arbre de travail ;
+- `tree.contains` : tel fichier contient tel texte (fins de ligne normalisées en LF).
+Les conditions de contenu lisent le fichier dans le dépôt de l'espace (`ctx.layout.repo`) :
+sans espace, ou si le fichier est absent ou illisible, elles échouent (échec fermé).
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from wavedevsecops.contracts import (
     Commit,
@@ -24,6 +37,11 @@ from wavedevsecops.scenarios.steps._base import Observed, StepArgs, StepContext,
 
 SHORT = 7
 HEAD_ID = element_id("ref", "HEAD")
+MAX_READ = 1 << 20
+"""Taille lue au plus pour une condition de contenu (octets)."""
+MARKER = re.compile(r"^(?:(?:<{7}|>{7}|\|{7})(?: .*)?|={7})$", re.MULTILINE)
+"""Ligne de marqueur de conflit : `<<<<<<<`, `|||||||`, `>>>>>>>` (suivis ou non d'une
+étiquette) ou `=======` seul sur sa ligne."""
 GENERIC_UNEXPECTED_TEXT = (
     "Le dépôt a changé, mais pas dans le sens que cette étape attend, et ce n'est pas un état "
     "qu'elle prévoyait. Rien n'est bloqué : vous pouvez continuer, relire l'état du dépôt ou "
@@ -43,6 +61,8 @@ class HeadCond(_Cond):
     detached: bool | None = None
     at: str | None = None
     """Commit visé par HEAD : `@alias`, nom de ref ou `HEAD`."""
+    contains: str | None = None
+    """Commit (`@alias`, ref, SHA) qui doit être accessible depuis HEAD."""
 
 
 class BranchCond(_Cond):
@@ -51,6 +71,8 @@ class BranchCond(_Cond):
     exists: bool = True
     at: str | None = None
     """Commit visé : `@alias`, nom de ref (`main`, `origin/main`) ou `HEAD`."""
+    contains: str | None = None
+    """Commit (`@alias`, ref, SHA) qui doit être accessible depuis la branche."""
 
 
 class TagCond(_Cond):
@@ -67,6 +89,9 @@ class CommitsCond(_Cond):
     min: int = Field(default=1, ge=0)
     subject_contains: str | None = None
     """Un de ces commits a un sujet qui contient ce texte (sans tenir compte de la casse)."""
+    merges: bool | None = None
+    """`False` : aucun de ces commits n'est une fusion (historique linéaire) ; `True` : au
+    moins un l'est."""
 
 
 class IndexCond(_Cond):
@@ -79,11 +104,41 @@ class IndexCond(_Cond):
     clean: bool | None = None
 
 
+def _safe_path(path: str) -> str:
+    pure = PurePosixPath(path)
+    if not path or "\\" in path or ":" in path or pure.is_absolute() or ".." in pure.parts:
+        raise ValueError(f"chemin relatif au dépôt attendu : {path!r}")
+    return path
+
+
+class FileText(_Cond):
+    """Un fichier de l'arbre de travail et un texte qu'il doit contenir."""
+
+    path: str
+    text: str = Field(min_length=1)
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return _safe_path(value)
+
+
 class TreeCond(_Cond):
-    """Fichiers présents dans l'arbre de travail."""
+    """Fichiers présents dans l'arbre de travail, et leur contenu."""
 
     present: list[str] = []
     absent: list[str] = []
+    markers_absent: list[str] = []
+    """Fichiers présents sans aucun marqueur de conflit."""
+    markers_present: list[str] = []
+    """Fichiers qui contiennent encore au moins un marqueur de conflit."""
+    contains: list[FileText] = []
+    """Fichiers qui contiennent un texte (comparaison exacte, fins de ligne normalisées)."""
+
+    @field_validator("markers_absent", "markers_present")
+    @classmethod
+    def _paths(cls, value: list[str]) -> list[str]:
+        return [_safe_path(v) for v in value]
 
 
 class StashCond(_Cond):
@@ -147,10 +202,33 @@ class Finding:
 class _State:
     """Recherches dans le `RepoState` pour évaluer les conditions."""
 
-    def __init__(self, state: RepoState, aliases: dict[str, str]) -> None:
+    def __init__(self, state: RepoState, aliases: dict[str, str], repo: Path | None = None) -> None:
         self.state = state
         self.aliases = aliases
+        self.repo = repo
         self.commits: dict[str, Commit] = {c.sha: c for c in state.commits}
+        self._texts: dict[str, str | None] = {}
+
+    def text(self, path: str) -> str | None:
+        """Contenu du fichier (fins de ligne LF) ; `None` s'il est absent ou illisible."""
+        if path not in self._texts:
+            self._texts[path] = self._read(path)
+        return self._texts[path]
+
+    def _read(self, path: str) -> str | None:
+        if self.repo is None:
+            return None
+        try:
+            root = Path(self.repo).resolve()
+            target = (root / path).resolve()
+            if not target.is_relative_to(root) or not target.is_file():
+                return None
+            with target.open("rb") as handle:
+                data = handle.read(MAX_READ)
+        except OSError:
+            return None
+        text = data.decode("utf-8", errors="replace")
+        return text.replace("\r\n", "\n").replace("\r", "\n")
 
     def alias(self, value: str) -> tuple[str, str]:
         """`(type, valeur)` de l'élément désigné par `@alias` ; `("", "")` s'il est inconnu."""
@@ -232,6 +310,15 @@ def _commit_observed(sha: str | None, text: str) -> Observed:
     return Observed(text=text, element_id=element_id("commit", sha) if sha else "")
 
 
+def _contains(spec: str, tip: str | None, where: str, st: _State) -> Finding:
+    """`spec` est accessible depuis `tip` (le même commit, pas un commit au même message)."""
+    target = st.commit(spec)
+    ok = target is not None and target in st.reachable(tip)
+    shown = target[:SHORT] if target else spec.removeprefix("@")
+    observed = [_commit_observed(target, f"Le commit `{shown}` n'est pas dans {where}.")]
+    return Finding(ok, f"le commit `{shown}` dans {where}", [] if ok else observed)
+
+
 def _head(cond: HeadCond, st: _State) -> list[Finding]:
     head = st.state.head
     found = []
@@ -254,6 +341,8 @@ def _head(cond: HeadCond, st: _State) -> list[Finding]:
                 [] if ok else [_commit_observed(head.commit or None, st.head_text().text)],
             )
         )
+    if cond.contains is not None:
+        found.append(_contains(cond.contains, head.commit or None, "l'historique de HEAD", st))
     return found
 
 
@@ -275,6 +364,8 @@ def _branch(cond: BranchCond, st: _State) -> list[Finding]:
             _commit_observed(ref.commit or None, f"`{name}` pointe sur `{ref.commit[:SHORT]}`.")
         ]
         found.append(Finding(ok, f"`{name}` sur le commit `{shown}`", [] if ok else observed))
+    if cond.contains is not None:
+        found.append(_contains(cond.contains, ref.commit or None, f"`{name}`", st))
     return found
 
 
@@ -343,6 +434,15 @@ def _commits(cond: CommitsCond, st: _State) -> list[Finding]:
                 [] if ok else [_commit_observed(tip, "Aucun commit ne porte ce message.")],
             )
         )
+    if cond.merges is not None:
+        merge = next((c for c in new if len(c.parents) > 1), None)
+        ok = (merge is not None) == cond.merges
+        wanted = "un commit de fusion" if cond.merges else "un historique linéaire, sans fusion"
+        if merge is not None:
+            seen = _commit_observed(merge.sha, f"`{merge.sha[:SHORT]}` est un commit de fusion.")
+        else:
+            seen = _commit_observed(tip, f"Aucun commit de fusion{where}.")
+        found.append(Finding(ok, wanted, [] if ok else [seen]))
     return found
 
 
@@ -391,6 +491,27 @@ def _tree(cond: TreeCond, st: _State) -> list[Finding]:
         ok = path not in present
         observed = Observed(text=f"`{path}` est présent.", element_id=st.path_id(path))
         found.append(Finding(ok, f"`{path}` absent", [] if ok else [observed]))
+    for path in cond.markers_absent:
+        text = st.text(path)
+        ok = text is not None and not MARKER.search(text)
+        seen = "est illisible" if text is None else "contient encore des marqueurs de conflit"
+        observed = Observed(text=f"`{path}` {seen}.", element_id=st.path_id(path))
+        found.append(Finding(ok, f"`{path}` sans marqueur de conflit", [] if ok else [observed]))
+    for path in cond.markers_present:
+        text = st.text(path)
+        ok = text is not None and bool(MARKER.search(text))
+        observed = Observed(text=f"`{path}` n'a pas de marqueur.", element_id=st.path_id(path))
+        found.append(Finding(ok, f"`{path}` avec marqueurs de conflit", [] if ok else [observed]))
+    for item in cond.contains:
+        text = st.text(item.path)
+        needle = item.text.replace("\r\n", "\n")
+        ok = text is not None and needle in text
+        observed = Observed(
+            text=f"`{item.path}` ne contient pas le texte attendu.",
+            element_id=st.path_id(item.path),
+        )
+        wanted = f"`{item.path}` contient « {item.text.strip()} »"
+        found.append(Finding(ok, wanted, [] if ok else [observed]))
     return found
 
 
@@ -458,7 +579,8 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:
     if state is None:
         return Verdict(status="pending")  # dépôt illisible : la projection l'a déjà signalé
     step: Args = ctx.step
-    st = _State(state, ctx.aliases)
+    layout = getattr(ctx, "layout", None)
+    st = _State(state, ctx.aliases, getattr(layout, "repo", None))
     findings = evaluate(step.expect, st)
     failed = [f for f in findings if not f.ok]
     if not failed:

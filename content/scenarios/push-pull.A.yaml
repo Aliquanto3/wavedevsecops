@@ -81,6 +81,8 @@ steps:
       collègue (une avance rapide).
     explain_ref: graph.remote_ref
     expect:
+      head:
+        contains: "@commit-collegue"
       commits:
         - ahead_of: "@depart"
           min: 1

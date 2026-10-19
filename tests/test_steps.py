@@ -473,6 +473,103 @@ def test_conditions_sur_l_index_l_arbre_et_le_stash() -> None:
     assert linked == element_id("path", "worktree", "a.txt")
 
 
+def _verdict_in(repo: Path, expect: dict, state: RepoState, aliases=None):
+    """Verdict avec un espace dont le dépôt est `repo` (conditions de contenu)."""
+    from types import SimpleNamespace
+
+    step = Args.model_validate(
+        {
+            "step_id": "essai",
+            "type": "repo_state",
+            "title_text": "T",
+            "instruction_text": "I",
+            "explanation_text": "E",
+            "expect": expect,
+        }
+    )
+    ctx = StepContext(step, aliases or {}, None, layout=SimpleNamespace(repo=repo))
+    return check(state, ctx)
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_conditions_de_contenu_marqueurs_et_texte(tmp_path: Path, eol: str) -> None:
+    conflicted = eol.join(["a", "<<<<<<< HEAD", "x", "=======", "y", ">>>>>>> feature", ""])
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "c.py").write_bytes(conflicted.encode())
+    plain = eol.join(["# Titre", "Une ligne.", "======= ici", ""])
+    (tmp_path / "ok.md").write_bytes(plain.encode())
+    state = _state()
+    passed = _verdict_in(
+        tmp_path,
+        {
+            "tree": {
+                "markers_present": ["src/c.py"],
+                "markers_absent": ["ok.md"],  # `======= ici` n'est pas un marqueur
+                "contains": [{"path": "ok.md", "text": "# Titre\nUne ligne."}],
+            }
+        },
+        state,
+    )
+    assert passed.status == "passed"
+    failed = _verdict_in(
+        tmp_path,
+        {
+            "tree": {
+                "markers_absent": ["src/c.py", "absent.md"],
+                "markers_present": ["ok.md"],
+                "contains": [{"path": "ok.md", "text": "autre"}],
+            }
+        },
+        state,
+    )
+    texts = {o.text for o in failed.observed}
+    assert "`src/c.py` contient encore des marqueurs de conflit." in texts
+    assert "`absent.md` est illisible." in texts
+    assert "`ok.md` n'a pas de marqueur." in texts
+    assert "`ok.md` ne contient pas le texte attendu." in texts
+    # Sans espace (hors du moteur), une condition de contenu échoue fermé.
+    assert _verdict({"tree": {"markers_absent": ["ok.md"]}}, state).status == "unexpected"
+
+
+def test_conditions_de_contenu_hors_du_depot_refusees(tmp_path: Path) -> None:
+    for bad in ("../x", "/etc/passwd", "C:/x", "a\\b"):
+        with pytest.raises(ValueError):
+            _verdict_in(tmp_path, {"tree": {"markers_absent": [bad]}}, _state())
+        with pytest.raises(ValueError):
+            _verdict_in(tmp_path, {"tree": {"contains": [{"path": bad, "text": "t"}]}}, _state())
+
+
+def test_commit_accessible_et_historique_lineaire() -> None:
+    merge = _commit(SHA_C, [SHA_B, SHA_A], "Fusionne")
+    linear = _state()
+    merged = _state(
+        commits=[_commit(SHA_A, [], "un"), _commit(SHA_B, [SHA_A], "deux"), merge],
+        head={"detached": False, "ref": "refs/heads/main", "commit": SHA_C},
+    )
+    aliases = {"debut": element_id("commit", SHA_A), "deux": element_id("commit", SHA_B)}
+    assert (
+        _verdict(
+            {
+                "head": {"contains": "@debut"},
+                "branches": [{"name": "main", "contains": "@deux"}],
+                "commits": [{"ahead_of": "@debut", "merges": False}],
+            },
+            linear,
+            aliases=aliases,
+        ).status
+        == "passed"
+    )
+    assert _verdict({"commits": [{"merges": True}]}, linear).status == "unexpected"
+    assert _verdict({"commits": [{"merges": True}]}, merged).status == "passed"
+    bad = _verdict({"commits": [{"merges": False}]}, merged)
+    assert f"`{SHA_C[:7]}` est un commit de fusion." in {o.text for o in bad.observed}
+    # Un commit qui n'est pas dans l'historique (même message, autre SHA) : refusé.
+    other = _state(commits=[*_state().commits, _commit(SHA_C, [SHA_A], "Corrige le bug")])
+    lost = {"perdu": element_id("commit", SHA_C)}
+    assert _verdict({"head": {"contains": "@perdu"}}, other, aliases=lost).status == "unexpected"
+    assert _verdict({"head": {"contains": "@inconnu"}}, linear).status == "unexpected"
+
+
 def test_etat_inchange_n_a_rien_a_dire() -> None:
     state = _state()
     assert _verdict({"head": {"branch": "autre"}}, state, previous=state).status == "pending"

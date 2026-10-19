@@ -130,6 +130,12 @@ steps:
         count: 0
       index:
         unstaged: [README.md]
+      tree:
+        contains:
+          - path: README.md
+            text: "# Mon projet (équipe)"
+          - path: README.md
+            text: "À compléter : la section d'installation."
       commits:
         - ahead_of: "@depart"
           min: 1
