@@ -89,7 +89,9 @@ def _build(engine: WorkspaceEngine, body: RunExerciseCode) -> Operation:
         _snapshot(ctx)
         ctx.output(f"$ {llmrun.COMMAND}", "app")
         try:
-            handle = llmrun.start_exercise(ctx.layout, ctx.settings)
+            handle = llmrun.start_exercise(
+                ctx.layout, ctx.settings, on_sync=lambda sync: ctx.on_interrupt(sync.terminate)
+            )
         except llmrun.ExerciseUnavailable as exc:
             raise AppError(
                 f"Le code d'exercice n'a pas pu être lancé : {exc.reason}.",

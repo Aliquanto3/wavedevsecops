@@ -22,7 +22,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from wavedevsecops.progress import FILENAME, _read_json, ensure_progress, write_json_atomic
 
-FactKind = Literal["step_validated", "quiz_first_attempt", "hint_opened", "scenario_completed"]
+FactKind = Literal[
+    "step_validated", "quiz_first_attempt", "hint_opened", "scenario_completed", "evidence_seen"
+]
 ScenarioState = Literal["todo", "in_progress", "done"]
 
 
@@ -50,12 +52,16 @@ class Fact(BaseModel):
     """`hint_opened` : temps écoulé avant la demande."""
     read_ms: int | None = None
     """`hint_opened` : temps de lecture."""
+    barrier_id: str = ""
+    """`evidence_seen` : la barrière (`content/chain.yaml`) dont la preuve s'est affichée."""
 
     @property
     def identity(self) -> tuple[Any, ...]:
         base = (self.kind, self.track, self.scenario_id, self.mode)
         if self.kind == "scenario_completed":
             return base
+        if self.kind == "evidence_seen":
+            return (*base, self.barrier_id)
         if self.kind == "hint_opened":
             return (*base, self.step_id, self.tier)
         return (*base, self.step_id)

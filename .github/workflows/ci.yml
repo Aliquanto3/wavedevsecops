@@ -79,7 +79,7 @@ jobs:
           "WDS_EXERCISE_UV=$WDS_EXERCISE_UV" "WDS_EXERCISE_DATA=$WDS_EXERCISE_DATA"
           .venv/bin/python -m pytest -q --tb=short
           tests/test_scenarios.py tests/test_setup.py tests/test_fingerprints.py
-          tests/test_exercise.py
+          tests/test_exercise.py tests/test_terminal_tools.py
 
       # AD-18 : les empreintes ne bougent pas sur un clone en core.autocrlf=true. Les fichiers
       # du dépôt sont réextraits avec ce réglage, puis les empreintes recomparées.

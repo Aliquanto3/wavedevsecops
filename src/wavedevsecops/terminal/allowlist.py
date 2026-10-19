@@ -72,6 +72,32 @@ class FileCommandSpec(BaseModel):
     """Vrai : les arguments sont du texte (echo), pas des chemins ni des options."""
 
 
+class ToolSpec(BaseModel):
+    """Outil de la chaîne tapé dans le terminal (story 7.2) : accepté seulement si le scénario
+    le déclare (`tools`), lancé par `toolrun` dans l'environnement d'exercice."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    barrier_id: str
+    """Barrière (`content/chain.yaml`) dont la sortie de l'outil est la preuve (AD-14)."""
+    subcommands: list[str] = []
+    """Premier mot obligatoire (`ruff check`) ; vide : l'outil n'en a pas (`pytest`)."""
+    options: list[str] = []
+    value_options: list[str] = []
+    """Options qui prennent une valeur (collée, après `=` ou dans l'argument suivant)."""
+    write_options: list[str] = []
+    """Options qui modifient l'arbre de travail (`--fix`) : refusées en `quiz_altered`."""
+    paths: bool = True
+    """Vrai : les positionnels sont des chemins du dépôt (jamais absolus ni hors du dépôt)."""
+
+    @model_validator(mode="after")
+    def _consistent(self) -> ToolSpec:
+        unknown = (set(self.value_options) | set(self.write_options)) - set(self.options)
+        if unknown:
+            raise ValueError(f"options hors de options : {sorted(unknown)}")
+        return self
+
+
 class Allowlist(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -79,6 +105,7 @@ class Allowlist(BaseModel):
     messages: dict[str, str]
     forbidden_options: list[str]
     files: dict[str, FileCommandSpec] = Field(default_factory=dict)
+    tools: dict[str, ToolSpec] = Field(default_factory=dict)
     git: dict[str, GitSubcommand]
 
     def message(self, key: str, **values: object) -> str:
@@ -89,6 +116,8 @@ class Allowlist(BaseModel):
         text = self.message("accepted", subcommands=", ".join(self.git))
         if self.files:
             text += " " + self.message("accepted_files", commands=", ".join(self.files))
+        if self.tools:
+            text += " " + self.message("accepted_tools", tools=", ".join(self.tools))
         return text
 
     def accepted_options(self, sub: str) -> str:

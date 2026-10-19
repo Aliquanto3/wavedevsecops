@@ -8,6 +8,7 @@ run du pipeline.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,8 @@ from wavedevsecops.engine.snapshots import take_snapshot
 from wavedevsecops.gitio import Git
 from wavedevsecops.scenarios import LoadedScenario, run_setup
 from wavedevsecops.wsfs import Layout
+
+log = logging.getLogger("wavedevsecops")
 
 
 class WorkspaceError(AppError):
@@ -42,6 +45,24 @@ def resolve_git(settings: Settings | None = None) -> Path:
             "Ouvrez le diagnostic pour installer ou mettre à jour git.",
         )
     return status.path
+
+
+def _prepare_tool_environment(tools: list[str], layout: Layout, settings: Settings) -> None:
+    """Crée `cache/venv/` à l'ouverture si le scénario déclare un outil de la chaîne (AD-12).
+
+    Hors ligne, depuis le `uv-cache` préchargé. Un échec n'empêche pas l'ouverture : le terminal
+    retente à la première commande de l'outil et dit pourquoi, avec le diagnostic.
+    """
+    if not toolrun.needs_environment(tools, settings):
+        return
+    venv = toolrun.venv_dir(layout.root)
+    synced = toolrun.sync_environment(layout.repo, venv, settings)
+    if not synced.ok:
+        log.warning(
+            "Environnement d'exercice non créé pour %s : %s",
+            layout.root.name,
+            synced.error or synced.stderr.strip()[-300:],
+        )
 
 
 def prepare_workspace(
@@ -81,6 +102,7 @@ def prepare_workspace(
     from wavedevsecops.engine import hints  # noqa: PLC0415 - hints importe le moteur
 
     first_step = scenario.steps[0].step_id if scenario.steps else None
+    _prepare_tool_environment(scenario.tools, layout, settings)
     wsfs.write_json(
         layout.run_json,
         {

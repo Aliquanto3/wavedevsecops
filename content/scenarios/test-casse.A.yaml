@@ -1,0 +1,55 @@
+# Station 1 (Story 7.2) : un test cassé prévu, que pytest signale avant le commit.
+# Le dépôt d'exercice est celui du parcours (sans IA ou LLM) ; un test neuf, non committé,
+# attend un résultat faux.
+schema_version: 1
+scenario_id: test-casse
+mode: A
+title_text: Trouver un test cassé avant de committer
+section: stations
+station: 1
+tracks: [llm, no_ai]
+tools: [git, pytest]
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  - op: write_file
+    path: tests/test_rupture.py
+    content: |
+      from inventory import Stock
+
+
+      def test_article_sous_le_seuil_est_a_recommander() -> None:
+          stock = Stock()
+          stock.add("vis", 2, threshold=5)
+          assert stock.below_threshold() == []
+steps:
+  - step_id: corriger_le_test
+    type: repo_state
+    title_text: Faire passer pytest, puis committer
+    instruction_text: >-
+      Le test `tests/test_rupture.py` vient d'être ajouté. Lancez `pytest` pour voir ce qui
+      échoue, corrigez le test (deux vis pour un seuil de cinq : l'article est à recommander),
+      puis committez le fichier corrigé.
+    explanation_text: >-
+      pytest exécute les tests et signale celui qui attend un résultat faux, avec la ligne de
+      l'assertion. Le voir avant le commit évite d'envoyer une pull request que la CI
+      refuserait : le test cassé est trouvé sur votre poste.
+    expect:
+      tree:
+        present: [tests/test_rupture.py]
+      commits:
+        - ahead_of: origin/main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            staged: [tests/test_rupture.py]
+        reason_text: Le fichier est dans l'index, mais pas encore committé.

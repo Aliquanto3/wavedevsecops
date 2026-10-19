@@ -1,0 +1,57 @@
+# Station 1 (Story 7.2) : un défaut de lint prévu, que ruff trouve avant le commit.
+# Le dépôt d'exercice est celui du parcours (sans IA ou LLM) ; un module neuf, non committé,
+# importe `os` sans s'en servir.
+schema_version: 1
+scenario_id: defaut-de-lint
+mode: A
+title_text: Trouver un défaut de lint avant de committer
+section: stations
+station: 1
+tracks: [llm, no_ai]
+tools: [git, ruff]
+template: empty
+setup:
+  - op: exercise_stage
+    stage: auto
+  - op: commit
+    message: Ajoute le projet d'inventaire
+  - op: push
+    branch: main
+    as: origin-main
+  - op: write_file
+    path: src/inventory/rapport.py
+    content: |
+      """Rapport des articles à recommander."""
+
+      import os
+
+      from inventory.stock import Stock
+
+
+      def recommandes(stock: Stock) -> str:
+          return ", ".join(stock.below_threshold())
+steps:
+  - step_id: corriger_le_lint
+    type: repo_state
+    title_text: Faire passer ruff, puis committer
+    instruction_text: >-
+      Le fichier `src/inventory/rapport.py` vient d'être ajouté. Lancez `ruff check .` pour
+      voir ce que ruff y trouve, corrigez le fichier (ou laissez `ruff check --fix .` le faire),
+      puis committez le fichier corrigé.
+    explanation_text: >-
+      ruff lit le code sans l'exécuter et signale ici un import inutilisé (F401). Le trouver
+      avant le commit évite qu'il n'arrive dans la pull request : c'est la première barrière,
+      sur votre poste.
+    expect:
+      tree:
+        present: [src/inventory/rapport.py]
+      commits:
+        - ahead_of: origin/main
+          min: 1
+      index:
+        clean: true
+    foreseen:
+      - when:
+          index:
+            staged: [src/inventory/rapport.py]
+        reason_text: Le fichier est dans l'index, mais pas encore committé.

@@ -183,20 +183,36 @@ class OpContext:
         """Soumet des faits du premier passage à `progress`, après l'écriture de `run.json`."""
         self._engine.submit_facts(drafts, self.op_id)
 
-    def output(self, text: str, stream: Stream = "stdout", *, lang: str = "") -> None:
+    def output(
+        self,
+        text: str,
+        stream: Stream = "stdout",
+        *,
+        lang: str = "",
+        tool: str = "",
+        spans: list[dict[str, Any]] | None = None,
+    ) -> None:
         """Émet une sortie de l'opération (`terminal_output`).
 
         Ses `spans` sont résolus contre le dernier état projeté ; après l'opération,
         `state_projected.output_spans` donne ceux qui changent avec le nouvel état.
+        `tool` : la sortie est celle d'un outil (bloc `tool-output`). `spans` explicites
+        (liens tirés d'une exécution machine, AD-10) : fixés, jamais recalculés.
         """
         linker = self._engine.last_projection.linker
-        spans = linker(text) if linker is not None else []
+        fixed = spans is not None
+        resolved = spans if spans is not None else (linker(text) if linker is not None else [])
         envelope = self._engine.publish(
             Kind.TERMINAL_OUTPUT,
-            TerminalOutput(stream=stream, text=text, lang=lang, spans=spans),  # type: ignore[arg-type]
+            TerminalOutput(stream=stream, text=text, lang=lang, spans=resolved, tool=tool),  # type: ignore[arg-type]
             op_id=self.op_id,
         )
-        self.outputs.append((envelope.seq, text, spans))
+        if not fixed:
+            self.outputs.append((envelope.seq, text, resolved))
+
+    def submit_evidence(self, barrier_id: str) -> None:
+        """Soumet à `progress` le fait `evidence_seen{barrier_id}` : la preuve s'affiche (AD-14)."""
+        self._engine.submit_evidence(barrier_id, self.op_id)
 
     def emit(self, kind: Kind | str, payload: BaseModel | dict[str, Any]) -> None:
         """Émet un événement de l'opération ; les `kind` de la séquence sont réservés."""
@@ -563,6 +579,19 @@ class WorkspaceEngine:
                 ),
                 op_id=op_id,
             )
+
+    def submit_evidence(self, barrier_id: str, op_id: str | None) -> None:
+        """`evidence_seen` du scénario de l'espace (premier passage seulement, AD-14)."""
+        if not self.layout.run_json.exists():
+            return
+        run = load_run(self.layout)
+        where = {
+            "track": run.get("track"),
+            "scenario_id": run.get("scenario_id"),
+            "mode": run.get("mode"),
+        }
+        draft = {"kind": "evidence_seen", "barrier_id": barrier_id, **where}
+        self._submit_facts([draft], op_id)
 
     def _replay_facts(self) -> None:
         """Reprise après un arrêt brutal : `run.json` est écrit avant les faits (AD-14)."""

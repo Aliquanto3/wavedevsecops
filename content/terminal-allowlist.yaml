@@ -30,6 +30,24 @@ messages:
   refused_argument: "« git {sub} {value} » n'est pas accepté dans ce terminal."
   too_many: "« git {sub} » reçoit trop d'arguments pour ce terminal."
   accepted_files: "Commandes de fichiers acceptées : {commands}."
+  accepted_tools: "Outils acceptés quand l'étape les déclare : {tools}."
+  tool_not_declared: >-
+    « {tool} » n'est pas disponible dans ce scénario : ses étapes ne déclarent pas cet outil.
+  tool_subcommand: "« {tool} » attend une sous-commande parmi : {subcommands}."
+  tool_unknown_option: "L'option « {option} » n'est pas acceptée pour « {tool} »{accepted}."
+  tool_options: " ; options acceptées : {options}"
+  tool_path: >-
+    « {value} » n'est pas un chemin du dépôt : écrivez-le depuis la racine du dépôt, sans « .. »
+    ni chemin absolu.
+  tool_missing_value: "L'option « {option} » de « {tool} » attend une valeur."
+  tool_unavailable: >-
+    « {tool} » ne peut pas tourner : {reason}. Ouvrez le diagnostic pour voir l'état des outils.
+  tool_env_failed: >-
+    L'environnement de l'exercice n'a pas pu être préparé : {reason}. Ouvrez le diagnostic, puis
+    relancez la commande.
+  tool_machine_failed: >-
+    Les liens vers le code ne sont pas disponibles pour cette sortie ({reason}) ; la sortie
+    ci-dessus est celle de l'outil, sans modification.
   file_unknown_option: "L'option « {option} » n'est pas acceptée pour « {command} »{accepted}."
   file_options_none: " (cette commande n'a pas d'option dans ce terminal)"
   file_options_some: " ; options acceptées : {options}"
@@ -86,6 +104,23 @@ files:
   cp: {options: ["-r", "-R"], min_args: 2, globs: true}
   pwd: {read: true, max_args: 0}
   clear: {read: true, max_args: 0}
+
+# Outils de la chaîne (story 7.2, AD-4, AD-10) : acceptés seulement si le scénario les déclare
+# dans `tools`, lancés par `toolrun` dans l'environnement d'exercice, hors ligne. `barrier_id` :
+# la barrière de `chain.yaml` dont leur sortie est la preuve. Ni `-p`, ni `-c`, ni `--rootdir`,
+# ni le séparateur `--`, ni une valeur séparée qui commence par `-` (pytest cherche `-p` partout) :
+# aucune option ne charge un greffon ni ne change la racine ; `--fix` est la seule écriture.
+tools:
+  ruff:
+    barrier_id: lint
+    subcommands: ["check"]
+    options: ["--fix", "--statistics", "--show-fixes", "--diff", "--select", "--ignore", "--no-cache"]
+    value_options: ["--select", "--ignore"]
+    write_options: ["--fix"]
+  pytest:
+    barrier_id: tests
+    options: ["-q", "--quiet", "-v", "--verbose", "-vv", "-x", "--exitfirst", "-k", "-m", "--tb", "--maxfail", "-r", "--no-header", "--disable-warnings", "-l", "--showlocals", "--collect-only", "--co"]
+    value_options: ["-k", "-m", "--tb", "--maxfail", "-r"]
 
 # Chaque sous-commande git : `read` (vrai : lecture, admise pendant un quiz ; un objet : lecture
 # seulement si toutes ses conditions tiennent), `options`, `value_options` (options qui prennent
