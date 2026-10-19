@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
@@ -109,12 +112,26 @@ class RefreshResult:
 # --- Lecture, migrations, écriture -------------------------------------------------------
 
 
+def _read_bytes(path: Path) -> bytes:
+    """Lit `github.json` ; sous Windows, un `os.replace` concurrent refuse l'ouverture un
+    instant (même pause que `wsfs`), d'où quelques essais avant de conclure à un fichier
+    illisible."""
+    for attempt in range(1, wsfs.REPLACE_ATTEMPTS + 1):
+        try:
+            return path.read_bytes()
+        except PermissionError:
+            if os.name != "nt" or attempt == wsfs.REPLACE_ATTEMPTS:
+                raise
+            time.sleep(wsfs.REPLACE_PAUSE_S * attempt)
+    raise AssertionError("inaccessible")
+
+
 def _read_raw(layout: Layout) -> dict[str, Any] | None:
     path = layout.github_json
     if not path.is_file():
         return None
     try:
-        data = json.loads(path.read_bytes().decode("utf-8"))
+        data = json.loads(_read_bytes(path).decode("utf-8"))
     except OSError, UnicodeDecodeError, json.JSONDecodeError:
         raise GithubSimError(
             "L'état du GitHub simulé de cet espace (github.json) est illisible.",
