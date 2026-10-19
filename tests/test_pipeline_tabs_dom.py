@@ -238,6 +238,29 @@ console.log(JSON.stringify({ ruff, left, focused, blurred, fetched: calls.filter
     assert out["fetched"] == 1
 
 
+def test_un_check_survole_qui_disparait_au_redessin_eteint_ses_lignes(
+    tmp_path: Path, data_file: Path
+) -> None:
+    """Le redessin retire la ligne survolée sans « mouseout » : l'éclairage ne reste pas posé."""
+    out = _js(
+        tmp_path,
+        data_file,
+        """
+viewButton("pytest").click();
+await flush();
+rowOf("ruff").dispatchEvent(makeEvent("mouseover", { bubbles: true }));
+const before = lit("is-lit").length;
+const views = JSON.parse(JSON.stringify(data.views));
+for (const pr of views.remote.pulls) pr.checks = pr.checks.filter((c) => c.job_id !== "ruff");
+store.applySnapshot({ workspace_id: "w", boot_id: "b", seq: 2, epoch: 0, state: "idle", views });
+await flush();
+console.log(JSON.stringify({ before, after: lit("is-lit"), row: Boolean(rowOf("ruff")) }));
+""",
+    )
+    assert out["before"] > 0 and out["row"] is False
+    assert out["after"] == []
+
+
 def test_balises_absentes_un_constat_non_bloquant_et_les_autres_onglets_restent(
     tmp_path: Path, data_file: Path
 ) -> None:

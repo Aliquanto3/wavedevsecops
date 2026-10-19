@@ -10,6 +10,7 @@ pipeline {
         // wds:job ruff
         stage('Lint (ruff)') {
             steps {
+                // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
                 sh 'uv sync --frozen'
                 sh 'uv run ruff check .'
             }
@@ -19,6 +20,7 @@ pipeline {
         // wds:job pytest
         stage('Tests (pytest)') {
             steps {
+                // uv doit être installé sur l'agent (GitHub Actions et GitLab CI l'installent).
                 sh 'uv sync --frozen'
                 sh 'uv run pytest -q --tb=short'
             }

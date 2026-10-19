@@ -167,6 +167,10 @@ def install_code_routes(app: FastAPI, manager: WorkspaceManager) -> None:
         except GitError:
             log.warning("Pipeline illisible pour %s", workspace_id, exc_info=True)
             return _refusal(409, "Git n'a pas pu lire les fichiers du pipeline. Réessayez.")
+        except ci.PipelineError as error:
+            # `content/pipeline.yaml` illisible : un défaut du contenu, pas une ressource absente.
+            log.warning("content/pipeline.yaml illisible : %s", error.cause_text)
+            return _refusal(409, f"{error.cause_text} {error.action_text}")
         except AppError as error:
             return _refusal(404, f"{error.cause_text} {error.action_text}")
         return JSONResponse(view)

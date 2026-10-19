@@ -397,6 +397,9 @@ export function renderRemote(body, ctx, renderEmpty) {
       for (const card of remote.pulls) root.append(buildCard(card, busy, expanded));
     }
     refreshSelection();
+    // Le check survolé a pu disparaître au redessin (sans « mouseout ») : son éclairage aussi.
+    const hovered = pipelineFocus.hover;
+    if (hovered && !root.querySelector(`.pr-check[data-job="${hovered}"]`)) pipelineFocus.setHover(null);
     const buttons = [...root.querySelectorAll("button, [data-roving]")];
     const byKey = (key) => key && buttons.find((b) => b.getAttribute("data-key") === key);
     // Merger (PR mergée) ou Ouvrir une PR (PR ouverte) disparaissent après leur action : le focus

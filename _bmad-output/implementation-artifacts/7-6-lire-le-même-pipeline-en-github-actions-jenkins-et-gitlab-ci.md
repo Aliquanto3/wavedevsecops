@@ -32,12 +32,24 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 7.6 » ; s
 ## Reports
 
 - Les volets repliés (petite fenêtre) ne s'ouvrent pas d'eux-mêmes sur « Voir dans le pipeline » : même limite que les liens fichier:ligne vers Code.
-- Explication (`explanations.yaml`, 2.10) : aucune entrée ajoutée ici, la 2.10 n'est pas encore sur `main`.
+- Explication (`explanations.yaml`, 2.10) : aucune entrée ajoutée ici, à ajouter dans une story de contenu (2.10 est maintenant sur `main`, aucun critère de la 7.6 ne l'exige).
 - Jobs `bandit`, `pip_audit`, `quality_gate` (8.1, 8.3, 8.4) et `secret_scan` (8.6) : chacun devra ajouter ses balises `wds:job` / `wds:end` dans les trois fichiers ; le test échoue tant qu'un `job_id` du pipeline manque dans l'un d'eux.
 - Les empreintes de référence changent avec le gabarit : une story parallèle qui les régénère doit relancer `scripts/update_fingerprints.py` après fusion.
-- La vue Code relit le pipeline à chaque changement de vues tant que le mode « Pipeline » est ouvert (comme le diff) : le survol d'un check qui se redessine n'est pas remis à zéro (cas rare).
+- La vue Code relit le pipeline à chaque changement de vues tant que le mode « Pipeline » est ouvert (comme le diff). Le survol d'un check retiré par un redessin est remis à zéro depuis la revue.
 
 ## À vérifier sur poste réel
 
 1. Dans un navigateur : le surlignage (fond et trait à gauche) est lisible en thème clair et sombre ; « Lecture seule » est annoncé au lecteur d'écran à l'ouverture.
 2. Clavier : Tab/flèches parcourent les onglets, les pastilles de tâche et le panneau de lignes (focalisable) ; le focus d'un check éclaire ses lignes.
+
+## Revue
+
+Rebasée sur `main` (36 commits : 2.10, 6.3, 5.4, 7.3, outillage des tests) ; conflits dans `code.js` (imports et état de `renderCode` : 2.10 et 7.6 gardés tous deux) et `fingerprints.json` (régénéré, stable sur deux passes).
+
+- low · second avis 1 · corrigé · `code/pipeline` : un `content/pipeline.yaml` illisible (`PipelineError`) répond 409 avec sa cause, plus 404 comme une PR absente (test de route ajouté).
+- low · second avis 2 · corrigé · `remote.js` : un check survolé retiré par un redessin (sans `mouseout`) éteint son éclairage à la fin de `draw` (test DOM ajouté).
+- low · second avis 3 · corrigé · `Jenkinsfile` : un commentaire dit que uv doit être installé sur l'agent, comme gitleaks (GitHub Actions et GitLab CI l'installent).
+- low · second avis 4 · corrigé · concordance : la commande `outil + human` doit figurer sur une ligne non commentée de la tâche (test du filtre ajouté).
+- low · revue · corrigé · contrat des jobs à venir (8.1, 8.3, 8.4, 8.6) : message d'échec du test de concordance qui dit la règle (6 fichiers, ordre de `pipeline.yaml`, balises, libellé, commande) et rappel dans l'en-tête de `content/pipeline.yaml`.
+- low · revue · rejeté · `repo_projector` relit `pipeline.yaml` à chaque projection : petit fichier, même coût que les autres lectures de la projection ; pas de structure qui grossit.
+- Complexité : 0 constat (le surlignage parcourt les lignes du fichier affiché, plafonné à 200 Ko ; aucun historique qui grossit).

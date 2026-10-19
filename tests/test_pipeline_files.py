@@ -73,6 +73,29 @@ NOTES = '  - op: write_file\n    path: NOTES.md\n    content: "notes\\n"'
 
 
 # ------------------------------------------------------------------ le gabarit
+def _contract(track: str, file: pf.PipelineFile, findings: object) -> str:
+    """Message d'échec : la règle à suivre quand une story ajoute un job (8.1, 8.3, 8.4, 8.6)."""
+    return (
+        f"content/exercise/{track}/{file.path} ne suit pas content/pipeline.yaml "
+        f"(attendu, dans cet ordre : {', '.join(PIPELINE.job_ids)}). Chaque job de "
+        "pipeline.yaml s'écrit dans les 6 fichiers CI des gabarits (no_ai et llm : "
+        ".github/workflows/ci.yml, Jenkinsfile, .gitlab-ci.yml), encadré par "
+        "« wds:job <job_id> » et « wds:end », chacun en commentaire seul sur sa ligne, avec son "
+        f"label_text et la commande « outil + human » de pipeline.yaml. Constats : {findings}"
+    )
+
+
+def _code_lines(block: list[str]) -> str:
+    """Lignes de la tâche hors commentaires : une commande commentée ne compte pas."""
+    return "\n".join(line for line in block if not line.lstrip().startswith(("#", "//")))
+
+
+def test_une_commande_commentee_ne_compte_pas() -> None:
+    block = ["      # - run: uv run ruff check .", "      - run: echo"]
+    assert "ruff check ." not in _code_lines(block)
+    assert "echo" in _code_lines(block)
+
+
 @pytest.mark.parametrize("track", TRACKS)
 @pytest.mark.parametrize("tab", [f.tab_id for f in pf.PIPELINE_FILES])
 def test_chaque_job_id_est_encadre_dans_les_trois_ecritures_du_gabarit(
@@ -81,8 +104,9 @@ def test_chaque_job_id_est_encadre_dans_les_trois_ecritures_du_gabarit(
     file = FILES[tab]
     text = (EXERCISE / track / file.path).read_text(encoding="utf-8")
     found = pf.job_ranges(file, text, PIPELINE.job_ids)
-    assert found.findings == [], found.findings
-    assert list(found.ranges) == PIPELINE.job_ids  # même ordre que le pipeline : en série
+    assert found.findings == [], _contract(track, file, found.findings)
+    # Même ordre que le pipeline : les tâches tournent en série.
+    assert list(found.ranges) == PIPELINE.job_ids, _contract(track, file, found.findings)
     previous = 0
     for job_id, rng in found.ranges.items():
         assert rng.first > previous, job_id
@@ -104,14 +128,18 @@ def test_les_trois_ecritures_refletent_content_pipeline_yaml(track: str, tab: st
     lines = text.splitlines()
     for job in PIPELINE.jobs:
         rng = ranges[job.job_id]
-        block = "\n".join(lines[rng.first - 1 : rng.last])
+        block = lines[rng.first - 1 : rng.last]
+        code = _code_lines(block)
         command = shlex.join([job.tool, *job.human])
-        assert command in block, f"{file.path} : « {command} » absent de la tâche {job.job_id}"
-        assert job.label_text in block, f"{file.path} : libellé de {job.job_id}"
+        assert command in code, (
+            f"{track}/{file.path} : « {command} » (outil + human de content/pipeline.yaml) "
+            f"absent des lignes non commentées de la tâche {job.job_id}"
+        )
+        assert job.label_text in "\n".join(block), f"{file.path} : libellé de {job.job_id}"
         # Une commande de la tâche n'est jamais celle d'une autre.
         for other in PIPELINE.jobs:
             if other.job_id != job.job_id:
-                assert shlex.join([other.tool, *other.human]) not in block
+                assert shlex.join([other.tool, *other.human]) not in code
 
 
 def test_les_trois_gabarits_sont_identiques_entre_parcours() -> None:
@@ -360,3 +388,17 @@ def test_la_route_sert_les_trois_ecritures_au_sha_de_tete(lint_instance: cli.Ins
     # La vue est une lecture : aucune route d'écriture ni d'exécution n'existe pour ces fichiers.
     status, _ = _call(lint_instance, "POST", url, session, {})
     assert status in (404, 405)
+
+
+def test_un_pipeline_yaml_illisible_est_un_refus_409_et_non_une_pr_absente(
+    lint_instance: cli.Instance, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_args: object, **_kwargs: object) -> ci.Pipeline:
+        raise ci.PipelineError("content/pipeline.yaml est invalide.", "Corrigez le fichier.")
+
+    monkeypatch.setattr(ci, "load_pipeline", broken)
+    session = _session(lint_instance)
+    status, refused = _call(
+        lint_instance, "GET", f"/api/ws/{LINT_WS}/code/pipeline?pr=1", session
+    )
+    assert status == 409 and "pipeline.yaml est invalide" in refused["reason_text"]
