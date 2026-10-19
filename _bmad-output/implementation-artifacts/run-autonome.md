@@ -498,6 +498,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 10:37 · — · décision pour Anaël · 5.8 : stash rendu visible et désignable dans la vue staging ; étape relancer ajoutée après le quiz --abort (quatre étapes) · —
 - 2026-10-19 10:38 · 8.3 · dev · lancé (dev-story Sonnet, base integ/pile-1) · —
 - 2026-10-19 10:50 · fix, 7.6, 7.5, 9.4, 8.1, 5.7 · fusion · CI de la pile verte sur les trois OS (6 jobs), main avancée en avance rapide sur integ/pile-1, stories done · bf717fc
+- 2026-10-19 11:03 · 5.8 · review · rebase --onto integ/pile-1 (code de 5.7 revue intact, fingerprints régénéré, stable), M (reprendre validé par une fonction au_revoir écrite à la main : corps exigé), M (--skip au quiz : texte renvoie à Recommencer), L3 (stash nommé stash@{n} dans la correction) corrigés ; L4, L6, L7 écartés ; L5 (CSS is-stash) reporté ; 1334 passed (rapides) · 2e86db7
+- 2026-10-19 11:18 · 5.8 · CI · verte sur les trois OS · 2e86db7
+- 2026-10-19 11:18 · 5.8 · fusion · commit de fusion sur main, story done ; toutes les stories dev des Epics 1 à 6 sont done, 6.7 éligible · da4a38b
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
 

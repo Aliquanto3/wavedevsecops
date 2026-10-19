@@ -85,7 +85,7 @@ development_status:
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: done
   5-6-le-scénario-b-env-committé: done
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: done
-  5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: review
+  5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: done
   epic-5-retrospective: optional
 
   epic-6: in-progress
