@@ -112,9 +112,9 @@ development_status:
   8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: done
   8-2-servir-une-base-de-vulnérabilités-locale-et-figée: done
   8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: done
-  8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: in-progress
-  8-5-le-scénario-llm-outil-trop-puissant-flow-4: backlog
-  8-6-la-clé-d-api-en-dur-le-test-de-config-llm-et-l-injection-de: backlog
+  8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: done
+  8-5-le-scénario-llm-outil-trop-puissant-flow-4: in-progress
+  8-6-la-clé-d-api-en-dur-le-test-de-config-llm-et-l-injection-de: in-progress
   epic-8-retrospective: optional
 
   epic-9: in-progress
@@ -123,7 +123,7 @@ development_status:
   9-3-trouver-les-scénarios-de-station-dans-le-catalogue: done
   9-4-relier-chaque-terme-du-vocabulaire-à-sa-barrière: done
   9-5-publier-la-release-v0-2-0: backlog
-  9-6-explications-de-la-vue-pipeline-et-lien-actif-traçabilité: backlog
+  9-6-explications-de-la-vue-pipeline-et-lien-actif-traçabilité: in-progress
   epic-9-retrospective: optional
 
   epic-10: backlog

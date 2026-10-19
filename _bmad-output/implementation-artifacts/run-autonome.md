@@ -543,6 +543,14 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 13:22 Â· 5.9 Â· CI Â· verte sur les trois OS Â· 66cefe8
 - 2026-10-19 13:22 Â· 5.9 Â· pile Â· empilÃ©e sur integ/pile-2 sans conflit, 209 ciblÃ©s verts, CI de la pile 39244184771 Â· 4c0a0e9
 - 2026-10-19 13:38 Â· chore/arbitrages-ui, 5.9 Â· fusion Â· CI de integ/pile-2 verte sur les trois OS (6 jobs), main avancÃ©e en avance rapide, 5.9 done Â· 4c0a0e9
+- 2026-10-19 13:43 Â· 8.4 Â· dev Â· fini, ciblÃ©s verts dont 7 slow avec vrais outils, CI 39246529649 ; jobs uv_lock et quality_gate, bandit --ini {config}/bandit.ini hors de l'arbre, uv.lock du scÃ©nario 8.3 rÃ©alignÃ© (op replace_in_file, Ã©tape finale exige uv_lock), scÃ©nario couverture-sous-le-seuil.A, finding_has sur pr_state Â· 4e7be0e
+- 2026-10-19 13:43 Â· 8.4 Â· second-avis Â· lancÃ© Â· â€”
+- 2026-10-19 13:43 Â· â€” Â· dÃ©cision pour AnaÃ«l Â· 8.4 : dependance-vulnerable Ã©choue au dÃ©part sur deux checks (pip_audit et uv_lock) ; un test sans assertion qui exÃ©cute le code passe le seuil (Ã  nommer au dÃ©brief) ; scÃ©nario LLM de la quality gate laissÃ© Ã  8.5 Â· â€”
+- 2026-10-19 13:53 Â· 8.4 Â· second-avis Â· 1 high (conftest.py de l'arbre rÃ©Ã©crit le coverage.xml au chemin prÃ©visible : quality gate verte sans tests, prouvÃ©), 1 medium (dÃ©lai de 60 s de test_pipeline pour 7 jobs), 6 low ; reviewer Opus lancÃ© (rebase sur main) Â· â€”
+- 2026-10-19 14:03 Â· 8.4 Â· review Â· rebase sur main (empreintes stables) ; M (dÃ©lai du test des vrais outils portÃ© Ã  LIMIT_S + 30) corrigÃ© ; H ramenÃ© Ã  M (conftest.py ou Coverage.current() rÃ©Ã©crivent la couverture : impossible Ã  fermer dans le processus de l'apprenant, comme en vraie CI) reportÃ© ; L nom pointÃ© et L test sans assertion reportÃ©s ; L diff non mesurÃ©, L bandit -r src, L check_states de 8.3, L glossaire Ã©cartÃ©s ; uv lock --check hors ligne = failure ; replace_in_file confinÃ© ; 23 + 108 ciblÃ©s, CI 39249030228 Â· e5247df
+- 2026-10-19 14:03 Â· â€” Â· dÃ©cision pour AnaÃ«l Â· 8.4 : nommer au dÃ©brief du scÃ©nario de couverture les deux limites (conftest.py qui rÃ©Ã©crit la couverture, test sans assertion) ; message de uv lock --check hors ligne (Â« No solution found â€¦ network was disabled Â») Ã  juger sur poste Â· â€”
+- 2026-10-19 14:20 Â· 8.4 Â· CI Â· verte sur les trois OS Â· e5247df
+- 2026-10-19 14:20 Â· 8.4 Â· fusion Â· commit de fusion sur main (branche Ã  jour de main), story done Â· efb774c
 
 ## Reprise (arrêt propre du 2026-10-19 12:39)
 
