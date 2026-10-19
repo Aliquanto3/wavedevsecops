@@ -427,6 +427,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:23 · 7.3 · CI · rouge, même test hérité de 2.10 (empilée dessus) ; 7.3 sera rebasée après le correctif · d0ce937
 - 2026-10-19 06:23 · 9.3 · review · rebase sur 6.4 sans conflit, M2 (appendActions partagé : Reprendre et Recommencer sur les cartes de station, L8 nom avec le mode), M1 (garde de dérive de STATION_ORDER), L10 partiel corrigés ; M3, L6, L7, L9 écartés ; L4, L5 reportés ; 1326 passed, CI branche verte · 3288a38
 - 2026-10-19 06:23 · 5.5, 6.4, 9.3 · fusion · 9.3 rebasée sur la 6.4 actuelle (contient 5.5), branche poussée ; suite unique sur 9.3 (couvre les trois) en cours à la place de celle de 6.4 ; CI 9.3 en cours · 42784c7
+- 2026-10-19 06:24 · 2.10 · fusion · correctif d'intégration par dev-story Opus (clic sur la sortie de check traité deux fois par remote.js et linking.js : preventDefault et defaultPrevented), 119 tests ciblés · 09e307c
+- 2026-10-19 06:24 · 5.5, 6.4, 9.3, 2.10, 7.3 · fusion · pile de cinq dans cet ordre sur main (2.10 sur 9.3, 7.3 sur 2.10, sans conflit) ; suite unique sur le sommet en cours, CI 2.10 et 7.3 relancées (5.5, 6.4 vertes ; 9.3 en cours) · 57e6d96
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
