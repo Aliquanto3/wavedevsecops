@@ -389,6 +389,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 04:19 · 2.10 · second-avis · aucun high, 3 medium (conflit workspace.js, arêtes sans retour pour une sortie d'outil, Tab ne ferme pas le popover), 7 low (taille des DiffLine, explications trop affirmatives, EXPLAIN_PATH appliqué aux non suivis…) ; reviewer Opus lancé · —
 - 2026-10-19 04:19 · 6.4 · second-avis · 2 high (empreinte jamais comparée : sha256 toujours vrai, dépôt modifié accepté ; Recommencer de l'encart hors de la remise 4.4 : ni scenario_reset, ni vérification, ni restoring), 2 medium (faux refus sur git concurrent, resolve_git hors try), 3 low ; reviewer Opus lancé · —
 - 2026-10-19 04:19 · — · outillage · quota API GitHub atteint un moment par les gh run watch en parallèle (403) ; attentes de CI relancées avec --interval 60 ; consigne aux agents à ajouter · —
+- 2026-10-19 04:20 · 5.5 · review · rebase sans conflit, L2 relevé en medium et corrigé (marques de N suspendues pendant que N+1 est armée), L3 (marque de ref dans le nom accessible) corrigés ; L1, L4, L9 écartés ; L8 reporté (4.4 absente au rebase) ; 1286 passed, CI verte sur le code · 731e7f0
+- 2026-10-19 04:20 · 5.5 · fusion · empilée sur 6.2 en conflit de fond (scenario.js : Recommencer de la correction contre la confirmation de 4.4 ; workspace.css) → dev-story Opus pour le rebase · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
