@@ -237,7 +237,7 @@ def create_app(
     install_code_routes(app, workspaces)
     install_catalogue_routes(app, workspaces, settings)
     install_explanation_routes(app, settings)
-    install_glossary_routes(app, settings)
+    install_glossary_routes(app, settings, workspaces)
     app.add_api_route(
         "/espace/{workspace_id}", shell_page, methods=["GET"], include_in_schema=False
     )

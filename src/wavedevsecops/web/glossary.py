@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from typing import Any, Literal
 
 import yaml
@@ -18,6 +19,8 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from wavedevsecops.config import Settings, get_settings
+from wavedevsecops.engine import workspace_id_for
+from wavedevsecops.progress.facts import ProgressStore
 from wavedevsecops.web.catalogue import load_catalogue, load_chain_texts
 
 log = logging.getLogger(__name__)
@@ -47,9 +50,18 @@ class GlossaryTerm(_Strict):
     scenario_id: str = ""
     named_only: bool = False
     trace_text: str = ""
+    trace_link_text: str = ""
+    """Libellé du lien vers les PR et les checks de l'espace ouvert (story 9.6)."""
+    trace_none_text: str = ""
+    """Phrase sans espace ouvert : jamais de lien mort, elle invite à ouvrir un scénario."""
 
     @model_validator(mode="after")
     def _coherent(self) -> GlossaryTerm:
+        parts = (self.trace_text, self.trace_link_text, self.trace_none_text)
+        if any(parts) and not all(parts):
+            raise ValueError(
+                f"{self.id} : trace_text, trace_link_text et trace_none_text vont ensemble"
+            )
         if self.named_only and (self.barrier_id or self.scenario_id or self.trace_text):
             raise ValueError(f"{self.id} : un terme nommé seulement ne mène à rien")
         if self.scenario_id and not self.barrier_id:
@@ -100,8 +112,42 @@ def _barriers(settings: Settings) -> dict[str, dict[str, Any]]:
     }
 
 
-def glossary_body(settings: Settings | None = None) -> dict[str, Any]:
-    """Termes, barrière et scénario résolus ; sans fichier valide, une liste vide."""
+def open_station_workspace(
+    settings: Settings, workspace_exists: Callable[[str], bool]
+) -> str | None:
+    """Espace du dernier scénario de station ouvert, s'il existe encore sur disque.
+
+    Seul un scénario de station (1 à 4) a des PR et des checks à montrer ; un scénario du socle ou
+    un espace disparu ne donne pas de lien (jamais de lien mort).
+    """
+    last = ProgressStore.for_dir(settings.resolved_data_dir()).last_opened()
+    if last is None:
+        return None
+    track, scenario_id, mode = last
+    for loaded in load_catalogue(settings):
+        scenario = loaded.scenario
+        if scenario.catalogue and scenario.scenario_id == scenario_id and scenario.mode == mode:
+            if not scenario.station:
+                return None
+            workspace_id = workspace_id_for(track, scenario.key)
+            return workspace_id if workspace_exists(workspace_id) else None
+    return None
+
+
+def _trace(term: GlossaryTerm, open_workspace: str | None) -> dict[str, Any] | None:
+    if not term.trace_text:
+        return None
+    if open_workspace:
+        return {"link": {"href": f"/espace/{open_workspace}", "text": term.trace_link_text}}
+    return {"link": None, "none_text": term.trace_none_text}
+
+
+def glossary_body(
+    settings: Settings | None = None, open_workspace: str | None = None
+) -> dict[str, Any]:
+    """Termes, barrière et scénario résolus ; sans fichier valide, une liste vide.
+
+    `open_workspace` : espace de station ouvert ; il donne au terme de traçabilité son lien."""
     settings = settings or get_settings()
     glossary = load_glossary(settings)
     if glossary is None:
@@ -128,6 +174,7 @@ def glossary_body(settings: Settings | None = None) -> dict[str, Any]:
                 "definition_text": term.definition_text,
                 "named_only": term.named_only,
                 "trace_text": term.trace_text,
+                "trace": _trace(term, open_workspace),
                 "barrier": barrier,
                 "scenario": (
                     {
@@ -143,8 +190,14 @@ def glossary_body(settings: Settings | None = None) -> dict[str, Any]:
     return {"schema_version": 1, "ui": glossary.ui.model_dump(), "terms": terms}
 
 
-def install_glossary_routes(app: FastAPI, settings: Settings) -> None:
+def install_glossary_routes(app: FastAPI, settings: Settings, manager: Any = None) -> None:
+    def exists(workspace_id: str) -> bool:
+        return manager is not None and manager.layout(workspace_id).root.is_dir()
+
+    def build() -> dict[str, Any]:
+        return glossary_body(settings, open_station_workspace(settings, exists))
+
     @app.get("/api/glossary")
     async def glossary() -> Response:
-        body = await asyncio.to_thread(glossary_body, settings)
+        body = await asyncio.to_thread(build)
         return JSONResponse(body, headers={"Cache-Control": "no-store"})

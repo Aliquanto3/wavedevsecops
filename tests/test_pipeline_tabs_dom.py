@@ -318,3 +318,34 @@ def test_feuille_de_style_de_pipeline_tabs() -> None:
     for needle in (".pipeline-line.is-job", ".pipeline-line.is-lit", ".pipeline-tab[aria-selected"):
         assert needle in css
     assert "http" not in css  # aucune URL externe (AD-13)
+
+
+def test_les_taches_la_sortie_et_le_check_ont_un_i_d_explication(
+    tmp_path: Path, data_file: Path
+) -> None:
+    out = _js(
+        tmp_path,
+        data_file,
+        """
+viewButton("pytest").click();
+await flush();
+// La doublure de DOM n'a pas de MutationObserver : un nouvel état du store déclenche la pose des « i ».
+// La doublure de DOM n'a pas de MutationObserver : un changement d'état sans nouvelle projection
+// (la vue Code ne se redessine pas) déclenche la pose des « i » sur les tâches déjà dessinées.
+store.fail("essai");
+await flush();
+const refs = $$(".pipeline-job[data-explain-ref]").map((b) => [b.getAttribute("data-job"), b.getAttribute("data-explain-ref")]);
+const triggers = $$('.explain-trigger').filter((b) => b.getAttribute("data-explain-for").startsWith("job:")).map((b) => [b.getAttribute("data-explain-for"), b.getAttribute("data-explain-ref"), b.getAttribute("aria-label")]);
+console.log(JSON.stringify({ refs, triggers, explain: store.state.views.explain }));
+""",
+    )
+    assert sorted(job for job, _ in out["refs"]) == sorted(job_id for job_id in PIPELINE.job_ids)
+    assert all(ref == f"pipeline.{job}" for job, ref in out["refs"])
+    assert sorted(t[0] for t in out["triggers"]) == sorted(f"job:{j}" for j in PIPELINE.job_ids)
+    assert all(t[2].startswith("Expliquer ") for t in out["triggers"])
+    # check et sortie du même job : la même clé que la tâche.
+    checks = {k: v for k, v in out["explain"].items() if k.startswith(("check:", "output:check-"))}
+    assert any(k.startswith("output:check-") for k in checks)
+    for element, ref in checks.items():
+        job = element.split(":")[2] if element.startswith("check:") else element.split(":")[1].split("-")[2]
+        assert ref == (f"pipeline.{job}" if job in PIPELINE.job_ids else "remote.check"), element

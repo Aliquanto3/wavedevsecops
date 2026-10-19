@@ -25,6 +25,7 @@ from wavedevsecops.projections.views import (
     EXPLAIN_REMOTE,
     EXPLAIN_REVIEW,
     EXPLAIN_SBOM,
+    pipeline_explain_ref,
 )
 
 PATH_ZONES = ("head", "index", "worktree")
@@ -107,7 +108,11 @@ def annotate(views: Views) -> Views:
             edges.add(pr.element_id, element_id("commit", heads[head]))
         for check in pr.checks:
             names[check.element_id] = f"check {check.job_id} ({label})"
-            explain[check.element_id] = EXPLAIN_CHECK
+            ref = pipeline_explain_ref(check.job_id, EXPLAIN_CHECK)
+            explain[check.element_id] = ref
+            if check.output_element_id and ref != EXPLAIN_CHECK:
+                names[check.output_element_id] = f"sortie {check.job_id} ({label})"
+                explain[check.output_element_id] = ref
             edges.add(check.element_id, *check.links)
             _, segments = parse_element_id(check.element_id)
             edges.add(check.element_id, element_id("commit", segments[2]))

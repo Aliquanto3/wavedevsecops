@@ -137,6 +137,7 @@ export function buildPipeline(data, state) {
       type: "button",
       "data-job": item.job_id,
       "aria-pressed": String(item.job_id === state.job),
+      "data-explain-ref": item.explain_ref || false,
     });
     pick.append(text("code", "pipeline-job-id", item.job_id), text("span", "pipeline-job-label", item.label_text));
     row.append(pick);

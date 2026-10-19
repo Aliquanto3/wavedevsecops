@@ -66,9 +66,44 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
     return linking.nameOf(id) || node.getAttribute("aria-label") || id;
   }
 
+  function makeTrigger(name, id, key) {
+    const button = el("button", "explain-trigger", {
+      type: "button",
+      tabindex: "-1",
+      "aria-label": triggerLabel(name),
+      "aria-haspopup": "dialog",
+      "aria-expanded": "false",
+      "data-explain-for": id,
+      "data-explain-ref": key,
+    });
+    button.textContent = "i";
+    button.addEventListener("click", (event) => {
+      event.stopPropagation(); // le « i » n'est pas une sélection de l'élément
+      if (current && current.trigger === button) close(true);
+      else open(button);
+    });
+    return button;
+  }
+
+  /** Tâches de la vue pipeline (story 9.6) : pas d'`element_id`, la clé vient du serveur. */
+  function decorateJobs() {
+    for (const node of grid.querySelectorAll(".pipeline-job[data-explain-ref]")) {
+      if (decorated.has(node)) continue;
+      const key = node.getAttribute("data-explain-ref");
+      const job = node.getAttribute("data-job");
+      if (!key || !job) continue;
+      decorated.add(node);
+      const label = node.querySelector(".pipeline-job-label");
+      const trigger = makeTrigger(label ? label.textContent : job, `job:${job}`, key);
+      trigger.classList.add("explain-inline"); // à la suite de la pastille, dans la rangée
+      node.after(trigger);
+    }
+  }
+
   /** Pose un « i » à côté de chaque élément expliqué qui n'en a pas encore. */
   function decorate() {
     if (current && !current.trigger.isConnected) close(false);
+    decorateJobs();
     for (const node of nodesOf()) {
       // Étiquette de ref du graphe : posée à côté du bouton du commit (jamais dedans), son « i »
       // la suit en ligne.
@@ -79,21 +114,7 @@ export function installExplain(root, { store, linking, selection, fetchImpl, gri
       const key = pill ? linking.explainOf(id) || "" : keyOf(node);
       if (!key) continue;
       decorated.add(node);
-      const button = el("button", "explain-trigger", {
-        type: "button",
-        tabindex: "-1",
-        "aria-label": triggerLabel(nameOf(node, id)),
-        "aria-haspopup": "dialog",
-        "aria-expanded": "false",
-        "data-explain-for": id,
-        "data-explain-ref": key,
-      });
-      button.textContent = "i";
-      button.addEventListener("click", (event) => {
-        event.stopPropagation(); // le « i » n'est pas une sélection de l'élément
-        if (current && current.trigger === button) close(true);
-        else open(button);
-      });
+      const button = makeTrigger(nameOf(node, id), id, key);
       if (pill) {
         button.classList.add("explain-inline");
         node.after(button);

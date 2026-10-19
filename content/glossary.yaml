@@ -1,6 +1,8 @@
 # Vocabulaire de la chaîne (Story 9.4, AD-2, AD-7). Chaque terme mène à la barrière qui l'incarne.
 # `barrier_id` : barrière de `content/chain.yaml` (un test le vérifie) ; vide : aucune barrière.
 # `scenario_id` : scénario qui fait jouer la barrière ; vide ou absent du catalogue : « à venir ».
+# `trace_text` (terme sans barrière) : `trace_link_text` mène à l'espace de station ouvert, sinon
+# `trace_none_text` (jamais de lien mort).
 # `named_only` : terme seulement nommé (aucune barrière, aucun scénario).
 # Dans une explication, `[[id|texte]]` pose un terme du vocabulaire (`glossary-term`).
 # Deux phrases par définition, en français, au vouvoiement.
@@ -72,6 +74,8 @@ terms:
       La traçabilité permet de retrouver qui a changé quoi, quand et pourquoi. Chaque
       modification laisse une trace : commit, pull request, checks et revue.
     trace_text: "Vous la retrouvez dans les PR et les checks de l'espace de travail."
+    trace_link_text: "Voir les PR et les checks de votre espace"
+    trace_none_text: "Aucun espace de station n'est ouvert : ouvrez un scénario de station pour voir des PR et des checks."
   - id: dast
     term_text: "DAST"
     definition_text: >-

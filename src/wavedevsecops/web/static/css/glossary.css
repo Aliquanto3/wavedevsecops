@@ -27,6 +27,18 @@
   color: var(--color-ink-soft);
 }
 
+.glossary-trace-none {
+  margin: var(--space-1) 0 0;
+  color: var(--color-ink-soft);
+}
+
+.glossary-trace-link {
+  display: inline-block;
+  margin-top: var(--space-1);
+  min-height: var(--hit-target-dense);
+  color: var(--color-primary);
+}
+
 .named-only-tag {
   padding: 0 var(--space-2);
   font-size: var(--font-size-body-sm);
