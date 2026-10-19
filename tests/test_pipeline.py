@@ -286,15 +286,15 @@ class Box:
     def states(self) -> dict[str, str]:
         return {c.job_id: c.state for c in self.pr().checks}
 
-    def wait(self, predicate: Callable[[], bool], what: str) -> None:
-        deadline = time.monotonic() + WAIT
+    def wait(self, predicate: Callable[[], bool], what: str, timeout: float = WAIT) -> None:
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if predicate():
                 return
             time.sleep(0.05)
         raise AssertionError(f"délai dépassé : {what} ({self.states()})")
 
-    def wait_settled(self) -> None:
+    def wait_settled(self, timeout: float = WAIT) -> None:
         self.wait(
             lambda: (
                 len(self.states()) == len(ci.load_pipeline(self.settings).job_ids)
@@ -302,6 +302,7 @@ class Box:
                 and not self.runner.busy
             ),
             "checks terminés",
+            timeout,
         )
 
     def push_new_commit(self, text: str) -> str:
@@ -812,7 +813,8 @@ def test_vrais_outils_dans_le_pipeline(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=data, content_dir=_content(tmp_path, scenario))
     opened = Box(settings, git_path)
     try:
-        opened.wait_settled()
+        # Sept jobs réels : attendre jusqu'à la limite du budget, pas le délai des doublures.
+        opened.wait_settled(LIMIT_S + 30)
         checks = {c.job_id: c for c in opened.pr().checks}
         assert checks["pytest"].state == "success", checks["pytest"].output
         assert "passed" in checks["pytest"].output

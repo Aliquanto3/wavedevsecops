@@ -36,6 +36,7 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 8.4 » ; F
 - Scénario du parcours LLM (quality gate sur `httpx`) : story 8.5.
 - Un fichier Python changé que coverage n'a pas pu analyser n'est pas un constat `unscanned_file` de la quality gate (ruff et pytest échouent déjà sur une syntaxe illisible).
 - Un test sans assertion qui exécute le code fait passer le seuil : c'est la limite connue de la couverture, à nommer dans le débrief, pas à corriger ici.
+- **Décision pour Anaël — couverture falsifiable depuis l'arbre testé** : le code de l'apprenant s'exécute dans le processus de pytest, qui mesure la couverture. Un `conftest.py` peut réécrire `<arbre>.reports/coverage.xml` (`pytest_unconfigure`) ou, plus court, ajouter des lignes à la mesure en cours (`coverage.Coverage.current().get_data().add_lines(...)`, prouvé en revue : 33 % → 100 %, que le XML soit écrit par pytest ou ensuite par `coverage xml`). Ni un chemin de rapport imprévisible (lisible dans `config.option`) ni un rapport produit hors de pytest ne ferment la seconde voie ; seule une mesure hors du processus de l'apprenant le ferait, ce qui n'existe pas pour Python. C'est aussi la limite d'une vraie CI. Le geste enseigné (ajouter un test) reste de loin le chemin le plus court ; option : nommer la limite au débrief avec celle du test sans assertion.
 
 ## À vérifier sur poste réel
 
@@ -43,3 +44,19 @@ Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 8.4 » ; F
 2. Ajouter `tests/test_alertes.py` (un test par fonction), committer, pousser : le check repasse au vert avec « … n % · seuil 80 % · ✓ ».
 3. `dependance-vulnerable` : `uv_lock` échoue avec `pip_audit` au départ, les deux repassent au vert avec la correction de `pyproject.toml` et `requirements.txt`.
 4. Temps du pipeline complet sur le poste (alerte à 90 s) ; sortie lisible de `uv_lock` (message de uv, hors ligne).
+
+## Revue
+
+Revue Opus du 2026-10-19, rebasée sur `main` (5394451), avec la liste du second avis (Haiku).
+
+- high → medium · second avis 1 · reporté (décision Anaël) · `conftest.py` qui falsifie la couverture : confirmé, mais une seconde voie (`Coverage.current()` + `add_lines`) contourne aussi un rapport produit hors de pytest ; parade fiable impossible en Python, limite consignée dans Reports.
+- medium · second avis 4 · corrigé · `test_vrais_outils_dans_le_pipeline` attendait les sept jobs réels 60 s (`WAIT`) alors qu'il tolère 180 s : `Box.wait_settled(timeout)`, ce test attend `LIMIT_S + 30`.
+- low · second avis 2 · reporté · fichier au nom pointé (`calc.v2.py`) jamais importé : hors mesure, comme dans coverage réel ; dans le scénario, `finding_has: diff_coverage` refuse un diff sans ligne mesurée.
+- low · second avis 3 · rejeté · diff sans ligne mesurée vert : comportement de diff-cover, constat `diff_coverage_none` affiché, et l'étape du scénario l'exclut (`finding_has`).
+- low · second avis 5 · rejeté · `bandit -r src` en dur : antérieur (8.1), les deux gabarits ont `src/`.
+- low · second avis 6 · rejeté · première étape de `dependance-vulnerable` sans `uv_lock: failure` : l'échec est garanti par le setup, l'étape porte sur pip-audit.
+- low · second avis 7 · rejeté · glossaire : la quality gate est désormais la barrière `coverage`, `tests` garde « Intégration continue ».
+- low · second avis 8 · reporté · test sans assertion : déjà dans Reports (débrief).
+- low · revue · reporté · `uv lock --check` hors ligne sur une version absente du cache sort 1 (donc `failure`, vérifié) mais avec « No solution found … network was disabled » plutôt que « needs to be updated » : texte à juger sur poste (point 4 de « À vérifier »).
+- vérifié · revue · `replace_in_file` confiné (`../x`, absolu, `a/../../x`, `.git/config` refusés) ; arrondi de diff-cover (entier tronqué) identique pour `--fail-under` et l'affichage ; scénarios à merge (`check-en-echec`, `pr-sans-revue`) : diff de tests seulement, donc couvert.
+- Complexité : 0 constat (sorties `before` concaténées sur une ou deux commandes, lecteurs linéaires).
