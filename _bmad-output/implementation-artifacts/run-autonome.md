@@ -415,6 +415,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 05:35 · — · outillage · création de worktree refusée (dossier vide laissé par la suppression ratée de 4.4, puis config git lue pendant une écriture concurrente) : dossier vide et worktree inutilisé supprimés, relance réussie · —
 - 2026-10-19 05:35 · 5.6 · dev · lancé (dev-story Sonnet, base story/5-5-lire-correction ; chemin critique de l'Epic 5) · —
 - 2026-10-19 05:38 · 6.3 · second-avis · 2 high prouvés (conflit commité avec marqueurs valide l'étape ; rebase --abort puis merge valide le rebase), 2 medium (récupération par un nouveau commit de même sujet, stash drop puis réécriture manuelle), 4 low ; reviewer Opus lancé avec ajout de conditions à repo_state (contenu, historique linéaire, sha atteignable) et vérification des scénarios 6.2 · —
+- 2026-10-19 05:50 · 7.4 ★ · fusion · suite complète 1350 passed / 47 skipped (durée 60 min), CI branche verte, commit de fusion sur main, story done ; 7.5, 7.6, 8.1 éligibles · a40f998
+- 2026-10-19 05:50 · 5.5, 6.4, 2.10 · fusion · empilées sur main dans cet ordre (2.10 : conflit projections/__init__.py, annotate + linker de 7.4, résolu par l'orchestrateur), ruff vert, trois branches poussées ; suite complète unique du sommet et CI en cours · —
+- 2026-10-19 05:50 · — · proposition · la suite complète locale dure maintenant ~60 min (7 min en début de soirée) et bride les fusions : pytest-xdist (accord d'Anaël sur la table Stack) ou un découpage des tests lents · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
