@@ -357,6 +357,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:37 · 3.5 · fusion · suite complète 1189 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 7.3 éligible (7.1, 3.5 done) ; 5.7 attend 5.6 · 3f00039
 - 2026-10-19 02:45 · 6.5 · review · rebase sans conflit, M1 (toutes les cellules CSV neutralisées, tests par colonne), M2 (RESTART_KIND partagé, remise exclue de l'état), M3 (ALLOW_DOWNLOADS vérifié dans pywebview 6.2.1 et protégé), L6, L7 corrigés ; L4, L5 écartés, L8 reporté ; 1158 passed, CI branche verte · 53812e8
 - 2026-10-19 02:45 · 6.5 · fusion · kind de remise réaligné par l'orchestrateur sur scenario_reset (4.4 l'émet ; le reviewer avait lu un état antérieur de 4.4), tests ciblés 102 passed, rebase sur main sans conflit, suite complète et CI en cours ; reviewer de 4.4 prévenu (RESTART_KIND unique, derive fusionné) · 8af0c93
+- 2026-10-19 02:56 · 6.2 · dev · fini, 1108 passed / 42 skipped, CI verte ; scénarios add-commit, push-pull, branche, pr-merge (.A, deux parcours, indices à 3 paliers, quiz), type d'étape pr_state, 8 empreintes ; setup identique entre parcours ; libellés « vue Distant » à réaligner sur 3.3 ; relecture pédagogique pour Anaël · 48fd7a7
+- 2026-10-19 02:56 · 6.2 · second-avis · lancé · —
+- 2026-10-19 02:56 · 2.10 · dev · lancé (dev-story Sonnet ; 2.7, 2.8, 3.3 done ; ouvre 9.4) ; 5.4, 7.3, 6.4 éligibles en attente de créneau · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 

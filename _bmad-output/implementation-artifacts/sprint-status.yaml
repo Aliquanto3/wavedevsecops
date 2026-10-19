@@ -55,7 +55,7 @@ development_status:
   2-7-voir-le-graphe-la-liste-des-commits-et-l-index: done
   2-8-éditer-un-fichier-dans-la-vue-code-et-lire-un-diff: done
   2-9-voir-les-vues-suivre-une-modification-faite-hors-de-l-applic: review
-  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: backlog
+  2-10-suivre-un-élément-d-une-vue-à-l-autre-et-lire-son-explicatio: in-progress
   2-11-préparer-les-gabarits-d-exercice-des-deux-parcours: done
   epic-2-retrospective: optional
 
@@ -90,7 +90,7 @@ development_status:
 
   epic-6: in-progress
   6-1-choisir-son-parcours-et-parcourir-le-catalogue: done
-  6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: in-progress
+  6-2-les-scénarios-a-add-commit-push-pull-branche-et-pr-merge: review
   6-3-les-scénarios-a-conflit-stash-rebase-et-récupération: backlog
   6-4-reprendre-le-dernier-scénario-là-où-on-l-a-laissé: backlog
   6-5-exporter-mon-rapport-de-progression: review
