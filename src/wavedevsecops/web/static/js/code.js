@@ -4,6 +4,8 @@
 // garde l'état d'édition (tampons non enregistrés). Toute écriture est l'intention `save_file` : elle
 // passe par la file d'opérations, et un disque qui a changé la refuse (409), d'où le choix
 // « Garder ma version » / « Recharger ».
+import { markCorrection } from "./correction.js";
+import { designationFor, markDesignated } from "./designation.js";
 import { el } from "./dom.js";
 import { conflictLines, createEditor, CONFLICT_MARK } from "./editor.js";
 import { diffSource, linkingFor } from "./linking.js";
@@ -93,6 +95,7 @@ export function buildDiff(diff) {
 export function renderCode(body, ctx, renderEmpty, options = {}) {
   const { store } = ctx;
   const selection = selectionFor(store);
+  const designation = designationFor(store);
   const send = (...args) => (options.fetch || globalThis.fetch)(...args);
   const settleMs = options.settleMs ?? 150;
   const base = () => `/api/ws/${encodeURIComponent(store.state.workspaceId)}`;
@@ -450,6 +453,7 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
         header.append(button("Arbre de travail", "diff-worktree", () => selection.set(null)));
       }
       diffPanel.replaceChildren(header, buildDiff(diff));
+      flagDiff();
       linking.setSource("diff", diffSource(diff));
       // Une ligne de diff sélectionnée qui a disparu du diff relu ne reste pas sélectionnée.
       const picked = selection.value;
@@ -467,6 +471,18 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
       if (token === diffToken) say(OFFLINE_TEXT);
     }
   }
+
+  // Fichiers et lignes du diff s'ouvrent à la désignation (story 5.6) selon les types que l'étape
+  // accepte, comme les éléments que la projection marque `designable` dans les autres vues.
+  function flagDiff() {
+    for (const node of diffPanel.querySelectorAll("[data-element-id]")) {
+      const kind = node.getAttribute("data-element-id").split(":")[0];
+      node.setAttribute("data-designable", String(designation.accepts(kind)));
+    }
+    markDesignated(diffPanel, designation);
+    markCorrection(diffPanel, designation);
+  }
+  designation.subscribe(flagDiff);
 
   function setMode(next) {
     mode = next;

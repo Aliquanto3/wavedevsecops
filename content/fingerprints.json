@@ -1,6 +1,7 @@
 {
   "fingerprints": {
     "llm/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
+    "llm/add-commit.B": "4056f1bbc2ea6d5c88eba21f64f84497bf1ec9433f330cc488dc57f9ed2e8316",
     "llm/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "llm/branche.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "llm/conflit.A": "55414326a2c2ecf8bca42b3420a5b3355e0b1e0e88c132ddc16f8be85630a8e1",
@@ -14,6 +15,7 @@
     "llm/stash.A": "301578b9afa23596e8411f3b97114e62cf5f23fbc9552bec165ef839ca49de01",
     "llm/test-casse.A": "00d679f63cd30f81433900b17f49d56eabd90653ab7c344727a67c144cfec168",
     "no_ai/add-commit.A": "e0ef907841f624e038cb9812fa438934b468c54598f65c084c6aae4d5693ee30",
+    "no_ai/add-commit.B": "4056f1bbc2ea6d5c88eba21f64f84497bf1ec9433f330cc488dc57f9ed2e8316",
     "no_ai/bac-a-sable-libre.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "no_ai/branche.A": "45a4cd37a2617f1a374159521d5faaec9f38e4d0dc11d08bda44966cbaf20cf0",
     "no_ai/conflit.A": "55414326a2c2ecf8bca42b3420a5b3355e0b1e0e88c132ddc16f8be85630a8e1",

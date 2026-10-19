@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -116,6 +117,9 @@ class StepContext:
     désigné… ; lecture seule."""
     views: dict[str, Any] = field(default_factory=dict)
     """Toutes les vues projetées après l'opération (pas seulement `repo`)."""
+    git: Callable[[], Any] | None = None
+    """Fabrique du `Git` de l'espace (résolu à la demande), pour les types qui interrogent
+    l'historique que `RepoState` ne détaille pas (contenu des commits) ; `None` hors du moteur."""
     layout: Any = None
     """Disposition de l'espace (`wsfs.Layout`), pour les types qui lisent un état hors du dépôt
     git (PR du GitHub simulé) ; `None` hors du moteur."""

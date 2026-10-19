@@ -1,0 +1,54 @@
+---
+story: "5.6"
+key: 5-6-le-scénario-b-env-committé
+title: Le scénario B « .env committé »
+status: review
+branch: story/5-6-scenario-b-env
+ad: [AD-7, AD-18]
+---
+
+# Story 5.6 : Le scénario B « `.env` committé »
+
+Source : `_bmad-output/planning-artifacts/epics.md`, section « Story 5.6 » ; FR-12, UJ-2, UX-DR8. S'appuie sur les actes de l'agent B (5.1), la désignation (5.2, 5.3, 5.5) et le format des scénarios (6.2).
+
+## Livré
+
+`content/scenarios/add-commit.B.yaml`, `tracks: [llm, no_ai]`, même setup pour les deux parcours (empreinte `4056f1bb…`, stable sur deux générations).
+
+- Setup : l'état propre de l'apprenant (README, `bonjour.py`, poussés), puis deux commits de l'agent B : « Ajoute le client de l'API » (`src/client.py`) et « Ajoute la configuration de l'API » (`.env`, avec `API_KEY=cle-factice-…`). Rien n'est poussé : la clé n'a pas quitté le poste, on répare par une réécriture locale.
+- Étape `designer` (`designate`, question « Qu'a fait l'agent ? ») : accepte `commit`, `path`, `diffline`. Bonnes réponses : le commit (principal, donc aussi son SHA une fois résolu), `path:head:.env`, la ligne `API_KEY=` (`diffline:<sha>:.env:new:1`). Une réponse fausse (l'autre commit) est corrigée comme à l'ordinaire et ferme l'étape.
+- Étape `retirer_de_l_historique` (nouveau type `history_clean`) : validée dès qu'aucun commit accessible depuis une ref (branche, tag, distant, stash) n'ajoute ou ne modifie `.env`, et que `.gitignore` l'ignore. Quelle que soit la suite de commandes (`reset --soft` ou `--hard`, `rebase`, `filter-branch`…). Raisons d'échec écrites par le serveur : historique encore contaminé (avec les commits cités), ou fichier retiré mais non ignoré.
+- Trois paliers d'indice par étape ; le premier ne donne pas la réponse. Vouvoiement.
+
+## Ajouts localisés au code partagé
+
+- Op de setup `diff_line` (module seul, découverte automatique) : produit l'alias d'une ligne de diff d'un commit (`@commit`, `path`, `line`, `side`, `contains` pour vérifier le contenu). Les SHA n'étant connus qu'à l'exécution, c'est le moyen de citer un `diffline` en bonne réponse.
+- Type d'étape `history_clean` (module seul). `RepoState` ne détaille pas le contenu des commits : l'étape interroge git en lecture seule (`git log --all --diff-filter=AMRC -- :(literal).env`, `git check-ignore --no-index`).
+- `StepContext.git` : fabrique facultative du `Git` de l'espace, renseignée par `StepRunner` (`engine/steps.py`) ; résolue seulement si un type l'appelle.
+
+## Reports
+
+- Encart « Ce qui l'aurait bloqué » (gitleaks, station 1, étiquette « Arrive en v0.2 ») : stories 8.x, comme le dit la spec 9-3 ; le catalogue ne le porte pas encore.
+- Vue Code : fichiers et lignes du diff sont désignables depuis la revue (types acceptés par l'étape) ; le clic dans un navigateur réel reste à vérifier.
+- Cas non couvert : un commit qui contiendrait `.env` sans jamais l'ajouter ni le modifier (impossible dans un dépôt cohérent) ; un `.env` renommé en un autre nom n'est pas suivi.
+- Contrôles dans un navigateur réel pour Anaël : lecture de l'étape de désignation avec la vue Code d'un commit.
+
+## Tests
+
+`tests/test_scenario_b_env.py` : lint du contenu (paliers, vouvoiement), setup dans les deux parcours (deux commits d'agent, `.env` ajouté, `origin` intact), désignation juste par le commit, le fichier, la ligne et le SHA résolu, désignation fausse (premier essai consigné), réparation (solution à cinq commandes, `reset --hard`, suppression dans un nouveau commit refusée, `--amend` refusé, fichier non ignoré signalé, branche de sauvegarde qui garde le fichier, lecture seule silencieuse). Empreintes : `tests/test_fingerprints.py`.
+
+## Revue
+
+Rebase sur `main` (63 commits) sans conflit : seul le commit 5.6 a été rejoué, les commits 5.5 de la branche étaient déjà dans `main`. Empreintes régénérées : 0 changement.
+
+- HIGH · second avis · corrigé : `history_clean` validait après `git reset --soft` + `.gitignore` alors que `.env` restait indexé (le commit suivant le remettait). L'étape exige maintenant que l'index ne le suive plus, avec une raison propre (`git rm --cached`). Test `test_env_encore_dans_l_index_n_est_pas_valide`.
+- MEDIUM · second avis · corrigé : une sauvegarde `refs/original/` (ou une branche, un tag) qui garde le commit bloquait sans la nommer. La raison cite les refs qui y mènent (`for-each-ref --contains`) et explique `refs/original/`. `filter-branch` n'est pas dans la liste du terminal : le cas vient d'un terminal externe. Test `test_les_refs_qui_menent_au_commit_sont_nommees`.
+- MEDIUM · second avis · corrigé : lignes et fichiers du diff non désignables dans la vue Code (critère 2 inatteignable à la souris pour la ligne et le fichier). `code.js` les marque `data-designable` selon les types acceptés par l'étape, et y pose les marques de choix et de correction. Test `test_lignes_du_diff_designables_selon_l_etape`.
+- MEDIUM · second avis · reporté (décision Anaël) : encart « Ce qui l'aurait bloqué » (critère 4). Aucun support existant (schéma de scénario, déclaration serveur, rendu du panneau) ; la spec 5-1 l'attribue à 5.6-5.8, la spec 9-3 à 8.x. De plus `chain.yaml` déclare la station 1 `delivered: true`, ce qui contredit l'étiquette « Arrive en v0.2 » du critère. À trancher : story dédiée (recommandé) ou reprise de 5.6.
+- MEDIUM · revue · corrigé : les 18 tests de bout en bout de `test_scenario_b_env.py` (vrai git) n'étaient pas marqués `slow` et dépassaient le délai de 60 s sous `-n auto` sur un poste chargé (12 échecs). Marqués `slow`, comme `test_designation.py` ; 20/20 verts sur 3 workers.
+- LOW · revue · corrigé : `--full-history` dans `git log` pour qu'une branche fusionnée en `-s ours` qui garde `.env` ne soit pas masquée par la simplification d'historique.
+- LOW · revue · corrigé : op `diff_line`, message « ne contient pas « None » » quand `contains` est absent, et ligne vide finale acceptée (`split` au lieu de `splitlines`).
+- LOW · revue · rejeté : `except OSError, UnicodeDecodeError:` dans `engine/steps.py` est valide en Python 3.14 (PEP 758), produit par ruff.
+- LOW · revue · rejeté : `ctx.git()` recréé à chaque appel ; `Git.for_workspace` est léger, sans effet mesurable.
+- LOW · revue · reporté : un `.env` renommé n'est plus suivi (`:(literal).env`) ; hors critère.
+- Complexité : 0 constat. `history_clean` lance 3 à 4 commandes git en lecture par opération pendant l'étape, en O(historique) sur des dépôts de quelques commits ; pas de structure qui grossit.

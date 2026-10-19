@@ -302,3 +302,35 @@ def test_aucune_url_externe_dans_le_composant_d_edition() -> None:
     for name in ("editor.js", "code.js"):
         source = (STATIC / "js" / name).read_text(encoding="utf-8")
         assert not re.search(r"https?://", source), name
+
+
+def test_lignes_du_diff_designables_selon_l_etape(tmp_path: Path, diffs: Path) -> None:
+    """Story 5.6 : la ligne `API_KEY=` ou le fichier `.env` d'un commit se désignent dans le diff,
+    pour les seuls types que l'étape accepte."""
+    out = _js(
+        tmp_path,
+        diffs,
+        """
+const { designationFor, installDesignation } = await import("@JS@/designation.js");
+const designation = designationFor(store);
+installDesignation(section, designation);
+selectionFor(store).set("commit:" + "a".repeat(40));
+await flush();
+const flags = () => [$$(".diff-file-header")[0].getAttribute("data-designable"), $$(".diff-line")[2].getAttribute("data-designable")];
+const before = flags();
+designation.sync({ stepId: "designer", slots: [{ slot_id: "fuite", label_text: "x" }], accept: ["commit", "diffline"] });
+const armedTypes = flags();
+designation.arm();
+$$(".diff-line")[2].click();
+const picked = designation.pickOf("fuite");
+const marked = $$(".diff-line")[2].classList.contains("is-designated");
+designation.sync({ stepId: "autre", slots: [{ slot_id: "f", label_text: "x" }], accept: ["path"] });
+designation.arm();
+$$(".diff-line")[1].click();
+console.log(JSON.stringify({ before, armedTypes, picked: picked && picked.id, marked, refused: designation.pickOf("f"), after: flags() }));
+""",
+    )
+    assert out["before"] == ["true", "true"]
+    assert out["armedTypes"] == ["false", "true"]
+    assert out["picked"] == f"diffline:{SHA}:f.txt:new:2" and out["marked"]
+    assert out["refused"] is None and out["after"] == ["true", "false"]
