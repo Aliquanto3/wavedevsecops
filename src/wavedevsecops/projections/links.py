@@ -19,6 +19,7 @@ from __future__ import annotations
 from wavedevsecops.contracts import Views, element_id, parse_element_id
 from wavedevsecops.projections.views import (
     EXPLAIN_CHECK,
+    EXPLAIN_COMMIT,
     EXPLAIN_PATH,
     EXPLAIN_PR,
     EXPLAIN_REMOTE,
@@ -79,6 +80,9 @@ def annotate(views: Views) -> Views:
             names[item.element_id] = f"fichier {item.path}"
             explain[item.element_id] = EXPLAIN_PATH
             paths.add(item.path)
+    for item in views.staging.stash:
+        names[item.element_id] = f"stash {item.path.partition(' :')[0]}"
+        explain[item.element_id] = EXPLAIN_COMMIT
     paths.update(views.repo.worktree)
     paths.update(entry.path for entry in views.repo.index)
     for path in sorted(paths):

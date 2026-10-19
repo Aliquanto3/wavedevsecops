@@ -46,7 +46,7 @@ ALREADY_TEXT = (
 )
 UNDEFINED_TEXT = "Ce scénario ne définit pas la bonne réponse de cette question."
 _HEX = re.compile(r"^[0-9a-f]+$")
-VIEW_GROUPS = ("staged", "unstaged", "untracked")
+VIEW_GROUPS = ("staged", "unstaged", "untracked", "stash")
 
 
 # ----------------------------------------------------------------- marques
@@ -123,7 +123,9 @@ def _exists(element: str, state: RepoState | None) -> bool:
         return True
     kind, segments = parse_element_id(element)
     if kind == "commit":
-        return any(c.sha == segments[0] for c in state.commits)
+        return any(c.sha == segments[0] for c in state.commits) or any(
+            s.sha == segments[0] for s in state.stash
+        )
     if kind == "ref":
         return segments[0] == "HEAD" or any(r.name == segments[0] for r in state.refs)
     if kind == "tag":

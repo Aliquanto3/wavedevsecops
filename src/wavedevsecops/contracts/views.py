@@ -116,6 +116,8 @@ class StagingView(_Model):
     staged: list[StagingItem] = []
     unstaged: list[StagingItem] = []
     untracked: list[StagingItem] = []
+    stash: list[StagingItem] = []
+    """Pile du stash (Story 5.8) : `commit:<sha du stash>`, `path` = « stash@{n} : message »."""
 
 
 class PromptView(_Model):
