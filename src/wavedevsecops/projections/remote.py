@@ -131,7 +131,12 @@ def _details(check: Check, linker: Linker | None) -> tuple[list[CheckDetail], st
     return details, tool_error
 
 
-def _check_row(pr: PullRequest, check: Check, linker: Linker | None = None) -> CheckRow:
+def _check_row(
+    pr: PullRequest,
+    check: Check,
+    linker: Linker | None = None,
+    pipeline_jobs: frozenset[str] = frozenset(),
+) -> CheckRow:
     element = check.element(pr.number)
     required = check.required or (
         pr.protection is not None and check.job_id in pr.protection.required_checks
@@ -160,6 +165,7 @@ def _check_row(pr: PullRequest, check: Check, linker: Linker | None = None) -> C
         details=details,
         tool_error_text=tool_error,
         can_rerun=check.state == "error" and pr.state == "open" and not stale,
+        in_pipeline=check.job_id in pipeline_jobs,
         output_element_id=element_id(
             "output", f"check-{pr.number}-{check.job_id}-{check.head_sha}"
         ),
@@ -228,10 +234,15 @@ def _merge_state(pr: PullRequest) -> MergeState:
     return MergeState(enabled=False, disabled_text=BLOCKED_TEXT, reasons=reasons)
 
 
-def _card(pr: PullRequest, current: bool, linker: Linker | None = None) -> PrCard:
+def _card(
+    pr: PullRequest,
+    current: bool,
+    linker: Linker | None = None,
+    pipeline_jobs: frozenset[str] = frozenset(),
+) -> PrCard:
     title = pr.title_text or f"PR n°{pr.number} : {pr.head}"
     checks = sorted(
-        (_check_row(pr, c, linker) for c in pr.checks),
+        (_check_row(pr, c, linker, pipeline_jobs) for c in pr.checks),
         key=lambda row: (CHECK_ORDER[row.state], row.job_id),
     )
     state_text = PR_STATE_TEXT[pr.state]
@@ -298,10 +309,15 @@ def _branches(
 
 
 def build_remote(
-    git: Git, layout: Layout, local_branch: str = "", linker: Linker | None = None
+    git: Git,
+    layout: Layout,
+    local_branch: str = "",
+    linker: Linker | None = None,
+    pipeline_jobs: frozenset[str] = frozenset(),
 ) -> RemoteView:
     """Vue « Distant + PR » de l'espace ; `local_branch` : nom court de la branche courante ;
-    `linker` lie les fichier:ligne des sorties de checks aux fichiers du bac à sable."""
+    `linker` lie les fichier:ligne des sorties de checks aux fichiers du bac à sable ;
+    `pipeline_jobs` : les `job_id` de `content/pipeline.yaml` (« Voir dans le pipeline »)."""
     try:
         state = github_sim.load(layout)
         heads = github_sim.origin_branches(git, layout) if layout.origin.is_dir() else {}
@@ -313,7 +329,7 @@ def build_remote(
             error_text="Les refs de origin n'ont pas pu être lues. Relancez une commande git."
         )
     current = _current_number(state.pulls, local_branch)
-    cards = [_card(p, p.number == current, linker) for p in state.pulls]
+    cards = [_card(p, p.number == current, linker, pipeline_jobs) for p in state.pulls]
     order = {"open": 0, "merged": 1, "closed": 2}
     cards.sort(key=lambda c: (not c.current, order[c.state], -c.number))
     return RemoteView(branches=branches, pulls=cards)

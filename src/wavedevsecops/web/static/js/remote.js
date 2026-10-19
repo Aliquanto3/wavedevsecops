@@ -9,6 +9,7 @@
 // propre : leur bouton porte `data-link` (l'élément en cause) et le sélectionne.
 import { bindAction } from "./actions.js";
 import { el } from "./dom.js";
+import { pipelineFocusFor } from "./pipeline-focus.js";
 import { postIntent } from "./quiz.js";
 import { selectionFor } from "./selection.js";
 import { splitSpans, TOOL_OUTPUT_LABEL } from "./terminal.js";
@@ -29,6 +30,7 @@ export const GLYPHS = { success: "✓", failure: "✗", error: "⚠", queued: "�
 export const SHOW_OUTPUT_LABEL = "Voir la sortie";
 export const HIDE_OUTPUT_LABEL = "Masquer la sortie";
 export const RERUN_LABEL = "Relancer le check";
+export const VIEW_PIPELINE_LABEL = "Voir dans le pipeline";
 export const NO_OUTPUT_TEXT = "L'outil n'a rien affiché.";
 const FINISHED = new Set(["success", "failure", "error"]);
 export const REVIEW_MARKS = { approved: "✓", changes_requested: "✗", commented: "•" };
@@ -150,15 +152,18 @@ function buildDetails(check) {
 
 /** Ligne de détail d'un check terminé : erreur de l'outil, constats, Voir la sortie, Relancer. */
 function buildCheckExtra(check, item, opts) {
-  if (!FINISHED.has(check.state) || check.output_text === undefined) return;
-  if (check.tool_error_text) item.append(text("p", "check-tool-error", check.tool_error_text));
-  if (check.details.length > 0) item.append(buildDetails(check));
-  const open = Boolean(check.output_text) && opts.expanded.has(check.element_id);
-  if (!check.output_text && !check.can_rerun) return;
+  const done = FINISHED.has(check.state) && check.output_text !== undefined;
+  if (done && check.tool_error_text) item.append(text("p", "check-tool-error", check.tool_error_text));
+  if (done && check.details.length > 0) item.append(buildDetails(check));
+  const open = done && Boolean(check.output_text) && opts.expanded.has(check.element_id);
+  const hasOutput = done && Boolean(check.output_text);
+  const hasRerun = done && check.can_rerun;
+  if (!hasOutput && !hasRerun && !check.in_pipeline) return;
   const actions = el("div", "check-actions");
   item.append(actions);
-  if (check.output_text) actions.append(outputToggle(check, opts, open));
-  if (check.can_rerun) {
+  if (hasOutput) actions.append(outputToggle(check, opts, open));
+  if (check.in_pipeline) actions.append(pipelineButton(check, opts));
+  if (hasRerun) {
     const rerun = el("button", "btn btn-secondary btn-small", {
       type: "button",
       "data-action": "check-rerun",
@@ -171,6 +176,20 @@ function buildCheckExtra(check, item, opts) {
     bindAction(rerun, opts.busy ? BUSY_TEXT : null);
   }
   if (open) item.append(buildCheckOutput(check));
+}
+
+/** « Voir dans le pipeline » : ouvre `pipeline-tabs` (vue Code) sur la tâche de ce check. */
+function pipelineButton(check, opts) {
+  const view = el("button", "btn btn-secondary btn-small", {
+    type: "button",
+    "data-action": "view-pipeline",
+    "data-number": opts.number,
+    "data-job": check.job_id,
+    "data-key": `pipeline:${check.element_id}`,
+    "aria-label": `${VIEW_PIPELINE_LABEL} : ${check.job_id}`,
+  });
+  view.textContent = VIEW_PIPELINE_LABEL;
+  return view;
 }
 
 function outputToggle(check, opts, open) {
@@ -190,6 +209,7 @@ function outputToggle(check, opts, open) {
 
 export function buildCheck(check, opts = { expanded: new Set(), busy: false, number: 0 }) {
   const row = selectable("button", `pr-check is-${check.state}${check.stale ? " is-stale" : ""}`, check.element_id, check.a11y_name_text);
+  row.setAttribute("data-job", check.job_id); // survol : éclaire les lignes de la tâche (pipeline-tabs)
   const glyph = el("span", check.state === "running" ? "check-glyph pending-dot" : "check-glyph");
   glyph.setAttribute("aria-hidden", "true");
   glyph.textContent = GLYPHS[check.state] || "";
@@ -320,6 +340,7 @@ export function fallbackKey(key) {
 export function renderRemote(body, ctx, renderEmpty) {
   const { store, pane } = ctx;
   const selection = selectionFor(store);
+  const pipelineFocus = pipelineFocusFor(store);
   const root = el("div", "remote-view");
   body.replaceChildren(root);
   let drawn; // dernière vue dessinée
@@ -418,6 +439,8 @@ export function renderRemote(body, ctx, renderEmpty) {
     const action = target.getAttribute("data-action");
     if (action === "toggle-output") {
       toggleOutput(target);
+    } else if (action === "view-pipeline") {
+      pipelineFocus.open(target.getAttribute("data-number"), target.getAttribute("data-job"));
     } else if (action === "check-rerun") {
       postIntent(store, "check_rerun", {
         number: Number(target.getAttribute("data-number")),
@@ -441,6 +464,23 @@ export function renderRemote(body, ctx, renderEmpty) {
       selection.toggle(block.getAttribute("data-element-id"));
     }
   });
+  // Survoler (ou focaliser) un check éclaire les lignes de sa tâche dans `pipeline-tabs`.
+  const checkOf = (event) => event.target.closest && event.target.closest(".pr-check");
+  const hoverJob = (event) => {
+    const row = checkOf(event);
+    if (row) pipelineFocus.setHover(row.getAttribute("data-job"));
+  };
+  const leaveJob = (event) => {
+    const row = checkOf(event);
+    if (!row) return;
+    const into = event.relatedTarget;
+    if (into && into.closest && into.closest(".pr-check") === row) return;
+    pipelineFocus.setHover(null);
+  };
+  root.addEventListener("mouseover", hoverJob);
+  root.addEventListener("focusin", hoverJob);
+  root.addEventListener("mouseout", leaveJob);
+  root.addEventListener("focusout", leaveJob);
   selection.subscribe(refreshSelection);
   store.subscribe((state) => draw(state));
 }

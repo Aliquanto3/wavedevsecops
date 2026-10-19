@@ -91,6 +91,8 @@ class CheckRow(_Model):
     """« gitleaks s'est arrêté sans résultat (code 1). Ce n'est pas un défaut de votre code. »"""
     can_rerun: bool = False
     """« Relancer le check » (`check_rerun`) : erreur de l'outil sur les SHA courants."""
+    in_pipeline: bool = False
+    """La tâche est dans `content/pipeline.yaml` : « Voir dans le pipeline » est proposé (7.6)."""
     output_element_id: str = ""
     """`output:check:<n>:<job_id>:<sha>` : le bloc `tool-output` déplié, désignable."""
 

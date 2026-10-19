@@ -1,0 +1,40 @@
+# Pipeline du projet en GitLab CI. Le même pipeline s'écrit dans « .github/workflows/ci.yml »
+# (GitHub Actions) et dans « Jenkinsfile » (Jenkins) : trois tâches, l'une après l'autre
+# (une étape par tâche, car les tâches d'une même étape tournent en parallèle).
+# Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
+# surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
+stages: [ruff, pytest, gitleaks]
+
+default:
+  image: python:3.14
+
+# wds:job ruff
+ruff:
+  # Lint (ruff)
+  stage: ruff
+  before_script:
+    - pip install uv
+    - uv sync --frozen
+  script:
+    - uv run ruff check .
+# wds:end
+
+# wds:job pytest
+pytest:
+  # Tests (pytest)
+  stage: pytest
+  before_script:
+    - pip install uv
+    - uv sync --frozen
+  script:
+    - uv run pytest -q --tb=short
+# wds:end
+
+# wds:job gitleaks
+gitleaks:
+  # Secrets (gitleaks)
+  stage: gitleaks
+  script:
+    # gitleaks doit être installé dans l'image qui exécute la tâche.
+    - gitleaks dir --no-banner --redact --exit-code 3 .
+# wds:end

@@ -7,8 +7,15 @@
 import { el } from "./dom.js";
 import { conflictLines, createEditor, CONFLICT_MARK } from "./editor.js";
 import { diffSource, linkingFor } from "./linking.js";
+import { pipelineFocusFor } from "./pipeline-focus.js";
 import { selectionFor } from "./selection.js";
 
+export const PIPELINE_MODE_TEXT = "Pipeline";
+export const PIPELINE_TABS_LABEL = "Écritures du pipeline";
+export const PIPELINE_JOBS_LABEL = "Tâches du pipeline";
+export const PIPELINE_MISSING_TEXT = "tâche non repérée";
+export const PIPELINE_ABSENT_TEXT = "Ce fichier n'existe pas à ce commit.";
+export const PIPELINE_ERROR_TEXT = "Le pipeline n'a pas pu être lu.";
 export const MARKER = { added: "+", removed: "−", context: " " };
 export const KIND_CLASS = { added: "is-added", removed: "is-removed", context: "is-context" };
 export const UNSAVED_TEXT = "non enregistré";
@@ -90,6 +97,98 @@ export function buildDiff(diff) {
   return wrap;
 }
 
+// --- pipeline-tabs (story 7.6) -----------------------------------------------------------------
+
+/** Texte du rang d'une tâche dans un onglet : « lignes 12 à 18 », ou pourquoi il n'y en a pas. */
+export function rangeText(tab, job) {
+  if (!tab.available) return PIPELINE_ABSENT_TEXT;
+  const found = job && tab.jobs[job];
+  return found ? found.range_text : PIPELINE_MISSING_TEXT;
+}
+
+/** Pose `is-job` (tâche ouverte) et `is-lit` (check survolé) sur les lignes du panneau ouvert. */
+export function paintPipeline(root, data, state) {
+  const tab = data.tabs.find((item) => item.id === state.tab);
+  if (!tab) return;
+  const within = (range, number) => Boolean(range) && number >= range.first && number <= range.last;
+  const opened = state.job && tab.jobs[state.job];
+  const lit = state.hover && tab.jobs[state.hover];
+  for (const line of root.querySelectorAll(".pipeline-line")) {
+    const number = Number(line.getAttribute("data-line"));
+    if (within(opened, number)) line.classList.add("is-job");
+    else line.classList.remove("is-job");
+    if (within(lit, number)) line.classList.add("is-lit");
+    else line.classList.remove("is-lit");
+  }
+}
+
+/** `pipeline-tabs` : GitHub Actions | Jenkins | GitLab CI, en lecture seule, tâche surlignée. */
+export function buildPipeline(data, state) {
+  const wrap = el("div", "pipeline-view");
+  const head = el("div", "pipeline-head");
+  head.append(text("p", "pipeline-title", data.title_text), text("span", "tag pipeline-readonly", data.read_only_text));
+  wrap.append(head, text("p", "pipeline-not-run", data.not_executed_text));
+  const jobs = el("ul", "pipeline-jobs", { "aria-label": PIPELINE_JOBS_LABEL });
+  for (const item of data.jobs) {
+    const row = el("li", "pipeline-job-item");
+    const pick = el("button", "pipeline-job", {
+      type: "button",
+      "data-job": item.job_id,
+      "aria-pressed": String(item.job_id === state.job),
+    });
+    pick.append(text("code", "pipeline-job-id", item.job_id), text("span", "pipeline-job-label", item.label_text));
+    row.append(pick);
+    jobs.append(row);
+  }
+  const tabs = el("div", "pipeline-tabs", { role: "tablist", "aria-label": PIPELINE_TABS_LABEL });
+  for (const tab of data.tabs) {
+    const on = tab.id === state.tab;
+    const pick = el("button", "pipeline-tab", {
+      type: "button",
+      role: "tab",
+      id: `pipeline-tab-${tab.id}`,
+      "data-tab": tab.id,
+      "aria-selected": String(on),
+      "aria-controls": "pipeline-panel",
+    });
+    pick.append(text("span", "pipeline-tab-name", tab.label_text), text("span", "pipeline-tab-range", rangeText(tab, state.job)));
+    tabs.append(pick);
+  }
+  const current = data.tabs.find((tab) => tab.id === state.tab) || data.tabs[0];
+  const panel = el("div", "pipeline-panel", {
+    role: "tabpanel",
+    id: "pipeline-panel",
+    "aria-labelledby": current ? `pipeline-tab-${current.id}` : false,
+  });
+  if (current) {
+    panel.append(text("code", "pipeline-path", current.path));
+    if (!current.available) {
+      panel.append(text("p", "empty", PIPELINE_ABSENT_TEXT));
+    } else {
+      const lines = el("div", "pipeline-lines", {
+        role: "region",
+        tabindex: "0",
+        "data-roving": true,
+        "aria-label": `${current.path}, ${data.read_only_text.toLowerCase()}`,
+      });
+      const rows = current.content.split("\n");
+      if (rows[rows.length - 1] === "") rows.pop();
+      rows.forEach((value, index) => {
+        const row = el("div", "pipeline-line", { "data-line": index + 1 });
+        const no = text("span", "pipeline-no", String(index + 1));
+        no.setAttribute("aria-hidden", "true");
+        row.append(no, text("span", "pipeline-text", value));
+        lines.append(row);
+      });
+      panel.append(lines);
+    }
+  }
+  wrap.append(jobs, tabs, panel);
+  if (data.notice_text) wrap.append(text("p", "pipeline-notice", data.notice_text));
+  paintPipeline(wrap, data, state);
+  return wrap;
+}
+
 export function renderCode(body, ctx, renderEmpty, options = {}) {
   const { store } = ctx;
   const selection = selectionFor(store);
@@ -110,6 +209,10 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   // (ligne de diff, ref, PR) laisse le diff en place ; seul l'effacement ramène à l'arbre.
   let shownTarget = diffTarget(selection.value);
   let pruning = false;
+  const focus = pipelineFocusFor(store);
+  // `pipeline-tabs` : écritures lues au SHA de tête de la PR demandée ; la tâche et l'onglet ouverts
+  // sont gardés quand on change d'onglet ou de tâche.
+  const pipe = { data: null, number: 0, tab: "github", job: null, token: 0 };
 
   const root = el("div", "code-view");
   const nav = el("nav", "code-files", { "aria-label": "Fichiers du bac à sable" });
@@ -120,14 +223,17 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
   const modes = el("div", "code-modes", { role: "group", "aria-label": "Affichage" });
   const fileTab = button("Fichier", "code-mode", () => setMode("file"));
   const diffTab = button("Diff", "code-mode", () => setMode("diff"));
-  modes.append(fileTab, diffTab);
+  const pipelineTab = button(PIPELINE_MODE_TEXT, "code-mode", () => setMode("pipeline"));
+  modes.append(fileTab, diffTab); // « Pipeline » s'ajoute au premier « Voir dans le pipeline »
   const filePanel = el("div", "code-panel code-file-panel");
   const diffPanel = el("div", "code-panel code-diff-panel");
   const status = el("p", "code-status", { "aria-live": "polite" });
   // `external-change-notice` : ligne en haut de l'éditeur après une modification venue d'ailleurs.
   const notice = el("p", "external-change-notice", { role: "status", hidden: true });
   notice.textContent = EXTERNAL_TEXT;
-  main.append(notice, modes, status, filePanel, diffPanel);
+  const pipelinePanel = el("div", "code-panel code-pipeline-panel");
+  pipelinePanel.hidden = true;
+  main.append(notice, modes, status, filePanel, diffPanel, pipelinePanel);
 
   const editor = createEditor({ onChange: onEdit, onSave: save });
   const title = el("div", "code-file-title");
@@ -468,13 +574,81 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
     }
   }
 
+  // --- pipeline (trois écritures, lecture seule) ---------------------------------------------
+  function drawPipeline(keepFocus = false) {
+    if (mode !== "pipeline" || !pipe.data) return;
+    const active = document.activeElement;
+    const focused = keepFocus && active && pipelinePanel.contains(active) ? focusKey(active) : null;
+    pipelinePanel.replaceChildren(buildPipeline(pipe.data, { ...pipe, hover: focus.hover }));
+    settleRoving();
+    const again = focused && [...pipelinePanel.querySelectorAll("button")].find((node) => focusKey(node) === focused);
+    if (again) again.focus();
+  }
+
+  function focusKey(node) {
+    return node.getAttribute("data-tab") || node.getAttribute("data-job") || "";
+  }
+
+  async function loadPipeline() {
+    const token = (pipe.token += 1);
+    try {
+      const response = await send(`${base()}/code/pipeline?pr=${encodeURIComponent(pipe.number)}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (token !== pipe.token) return;
+      if (!response.ok) {
+        pipe.data = null;
+        pipelinePanel.replaceChildren(text("p", "empty", await failure(response, PIPELINE_ERROR_TEXT)));
+        return;
+      }
+      pipe.data = await response.json();
+      if (token !== pipe.token) return;
+      const tab = pipe.data.tabs.find((item) => item.id === pipe.tab);
+      say(
+        tab && pipe.job
+          ? `Pipeline, ${pipe.job} : ${rangeText(tab, pipe.job)} dans ${tab.label_text}.`
+          : "",
+      );
+      drawPipeline(true);
+      pipelinePanel.querySelector(".pipeline-line.is-job")?.scrollIntoView?.({ block: "nearest" });
+    } catch (err) {
+      if (token === pipe.token) say(OFFLINE_TEXT);
+    }
+  }
+
+  pipelinePanel.addEventListener("click", (event) => {
+    const target = event.target.closest && event.target.closest("button");
+    if (!target || !pipe.data) return;
+    if (target.hasAttribute("data-tab")) pipe.tab = target.getAttribute("data-tab");
+    else if (target.hasAttribute("data-job")) pipe.job = target.getAttribute("data-job");
+    else return;
+    drawPipeline(true);
+  });
+
+  focus.subscribe((kind) => {
+    if (kind === "hover") {
+      if (mode === "pipeline" && pipe.data) paintPipeline(pipelinePanel, pipe.data, { ...pipe, hover: focus.hover });
+      return;
+    }
+    const request = focus.request;
+    pipe.number = request.number;
+    pipe.job = request.jobId;
+    if (!pipelineTab.parentNode) modes.append(pipelineTab);
+    setMode("pipeline");
+  });
+
   function setMode(next) {
     mode = next;
     filePanel.hidden = mode !== "file";
     diffPanel.hidden = mode !== "diff";
+    pipelinePanel.hidden = mode !== "pipeline";
     fileTab.setAttribute("aria-pressed", String(mode === "file"));
     diffTab.setAttribute("aria-pressed", String(mode === "diff"));
+    pipelineTab.setAttribute("aria-pressed", String(mode === "pipeline"));
     if (mode === "diff") loadDiff();
+    if (mode === "pipeline") loadPipeline();
+    else pipelinePanel.replaceChildren(); // ses boutons ne restent pas dans l'ordre de tabulation
     settleRoving();
   }
 
@@ -502,6 +676,7 @@ export function renderCode(body, ctx, renderEmpty, options = {}) {
     loadTree();
     refreshOpen();
     if (mode === "diff") loadDiff();
+    if (mode === "pipeline") loadPipeline();
   });
 
   drawFile();

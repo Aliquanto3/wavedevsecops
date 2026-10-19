@@ -82,6 +82,7 @@ def project(
     *,
     restored: frozenset[str] = frozenset(),
     after_restore: bool = False,
+    pipeline_jobs: frozenset[str] = frozenset(),
 ) -> Projected:
     """Relit le dépôt de l'espace et calcule ses vues ; `previous_views` fixe les marques.
 
@@ -97,7 +98,7 @@ def project(
     views = build_views(state, previous, restored, previous_graph(previous_views))
     branch = state.head.ref.removeprefix("refs/heads/")
     linker = Linker(state)
-    remote = build_remote(git, layout, branch, linker)
+    remote = build_remote(git, layout, branch, linker, pipeline_jobs)
     before = previous_remote(previous_views)
     news = announce_remote(before, remote) if before is not None else ""
     views = views.model_copy(
