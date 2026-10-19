@@ -424,6 +424,9 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:02 · 7.3 · fusion · empilée sur 2.10 (conflits d'ajout toolrun imports et terminal.js markSpans/appendWithLinks, résolus par l'orchestrateur) ; suite complète unique relancée sur le sommet de pile 5.5 + 6.4 + 2.10 + 7.3 · —
 - 2026-10-19 06:10 · 5.5, 6.4 · fusion · CI branche verte sur 6 jobs (adf9535, 1b6532d) ; suite complète locale sur 6.4 (qui contient 5.5) en cours · —
 - 2026-10-19 06:10 · 2.10 · CI · rouge sur les trois OS : un test de 7.4 (test_remote_dom::test_voir_la_sortie_erreur_de_l_outil_et_relancer, bloc output: de check non désigné) cassé par l'interaction avec linking.js de 2.10 ; suite du sommet arrêtée ; dev-story Opus pour le correctif d'intégration · 786be18
+- 2026-10-19 06:23 · 7.3 · CI · rouge, même test hérité de 2.10 (empilée dessus) ; 7.3 sera rebasée après le correctif · d0ce937
+- 2026-10-19 06:23 · 9.3 · review · rebase sur 6.4 sans conflit, M2 (appendActions partagé : Reprendre et Recommencer sur les cartes de station, L8 nom avec le mode), M1 (garde de dérive de STATION_ORDER), L10 partiel corrigés ; M3, L6, L7, L9 écartés ; L4, L5 reportés ; 1326 passed, CI branche verte · 3288a38
+- 2026-10-19 06:23 · 5.5, 6.4, 9.3 · fusion · 9.3 rebasée sur la 6.4 actuelle (contient 5.5), branche poussée ; suite unique sur 9.3 (couvre les trois) en cours à la place de celle de 6.4 ; CI 9.3 en cours · 42784c7
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
