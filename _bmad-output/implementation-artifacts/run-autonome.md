@@ -451,6 +451,7 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 07:13 · 5.4 · fusion · commit de fusion sur main, story done · 782b4cf
 - 2026-10-19 07:33 · 7.6 · dev · fini, tests ciblés verts (suite complète en CI, verte) ; ci.yml, Jenkinsfile et .gitlab-ci.yml dans les gabarits d'exercice avec balises wds:job, test de concordance avec pipeline.yaml, bouton « Voir dans le pipeline » et onglets Pipeline dans la vue Code ; base avant 2.10 et 6.3 (empreintes à régénérer au rebase) ; les jobs 8.x devront baliser les trois fichiers · 65ea7ab
 - 2026-10-19 07:35 · 8.1 · dev · fini, 97 tests ciblés, CI verte sur 6 jobs ; job bandit en fin de pipeline.yaml (bandit 1.9.4 déjà dans la table Stack), lecteur bandit_json, scénario code-vulnerable.A (station 3, pipeline: true, parcours sans IA), champ checks de pr_state ; doit aussi baliser ci.yml, Jenkinsfile et .gitlab-ci.yml après 7.6 · 81328ca
+- 2026-10-19 08:22 · outillage · fusion · 242 tests marqués slow (rapide local : 2 min avec -n auto), pytest-xdist 3.8.0 (table Stack, groupe dev), CI en -n auto : macOS 7 → 3-5 min, Windows 17 → 8-11 min ; CI verte deux fois, aucune instabilité ; commit de fusion sur main · f3d5720
 - 2026-10-19 07:13 · — · arrêt propre · pause demandée par Anaël pour /clear ; agents encore actifs listés dans « Reprise » · —
 
 ## Reprise (arrêt propre du 2026-10-19, matin)
@@ -464,7 +465,6 @@ Agents encore actifs au moment de la pause (leur travail est poussé sur leur br
 
 | 7.6 | `story/7-6-pipeline-trois-ci` (65ea7ab) · agent-a86fecb393c4f1485 | dev fini, CI verte : second avis, puis reviewer ; rebase sur main (2.10, 6.3 : empreintes à régénérer). |
 | 8.1 | `story/8-1-bandit-sast` (81328ca) · agent-a36487cfb1221a062 | dev fini, CI verte : second avis, puis reviewer ; à fusionner après 7.6 (baliser le job bandit dans les trois fichiers CI des gabarits), empreintes à régénérer au rebase. |
-| outillage | `chore/tests-rapides` · agent-afd00f6cf6816f025 | marqueur slow + pytest-xdist en cours. À fusionner en priorité dès sa CI verte (accélère tout le reste). |
 
 Revues prêtes à lancer (aucun agent) :
 
@@ -475,6 +475,6 @@ Revues prêtes à lancer (aucun agent) :
 
 Éligibles ensuite : 5.7 (← 5.6 et 3.5), 8.3 (← 8.1, 8.2), 9.4 (← 2.10, done). Puis 5.8 (← 5.7), 8.4, 8.5, 8.6. 6.7 (mixte, release v0.1.0) quand toutes les stories `dev` des Epics 1 à 6 sont `done` (restent 5.6, 5.7, 5.8). 10.2 à 10.5 restent en backlog.
 
-Méthode : empiler les branches revues, CI sur chaque branche, fusion de la pile quand toutes les CI sont vertes ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees des stories done en fin de run seulement (fichiers verrouillés sous Windows). Contrats partagés à rappeler dans les prompts : identifiants du socle et des stations (`scenarios/order.py`), `RESTART_KIND = "scenario_reset"`, `answer_submit` avec `step_id` obligatoire, conditions de `repo_state` ajoutées par 6.3.
+Tests : en local `uv run pytest -q -m "not slow" -n auto` (environ 2 min) ; la CI joue tout. Méthode : empiler les branches revues, CI sur chaque branche, fusion de la pile quand toutes les CI sont vertes ; `gh run watch <id> --interval 60` ; `git worktree prune` avant de lancer un agent ; suppression des worktrees des stories done en fin de run seulement (fichiers verrouillés sous Windows). Contrats partagés à rappeler dans les prompts : identifiants du socle et des stations (`scenarios/order.py`), `RESTART_KIND = "scenario_reset"`, `answer_submit` avec `step_id` obligatoire, conditions de `repo_state` ajoutées par 6.3.
 
 Pour Anaël : lancer le script d'exclusions Defender en administrateur ; décisions non bloquantes au journal (la plus utile : identifiants des scénarios du socle et des stations) ; contrôles navigateur listés dans les specs.
