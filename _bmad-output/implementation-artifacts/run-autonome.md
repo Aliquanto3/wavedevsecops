@@ -355,6 +355,8 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 02:35 · 4.4 · second-avis · aucun high, 2 medium (derive ne borne pas au premier passage : score modifié par le 2e passage, prouvé ; double POST restart), 3 low (restoring posé après la réécriture de run.json, epoch 0 transitoire, faux positif content_changed) ; reviewer Opus lancé (coordination de derive avec 6.5) · —
 - 2026-10-19 02:35 · — · vérification · uv run dans un worktree importe bien le src du worktree (pas celui de main) : suites complètes des piles valides · —
 - 2026-10-19 02:37 · 3.5 · fusion · suite complète 1189 passed / 46 skipped, CI branche verte sur 6 jobs, commit de fusion sur main, story done ; 7.3 éligible (7.1, 3.5 done) ; 5.7 attend 5.6 · 3f00039
+- 2026-10-19 02:45 · 6.5 · review · rebase sans conflit, M1 (toutes les cellules CSV neutralisées, tests par colonne), M2 (RESTART_KIND partagé, remise exclue de l'état), M3 (ALLOW_DOWNLOADS vérifié dans pywebview 6.2.1 et protégé), L6, L7 corrigés ; L4, L5 écartés, L8 reporté ; 1158 passed, CI branche verte · 53812e8
+- 2026-10-19 02:45 · 6.5 · fusion · kind de remise réaligné par l'orchestrateur sur scenario_reset (4.4 l'émet ; le reviewer avait lu un état antérieur de 4.4), tests ciblés 102 passed, rebase sur main sans conflit, suite complète et CI en cours ; reviewer de 4.4 prévenu (RESTART_KIND unique, derive fusionné) · 8af0c93
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
