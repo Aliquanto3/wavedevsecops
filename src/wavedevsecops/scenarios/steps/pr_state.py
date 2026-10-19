@@ -40,10 +40,15 @@ class Args(StepArgs):
     """Composants que le SBOM de chaque check (par `job_id`, SHA courants) doit encore contenir
     (nom de paquet) : un vert obtenu en vidant ou en supprimant le fichier de dépendances ne
     valide pas l'étape (leçon 6.2 : le geste enseigné, pas un contournement)."""
+    finding_has: dict[str, list[str]] = Field(default_factory=dict)
+    """Constats (`rule_id`) que chaque check (par `job_id`, SHA courants) doit porter : la quality
+    gate doit avoir mesuré des lignes du nouveau code (`diff_coverage`), pas constaté qu'il n'y en
+    a plus (`diff_coverage_none`) : supprimer le code non testé ne valide pas l'étape (leçon
+    6.2 : le geste enseigné, pas un contournement)."""
     mergeable: bool | None = None
     """`True` : « Merger » est actif ; `False` : la PR est bloquée (`merge-blocked`)."""
 
-    @field_validator("check_states", "sbom_has")
+    @field_validator("check_states", "sbom_has", "finding_has")
     @classmethod
     def _jobs(cls, value: dict) -> dict:
         for job in value:
@@ -72,6 +77,7 @@ def check(state: RepoState | None, ctx: StepContext) -> Verdict:  # noqa: ARG001
             and (step.mergeable is None or pr.mergeable is step.mergeable)
             and _checks_match(pr, step.check_states)
             and _sbom_match(pr, step.sbom_has)
+            and _findings_match(pr, step.finding_has)
         ):
             return Verdict(status="passed")
     return Verdict(status="pending")
@@ -86,6 +92,19 @@ def _sbom_match(pr: PullRequest, wanted: dict[str, list[str]]) -> bool:
             return False
         present = {re.sub(r"[-_.]+", "-", item.name).lower() for item in check.sbom}
         if any(re.sub(r"[-_.]+", "-", name).lower() not in present for name in names):
+            return False
+    return True
+
+
+def _findings_match(pr: PullRequest, wanted: dict[str, list[str]]) -> bool:
+    """Chaque check demandé porte chacun des constats, calculé pour les SHA courants."""
+    checks = {c.job_id: c for c in pr.checks}
+    for job_id, rules in wanted.items():
+        check = checks.get(job_id)
+        if check is None or (check.head_sha, check.base_sha) != (pr.head_sha, pr.base_sha):
+            return False
+        present = {finding.rule_id for finding in check.findings}
+        if any(rule not in present for rule in rules):
             return False
     return True
 

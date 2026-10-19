@@ -3,8 +3,10 @@
 # `pyproject.toml` et à `requirements.txt` (le fichier épinglé que lit pip-audit). Le pipeline
 # simulé tourne sur la PR ; le check pip_audit échoue (base OSV embarquée et figée), le SBOM
 # montre la ligne vulnérable, puis le check repasse au vert quand la version corrigée est poussée.
-# Le `uv.lock` reste celui du gabarit : jinja2 3.1.6, la version corrigée, y est déjà préchargée
-# (c'est une dépendance de diff-cover), donc `uv sync --offline` réussit sans réseau.
+# Le `uv.lock` verrouille jinja2 3.1.6, la version corrigée, déjà préchargée (c'est une
+# dépendance de diff-cover) : `uv sync --offline` réussit sans réseau. Le verrou déclare donc
+# `jinja2==3.1.6` comme dépendance du projet (story 8.4) : tant que `pyproject.toml` demande 3.1.2,
+# le check `uv_lock` (`uv lock --check`) échoue aussi ; il passe quand la version est corrigée.
 schema_version: 1
 scenario_id: dependance-vulnerable
 mode: A
@@ -78,6 +80,31 @@ setup:
       # (tâche « pip_audit » du pipeline). Il reflète `dependencies` de pyproject.toml ; aucune
       # dépendance pour l'instant.
       jinja2==3.1.2
+  # Le verrou suit la version corrigée seulement : 3.1.2 n'est pas dans le cache préchargé, donc
+  # `uv lock` ne peut pas la verrouiller hors ligne. Les deux ajouts sont ceux de `uv lock` pour
+  # `dependencies = ["jinja2==3.1.6"]`.
+  - op: replace_in_file
+    path: uv.lock
+    old: |
+      source = { virtual = "." }
+      default-groups = ["chain"]
+    new: |
+      source = { virtual = "." }
+      dependencies = [
+          { name = "jinja2" },
+      ]
+      default-groups = ["chain"]
+  - op: replace_in_file
+    path: uv.lock
+    old: |
+      [package.metadata]
+
+      [package.metadata.requires-dev]
+    new: |
+      [package.metadata]
+      requires-dist = [{ name = "jinja2", specifier = "==3.1.6" }]
+
+      [package.metadata.requires-dev]
   - op: commit
     message: Ajoute jinja2 pour les rapports de stock
 steps:
@@ -134,7 +161,8 @@ steps:
       il n'interroge aucun site : la base est embarquée dans WaveDevSecOps et figée à la date
       citée dans le détail du check. jinja2 3.1.2 y a plusieurs failles, toutes corrigées dans
       des versions plus récentes. Le check est obligatoire : tant qu'il échoue, la PR ne peut pas
-      être mergée.
+      être mergée. Le check `uv_lock` échoue aussi : `pyproject.toml` demande 3.1.2 alors que le
+      verrou `uv.lock` est à 3.1.6, et `uv lock --check` refuse ce décalage.
     head: feature
     base: main
     pr_state: open
@@ -191,11 +219,15 @@ steps:
       la main : le pipeline relance pip-audit sur le nouveau commit, et le check repasse au vert
       de lui-même. C'est ce résultat, et non votre commande, qui valide l'étape. Supprimer ou
       vider `requirements.txt` ne ferait pas l'affaire : le SBOM doit toujours contenir jinja2.
+      Corriger `pyproject.toml` aussi remet `uv_lock` au vert : il vérifie que le verrou et la
+      version demandée sont d'accord. Corriger seulement `requirements.txt` laisserait ce check
+      en échec.
     head: feature
     base: main
     pr_state: open
     check_states:
       pip_audit: success
+      uv_lock: success
     sbom_has:
       pip_audit: [jinja2]
     hints:

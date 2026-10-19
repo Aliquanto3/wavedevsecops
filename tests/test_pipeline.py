@@ -48,9 +48,26 @@ FEATURE = "src/inventory/rapport.py"
 
 
 # ------------------------------------------------------------------ contrat du pipeline
+PIPELINE_JOBS = [
+    "ruff",
+    "pytest",
+    "gitleaks",
+    "bandit",
+    "pip_audit",
+    "uv_lock",
+    "quality_gate",
+]
 def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
     pipeline = ci.load_pipeline(Settings())
-    assert pipeline.job_ids == ["ruff", "pytest", "gitleaks", "bandit", "pip_audit"]
+    assert pipeline.job_ids == [
+        "ruff",
+        "pytest",
+        "gitleaks",
+        "bandit",
+        "pip_audit",
+        "uv_lock",
+        "quality_gate",
+    ]
     registry = load_registry(settings=Settings())
     chain = yaml.safe_load((CONTENT / "chain.yaml").read_text("utf-8"))
     barriers = {
@@ -60,7 +77,9 @@ def test_le_pipeline_declare_ruff_pytest_gitleaks_avec_leur_contrat() -> None:
         if isinstance(b, dict) and "id" in b
     }
     for job in pipeline.jobs:
-        assert job.label_text and job.human and job.machine and job.required
+        # `uv lock --check` ne lit que son code de sortie : aucune exécution machine.
+        assert job.label_text and job.human and job.required
+        assert job.machine or job.job_id == "uv_lock"
         assert registry.get(job.tool)  # résolu par le registre (AD-16)
         assert job.barrier in barriers, job.barrier
         assert job.exit_codes.meaning(0) == "success"
@@ -267,15 +286,15 @@ class Box:
     def states(self) -> dict[str, str]:
         return {c.job_id: c.state for c in self.pr().checks}
 
-    def wait(self, predicate: Callable[[], bool], what: str) -> None:
-        deadline = time.monotonic() + WAIT
+    def wait(self, predicate: Callable[[], bool], what: str, timeout: float = WAIT) -> None:
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if predicate():
                 return
             time.sleep(0.05)
         raise AssertionError(f"délai dépassé : {what} ({self.states()})")
 
-    def wait_settled(self) -> None:
+    def wait_settled(self, timeout: float = WAIT) -> None:
         self.wait(
             lambda: (
                 len(self.states()) == len(ci.load_pipeline(self.settings).job_ids)
@@ -283,6 +302,7 @@ class Box:
                 and not self.runner.busy
             ),
             "checks terminés",
+            timeout,
         )
 
     def push_new_commit(self, text: str) -> str:
@@ -326,8 +346,16 @@ DEFAULT_BEHAVIOUR: Behaviour = {
         '{"dependencies": [], "components": []}',
         0,
     ),
+    # quality_gate : couverture suffisante, lisible par les deux lecteurs (sinon le check rougit).
+    "diff-cover": (
+        "No lines with coverage information in this diff.\n",
+        0,
+        '{"src_stats": {}, "total_num_lines": 0, "total_num_violations": 0}',
+        0,
+    ),
+    "coverage": ("", 0, '{"files": {"a.py": {}}, "totals": {"percent_covered": 100.0}}', 0),
 }
-MACHINE_FLAGS = ("--output-format", "--junitxml", "--report-format", "-f")
+MACHINE_FLAGS = ("--output-format", "--junitxml", "--report-format", "-f", "--format", "json")
 
 RUFF_TEXT = "src/inventory/rapport.py:1:8: F401 [*] `os` imported but unused\nFound 1 error.\n"
 RUFF_JSON = json.dumps(
@@ -432,7 +460,7 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(box, monkeypatch: pytest.Mo
     opened.wait_settled()
     pr = opened.pr()
     checks = {c.job_id: c for c in pr.checks}
-    assert [c.job_id for c in pr.checks] == ["ruff", "pytest", "gitleaks", "bandit", "pip_audit"]
+    assert [c.job_id for c in pr.checks] == PIPELINE_JOBS
     # bandit : sortie humaine verbatim, constat (fichier, ligne, règle) de `-f json`.
     bandit = checks["bandit"]
     assert bandit.state == "failure" and bandit.output == BANDIT_TEXT
@@ -466,6 +494,12 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(box, monkeypatch: pytest.Mo
         ("bandit", True),
         ("pip-audit", False),
         ("pip-audit", True),
+        ("uv", False),
+        # quality_gate : mesure (pytest), sortie humaine, puis les deux lectures machine.
+        ("pytest", False),
+        ("diff-cover", False),
+        ("diff-cover", True),
+        ("coverage", True),
     ]
     assert not tree.exists()
     # Chaque changement d'état est une opération de la file : check_updated, puis pr_updated.
@@ -481,6 +515,10 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(box, monkeypatch: pytest.Mo
         ("bandit", "failure"),
         ("pip_audit", "running"),
         ("pip_audit", "success"),
+        ("uv_lock", "running"),
+        ("uv_lock", "success"),
+        ("quality_gate", "running"),
+        ("quality_gate", "success"),
     ]
     assert updates[1]["element_id"] == f"check:1:ruff:{pr.head_sha}"
     ops = {e.op_id for e in opened.events if e.kind == Kind.CHECK_UPDATED}
@@ -493,6 +531,8 @@ def test_chaque_job_donne_un_check_ecrit_par_la_file(box, monkeypatch: pytest.Mo
         "gitleaks": "error",
         "bandit": "failure",
         "pip_audit": "success",
+        "uv_lock": "success",
+        "quality_gate": "success",
     }
     # Vue Distant + PR : sortie verbatim liée, ligne de détail fichier:ligne, erreur de l'outil.
     opened.engine.submit(Operation("noop", lambda ctx: 0, writes=False)).result(WAIT)
@@ -642,6 +682,8 @@ def test_relancer_un_check_ne_relance_que_ce_job(box, monkeypatch: pytest.Monkey
         "gitleaks": "success",
         "bandit": "success",
         "pip_audit": "success",
+        "uv_lock": "success",
+        "quality_gate": "success",
     }
     assert opened.pr().mergeable
 
@@ -771,7 +813,8 @@ def test_vrais_outils_dans_le_pipeline(tmp_path: Path, git_path: Path) -> None:
     settings = Settings(data_dir=data, content_dir=_content(tmp_path, scenario))
     opened = Box(settings, git_path)
     try:
-        opened.wait_settled()
+        # Sept jobs réels : attendre jusqu'à la limite du budget, pas le délai des doublures.
+        opened.wait_settled(LIMIT_S + 30)
         checks = {c.job_id: c for c in opened.pr().checks}
         assert checks["pytest"].state == "success", checks["pytest"].output
         assert "passed" in checks["pytest"].output

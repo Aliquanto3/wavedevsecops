@@ -1,5 +1,5 @@
 # Pipeline du projet en GitHub Actions. Le même pipeline s'écrit dans « Jenkinsfile » (Jenkins)
-# et dans « .gitlab-ci.yml » (GitLab CI) : cinq tâches, l'une après l'autre.
+# et dans « .gitlab-ci.yml » (GitLab CI) : sept tâches, l'une après l'autre.
 # Les commentaires « wds:job » et « wds:end » encadrent chaque tâche : WaveDevSecOps s'en sert pour
 # surligner ses lignes. Ce fichier se lit, il ne s'exécute pas dans WaveDevSecOps.
 name: CI
@@ -54,7 +54,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen
       # Le code de l'application (src/), sans les exemptions « # nosec ».
-      - run: uv run bandit -r src -q --ignore-nosec
+      # `--ini` : réglages de bandit lus hors de votre dépôt ({config} : dossier de la plateforme), donc un fichier .bandit déposé dans src/ n'écarte aucun test.
+      - run: uv run bandit -r src -q --ignore-nosec --ini '{config}/bandit.ini'
   # wds:end
 
   # wds:job pip_audit
@@ -68,4 +69,34 @@ jobs:
       - run: uv sync --frozen
       # Dépendances épinglées de requirements.txt, sans résolution ; {osv_url} : adresse du point OSV (dans WaveDevSecOps : le point local, base figée).
       - run: uv run pip-audit --vulnerability-service osv --osv-url '{osv_url}' --no-deps --disable-pip --progress-spinner off -r requirements.txt
+  # wds:end
+
+  # wds:job uv_lock
+  uv_lock:
+    name: Verrou des dépendances (uv)
+    needs: pip_audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      # Échoue si uv.lock ne correspond plus à pyproject.toml : `uv sync --frozen` ne le voit pas.
+      - run: uv lock --check
+  # wds:end
+
+  # wds:job quality_gate
+  quality_gate:
+    name: Couverture du nouveau code (quality gate)
+    needs: uv_lock
+    runs-on: ubuntu-latest
+    steps:
+      # L'historique complet : diff-cover compare aux lignes modifiées depuis la base de la PR.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      # Mesure de la couverture ; {config} : réglages de coverage hors de votre dépôt, {reports} : dossier des rapports du pipeline.
+      - run: uv run pytest -o addopts= --cov '--cov-config={config}/coverage.ini' '--cov-report=xml:{reports}/coverage.xml' -q --tb=short
+      # Échoue sous 80 % de couverture des lignes modifiées ; {base_sha} : le commit de base de la PR.
+      - run: uv run diff-cover '{reports}/coverage.xml' '--compare-branch={base_sha}' --fail-under=80
   # wds:end

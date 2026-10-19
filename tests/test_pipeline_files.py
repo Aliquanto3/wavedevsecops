@@ -69,6 +69,8 @@ setup:
       - {{job_id: gitleaks, state: queued}}
       - {{job_id: bandit, state: success}}
       - {{job_id: pip_audit, state: success}}
+      - {{job_id: uv_lock, state: success}}
+      - {{job_id: quality_gate, state: success}}
       - {{job_id: revue_manuelle, state: success}}
 """
 NOTES = '  - op: write_file\n    path: NOTES.md\n    content: "notes\\n"'
@@ -293,6 +295,8 @@ def test_voir_dans_le_pipeline_n_est_propose_que_pour_les_taches_du_pipeline(
         "gitleaks": True,
         "bandit": True,
         "pip_audit": True,
+        "uv_lock": True,
+        "quality_gate": True,
         # Un check hors de content/pipeline.yaml n'a pas de tâche à montrer.
         "revue_manuelle": False,
     }

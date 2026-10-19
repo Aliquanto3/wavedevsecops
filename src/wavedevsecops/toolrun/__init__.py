@@ -540,6 +540,9 @@ def spawn_tool(
     env["NO_COLOR"] = "1"
     if tool_id == "pre-commit":
         env = hook_environment(env, venv, settings)
+    elif tool_id == "diff-cover":
+        # diff-cover lance `git diff` : le git que résout le registre, pas celui du PATH du poste.
+        env = with_tools_on_path(env, ("git",), settings)
     return procs.spawn([status.path, *args], env=env, cwd=cwd, timeout=timeout)
 
 
@@ -547,15 +550,24 @@ def hook_environment(env: dict[str, str], venv: Path, settings: Settings) -> dic
     """Environnement de `pre-commit run` (story 7.3, AD-9) : ses hooks `language: system`
     cherchent `gitleaks` et `uv` dans le PATH, que le registre résout (jamais le PATH du poste
     pris tel quel). Le dossier de chacun passe en tête du PATH ; `uv run` vise `cache/venv/`."""
+    out = with_tools_on_path(env, ("gitleaks", "uv"), settings)
+    out["UV_PROJECT_ENVIRONMENT"] = str(venv)
+    return out
+
+
+def with_tools_on_path(
+    env: dict[str, str], tool_ids: Sequence[str], settings: Settings
+) -> dict[str, str]:
+    """`env` avec le dossier de chaque outil du registre en tête du PATH (jamais le PATH du
+    poste pris tel quel)."""
     extra: list[str] = []
-    for tool_id in ("gitleaks", "uv"):
+    for tool_id in tool_ids:
         status = resolve(tool_id, settings)
         if status.ok and status.path is not None:
             extra.append(str(status.path.parent))
     key = next((k for k in env if k.upper() == "PATH"), "PATH")
     out = dict(env)
     out[key] = os.pathsep.join([*extra, out.get(key, "")]).rstrip(os.pathsep)
-    out["UV_PROJECT_ENVIRONMENT"] = str(venv)
     return out
 
 
