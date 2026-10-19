@@ -83,7 +83,7 @@ development_status:
   5-3-désigner-un-élément-dans-les-vues: done
   5-4-choisir-dans-une-liste-ou-par-sha: review
   5-5-lire-la-correction-dans-les-vues-et-dans-le-panneau: review
-  5-6-le-scénario-b-env-committé: in-progress
+  5-6-le-scénario-b-env-committé: review
   5-7-le-scénario-b-push-force-qui-écrase-un-collègue: backlog
   5-8-les-scénarios-b-stash-oublié-et-rebase-laissé-en-conflit: backlog
   epic-5-retrospective: optional
@@ -108,7 +108,7 @@ development_status:
   epic-7-retrospective: optional
 
   epic-8: in-progress
-  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: backlog
+  8-1-bloquer-une-pr-sur-du-code-vulnérable-avec-bandit-sast: in-progress
   8-2-servir-une-base-de-vulnérabilités-locale-et-figée: done
   8-3-bloquer-une-pr-sur-une-dépendance-vulnérable-et-lire-le-sbom: backlog
   8-4-bloquer-une-pr-quand-la-couverture-du-nouveau-code-passe-sou: backlog

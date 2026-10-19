@@ -437,6 +437,10 @@ Une ligne par événement : date-heure · story · étape (dev, second-avis, rev
 - 2026-10-19 06:42 · 7.6 · dev · lancé (dev-story Sonnet ; 7.4 done) · —
 - 2026-10-19 06:47 · 9.3, 2.10 · CI · vertes (42784c7, 09e307c) · —
 - 2026-10-19 06:47 · 7.3 · CI · rouge : 2 tests de 9.3 (garde STATION_ORDER, nombre de cartes) cassés par le nouveau scénario de station secret-dans-un-commit ; corrigé par l'orchestrateur (ajout à STATION_ORDER, test aligné), 43 tests ciblés ; 6.3 rebasée dessus ; suite unique du sommet relancée, CI 7.3 et 6.3 relancées · e670a2a
+- 2026-10-19 07:06 · 5.4 · second-avis · 1 medium prouvé (aperçu de SHA non vidé au changement d'étape : commit placé dans une étape qui attend une ref), 4 low ; reviewer Opus lancé (rebase sur le sommet de pile 6.3) · —
+- 2026-10-19 07:06 · 5.6 · dev · fini, 1362 passed, CI verte ; scénario add-commit.B (désignation du commit, de .env ou de la ligne API_KEY, puis history_clean), op diff_line, type d'étape history_clean, StepContext.git · 8e8d3e1
+- 2026-10-19 07:06 · 5.6 · second-avis · lancé · —
+- 2026-10-19 07:06 · 8.1 · dev · lancé (dev-story Sonnet ; job bandit dans pipeline.yaml, arrêt si bandit absent de la table Stack) · —
 
 ## Reprise (arrêt propre du 2026-10-18, fin de soirée)
 
